@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-demo/
+.claude/
+package-lock.json
+*.local
+.env
+.env.*
+!.env.example
+.npmrc
