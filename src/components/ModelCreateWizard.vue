@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, reactive, ref } from 'vue'
 import type { Dataset, MLAdapter } from '../types'
-import { allModelInfo, modelsByTaskType, parameterSchemas, quickGuideFor, taskTypeLabel } from './modelCatalogData'
+import { allModelInfo, modelsByTaskType, parameterSchemas, taskTypeLabel } from './modelCatalogData'
+import ModelLens from './shared/ModelLens.vue'
+import ModelQuestionTree from './ModelQuestionTree.vue'
 
 const props = defineProps<{
   adapter?: MLAdapter
@@ -37,8 +39,8 @@ const availableModels = computed<string[]>(() =>
   selectedDataset.value ? (modelsByTaskType[selectedDataset.value.task_type] || Object.keys(allModelInfo)) : [],
 )
 const currentSchema = computed(() => parameterSchemas[modelType.value] || [])
-const quickGuide = computed(() => (selectedDataset.value ? quickGuideFor(selectedDataset.value.task_type) : null))
 const taskLabel = computed(() => (selectedDataset.value ? taskTypeLabel(selectedDataset.value.task_type) : ''))
+const datasetLabels = computed(() => selectedDataset.value?.labels ?? null)
 
 onMounted(async () => {
   if (!adapter.value) {
@@ -135,12 +137,11 @@ async function createModel() {
         <h2 class="vmlb-step-title"><span class="vmlb-step-num">2</span> Select Model Type</h2>
         <p class="vmlb-muted vmlb-indent">Available models for <strong>{{ taskLabel }}</strong> tasks:</p>
 
-        <div v-if="quickGuide" class="vmlb-guide">
-          <p class="vmlb-guide-title">Quick Selection Guide</p>
-          <p v-for="item in quickGuide" :key="item.q" class="vmlb-guide-line">
-            <strong>{{ item.q }}</strong> → {{ item.a }}
-          </p>
-        </div>
+        <ModelQuestionTree
+          :task-type="selectedDataset.task_type"
+          :current-model-type="modelType"
+          @select="selectModelType"
+        />
 
         <div class="vmlb-model-grid">
           <div
@@ -178,53 +179,70 @@ async function createModel() {
       <div v-if="modelType" class="vmlb-card">
         <h2 class="vmlb-step-title"><span class="vmlb-step-num">3</span> Configure Model</h2>
 
-        <div class="vmlb-field">
-          <label for="vmlb-model-name">Model Name *</label>
-          <input
-            id="vmlb-model-name"
-            v-model="modelName"
-            type="text"
-            placeholder="e.g., Decision Tree - Legal Contracts"
-            @input="modelNameEdited = true"
-          />
-        </div>
-
-        <div v-if="currentSchema.length" class="vmlb-params">
-          <div v-for="param in currentSchema" :key="param.key" class="vmlb-param-row">
-            <div class="vmlb-param-head">
-              <button type="button" class="vmlb-link-btn" @click="toggleParam(param.key)">
-                {{ param.label }}
-              </button>
-              <p class="vmlb-muted vmlb-small">{{ param.shortDesc }}</p>
-            </div>
-            <div class="vmlb-param-input">
-              <select v-if="param.type === 'select'" v-model="parameters[param.key]">
-                <option v-for="opt in param.options" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
-              <select v-else-if="param.type === 'boolean'" v-model="parameters[param.key]">
-                <option :value="true">true</option>
-                <option :value="false">false</option>
-              </select>
+        <div class="vmlb-configure">
+          <div class="vmlb-configure-form">
+            <div class="vmlb-field">
+              <label for="vmlb-model-name">Model Name *</label>
               <input
-                v-else
-                v-model.number="parameters[param.key]"
-                type="number"
-                :step="param.step ?? 'any'"
-                :min="param.min"
-                :max="param.max"
-                :placeholder="param.default === null ? 'unlimited' : String(param.default)"
+                id="vmlb-model-name"
+                v-model="modelName"
+                type="text"
+                placeholder="e.g., Decision Tree - Legal Contracts"
+                @input="modelNameEdited = true"
               />
             </div>
-            <div v-if="expandedParams[param.key]" class="vmlb-param-explain">
-              <p>{{ param.explanation }}</p>
-              <div v-if="param.optionsExplained">
-                <div v-for="opt in param.optionsExplained" :key="opt.value" class="vmlb-option-line">
-                  <code>{{ opt.value }}</code> <span>{{ opt.desc }}</span>
+
+            <div v-if="currentSchema.length" class="vmlb-params">
+              <div v-for="param in currentSchema" :key="param.key" class="vmlb-param-row">
+                <div class="vmlb-param-head">
+                  <button type="button" class="vmlb-link-btn" @click="toggleParam(param.key)">
+                    {{ param.label }}
+                  </button>
+                  <p class="vmlb-muted vmlb-small">{{ param.shortDesc }}</p>
+                </div>
+                <div class="vmlb-param-input">
+                  <select v-if="param.type === 'select'" v-model="parameters[param.key]">
+                    <option v-for="opt in param.options" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                  <select v-else-if="param.type === 'boolean'" v-model="parameters[param.key]">
+                    <option :value="true">true</option>
+                    <option :value="false">false</option>
+                  </select>
+                  <input
+                    v-else
+                    v-model.number="parameters[param.key]"
+                    type="number"
+                    :step="param.step ?? 'any'"
+                    :min="param.min"
+                    :max="param.max"
+                    :placeholder="param.default === null ? 'unlimited' : String(param.default)"
+                  />
+                </div>
+                <div v-if="expandedParams[param.key]" class="vmlb-param-explain">
+                  <p>{{ param.explanation }}</p>
+                  <div v-if="param.optionsExplained">
+                    <div v-for="opt in param.optionsExplained" :key="opt.value" class="vmlb-option-line">
+                      <code>{{ opt.value }}</code> <span>{{ opt.desc }}</span>
+                    </div>
+                  </div>
+                  <div class="vmlb-recommendation">💡 {{ param.recommendation }}</div>
                 </div>
               </div>
-              <div class="vmlb-recommendation">💡 {{ param.recommendation }}</div>
             </div>
           </div>
+
+          <aside class="vmlb-configure-lens">
+            <ModelLens
+              :model-type="modelType"
+              :parameters="parameters"
+              :labels="datasetLabels"
+              :task-type="selectedDataset?.task_type"
+              :dataset-name="selectedDataset?.name"
+            />
+            <p class="vmlb-lens-footnote">
+              Change a setting on the left and watch the diagram redraw — that is the model changing how it decides.
+            </p>
+          </aside>
         </div>
       </div>
 
@@ -244,7 +262,7 @@ async function createModel() {
 </template>
 
 <style scoped>
-.vmlb-wizard { max-width: 42rem; margin: 0 auto; }
+.vmlb-wizard { max-width: 60rem; margin: 0 auto; }
 .vmlb-card { background: var(--vmlb-surface, #fff); border: 1px solid var(--vmlb-border, #e5e7eb); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.25rem; }
 .vmlb-step-title { display: flex; align-items: center; gap: 0.75rem; font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; }
 .vmlb-step-num { width: 1.75rem; height: 1.75rem; border-radius: 999px; background: var(--vmlb-primary, #4f46e5); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; font-weight: 700; flex-shrink: 0; }
@@ -254,9 +272,10 @@ async function createModel() {
 .vmlb-select, .vmlb-field input, .vmlb-param-input select, .vmlb-param-input input {
   width: 100%; border: 1px solid var(--vmlb-border, #d1d5db); border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem;
 }
-.vmlb-guide { background: #eef2ff; border: 1px solid #e0e7ff; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; }
-.vmlb-guide-title { font-weight: 600; color: #3730a3; margin-bottom: 0.5rem; font-size: 0.875rem; }
-.vmlb-guide-line { color: #4338ca; font-size: 0.875rem; }
+.vmlb-configure { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+.vmlb-configure-lens { position: sticky; top: 1rem; }
+.vmlb-lens-footnote { margin-top: 0.75rem; font-size: 0.75rem; color: var(--vmlb-text-muted, #6b7280); }
+@media (max-width: 46rem) { .vmlb-configure { grid-template-columns: 1fr; } .vmlb-configure-lens { position: static; } }
 .vmlb-model-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 .vmlb-model-card { border: 2px solid var(--vmlb-border, #e5e7eb); border-radius: 0.75rem; padding: 1rem; cursor: pointer; transition: border-color 0.15s; }
 .vmlb-model-card.vmlb-selected { border-color: var(--vmlb-primary, #4f46e5); background: #eef2ff; }

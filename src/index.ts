@@ -1,4 +1,5 @@
 import type { App } from 'vue'
+import './styles/tokens.css'
 import { createSelfHostedAdapter } from './adapters/selfHosted'
 import AnnotationWorkspace from './components/AnnotationWorkspace.vue'
 import DatasetEda from './components/DatasetEda.vue'
@@ -6,8 +7,10 @@ import DatasetManager from './components/DatasetManager.vue'
 import ModelCreateWizard from './components/ModelCreateWizard.vue'
 import ModelDetail from './components/ModelDetail.vue'
 import ModelList from './components/ModelList.vue'
+import ModelQuestionTree from './components/ModelQuestionTree.vue'
 import ParameterPerformanceExplorer from './components/ParameterPerformanceExplorer.vue'
 import ConfusionMatrix from './components/shared/ConfusionMatrix.vue'
+import ModelLens from './components/shared/ModelLens.vue'
 import PlotlyChart from './components/shared/PlotlyChart.vue'
 import TrainingCurves from './components/TrainingCurves.vue'
 import TrainingMonitor from './components/TrainingMonitor.vue'
@@ -35,11 +38,13 @@ export const VueLegalMlBuilderPlugin = {
     app.component('ModelList', ModelList)
     app.component('ModelCreateWizard', ModelCreateWizard)
     app.component('ModelDetail', ModelDetail)
+    app.component('ModelQuestionTree', ModelQuestionTree)
     app.component('TrainingMonitor', TrainingMonitor)
     app.component('TrainingCurves', TrainingCurves)
     app.component('ParameterPerformanceExplorer', ParameterPerformanceExplorer)
     app.component('AnnotationWorkspace', AnnotationWorkspace)
     app.component('ConfusionMatrix', ConfusionMatrix)
+    app.component('ModelLens', ModelLens)
     app.component('PlotlyChart', PlotlyChart)
   },
 }
@@ -57,7 +62,9 @@ export {
   DatasetManager,
   ModelCreateWizard,
   ModelDetail,
+  ModelLens,
   ModelList,
+  ModelQuestionTree,
   ParameterPerformanceExplorer,
   PlotlyChart,
   TrainingCurves,
@@ -76,6 +83,10 @@ export { useTraining } from './composables/useTraining'
 export { useTrainingCurves } from './composables/useTrainingCurves'
 
 export { allModelInfo, modelsByTaskType, parameterSchemas, quickGuideFor, taskTypeLabel } from './components/modelCatalogData'
+export { classColor, defaultLabels, lensCopy, lensFamily } from './lens/modelLens'
+export type { LensCopy, LensFamily, LensPoint } from './lens/modelLens'
+export { decisionTreeFor } from './lens/modelGuide'
+export type { DecisionTree, GuideNode, GuideOption } from './lens/modelGuide'
 
 export type {
   AnnotationTask,
