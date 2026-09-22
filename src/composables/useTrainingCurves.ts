@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import type { Id, MLAdapter, TrainingMetricPoint } from '../types'
 
 /** Incrementally polls getTrainingMetrics and accumulates a reactive series —
@@ -9,22 +9,19 @@ import type { Id, MLAdapter, TrainingMetricPoint } from '../types'
  * either way. */
 export function useTrainingCurves(adapter: MLAdapter, pollIntervalMs = 3000) {
   const points = ref<TrainingMetricPoint[]>([])
+  const byMetric = ref<Record<string, TrainingMetricPoint[]>>({})
   const isPolling = ref(false)
   let timer: ReturnType<typeof setInterval> | null = null
   let lastStep = -1
 
-  const byMetric = computed<Record<string, TrainingMetricPoint[]>>(() => {
-    const grouped: Record<string, TrainingMetricPoint[]> = {}
-    for (const p of points.value) {
-      ;(grouped[p.metric_name] ??= []).push(p)
-    }
-    return grouped
-  })
-
   async function fetchNew(jobId: Id) {
     const newPoints = await adapter.getTrainingMetrics(jobId, lastStep)
     if (newPoints.length) {
-      points.value = [...points.value, ...newPoints]
+      points.value.push(...newPoints)
+      const grouped = byMetric.value
+      for (const p of newPoints) {
+        ;(grouped[p.metric_name] ??= []).push(p)
+      }
       lastStep = Math.max(...newPoints.map((p) => p.step))
     }
   }
@@ -46,6 +43,7 @@ export function useTrainingCurves(adapter: MLAdapter, pollIntervalMs = 3000) {
 
   function reset() {
     points.value = []
+    byMetric.value = {}
     lastStep = -1
   }
 
