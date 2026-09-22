@@ -28,11 +28,11 @@ export const LENS_FAMILY_LABEL: Record<LensFamily, string> = {
 }
 
 const CLASS_TOKENS = [
-  'var(--vmlb-lens-class-a, #2563eb)',
-  'var(--vmlb-lens-class-b, #d97706)',
-  'var(--vmlb-lens-class-c, #059669)',
-  'var(--vmlb-lens-class-d, #db2777)',
-  'var(--vmlb-lens-class-e, #7c3aed)',
+  'var(--vmlb-lens-class-a, #1f6f8b)',
+  'var(--vmlb-lens-class-b, #b06a2a)',
+  'var(--vmlb-lens-class-c, #4a7c59)',
+  'var(--vmlb-lens-class-d, #8b4a5c)',
+  'var(--vmlb-lens-class-e, #6a5a8c)',
 ]
 
 export function classColor(index: number): string {

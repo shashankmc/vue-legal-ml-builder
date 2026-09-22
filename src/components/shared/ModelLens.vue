@@ -375,7 +375,7 @@ function tokenX(i: number, total: number): number {
             :d="`M ${tokenX(pair.from, attention.tokens.length)} 214 Q ${(tokenX(pair.from, attention.tokens.length) + tokenX(pair.to, attention.tokens.length)) / 2} ${214 - 70 * pair.weight} ${tokenX(pair.to, attention.tokens.length)} 214`"
             fill="none"
             class="vmlb-lens-attention"
-            :style="{ stroke: 'var(--vmlb-lens-path, #4f46e5)', opacity: 0.25 + pair.weight * 0.6 }"
+            :style="{ stroke: 'var(--vmlb-lens-path, #0f5f5a)', opacity: 0.25 + pair.weight * 0.6 }"
             :stroke-width="1 + pair.weight * 3"
           />
         </g>
@@ -404,10 +404,11 @@ function tokenX(i: number, total: number): number {
 <style scoped>
 .vmlb-lens {
   margin: 0;
-  border: 1px solid var(--vmlb-border, #e5e7eb);
-  border-radius: var(--vmlb-lens-radius, 0.75rem);
-  background: var(--vmlb-lens-paper, #fbfbfc);
+  border: 1px solid var(--vmlb-border, #e2dccd);
+  border-radius: var(--vmlb-lens-radius, 0.875rem);
+  background: var(--vmlb-lens-paper, #fffdf9);
   overflow: hidden;
+  box-shadow: var(--vmlb-shadow-sm, 0 1px 2px rgba(60, 48, 30, 0.06));
 }
 .vmlb-lens-head {
   display: flex;
@@ -415,51 +416,51 @@ function tokenX(i: number, total: number): number {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.625rem 0.875rem;
-  border-bottom: 1px solid var(--vmlb-border, #e5e7eb);
-  background: var(--vmlb-surface, #fff);
+  border-bottom: 1px solid var(--vmlb-border, #e2dccd);
+  background: var(--vmlb-surface, #fffdf9);
 }
 .vmlb-lens-badge {
   font-size: 0.6875rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--vmlb-lens-boundary, #4338ca);
+  color: var(--vmlb-lens-boundary, #0b4a46);
 }
 .vmlb-lens-source {
   font-size: 0.6875rem;
-  color: var(--vmlb-text-muted, #6b7280);
+  color: var(--vmlb-text-muted, #6d6455);
 }
 .vmlb-lens-canvas {
   display: block;
   width: 100%;
   height: auto;
 }
-.vmlb-lens-paper { fill: var(--vmlb-lens-paper, #fbfbfc); }
-.vmlb-lens-grid { stroke: var(--vmlb-lens-grid, #eef0f3); stroke-width: 1; }
-.vmlb-lens-grid-strong { stroke: var(--vmlb-lens-grid-strong, #d9dde3); }
-.vmlb-lens-edge { stroke: var(--vmlb-lens-node-border, #9ca3af); stroke-width: 1.25; }
-.vmlb-lens-edge-lit { stroke: var(--vmlb-lens-path, #4f46e5); stroke-width: 2; }
-.vmlb-lens-node { stroke: var(--vmlb-lens-node-border, #9ca3af); stroke-width: 1.25; fill: var(--vmlb-lens-node, #fff); }
-.vmlb-lens-path { fill: var(--vmlb-lens-path, #4f46e5); opacity: 0.18; }
-.vmlb-lens-vote { fill: var(--vmlb-lens-vote, #6366f1); opacity: 0.14; }
-.vmlb-lens-vote-text { font-size: 9px; font-family: var(--vmlb-lens-font-mono, monospace); fill: var(--vmlb-text-muted, #6b7280); }
-.vmlb-lens-boundary { stroke: var(--vmlb-lens-boundary, #4338ca); stroke-width: 2.5; }
-.vmlb-lens-margin { stroke: var(--vmlb-lens-margin, #c7d2fe); opacity: 0.55; stroke-width: 30; }
-.vmlb-lens-point { stroke: var(--vmlb-surface, #fff); stroke-width: 1.25; }
-.vmlb-lens-point-noise { fill: var(--vmlb-lens-paper, #fbfbfc); stroke: var(--vmlb-lens-noise, #9ca3af); stroke-dasharray: 2 2; }
+.vmlb-lens-paper { fill: var(--vmlb-lens-paper, #fffdf9); }
+.vmlb-lens-grid { stroke: var(--vmlb-lens-grid, #e9e4d8); stroke-width: 1; }
+.vmlb-lens-grid-strong { stroke: var(--vmlb-lens-grid-strong, #d5cdbc); }
+.vmlb-lens-edge { stroke: var(--vmlb-lens-node-border, #b3a992); stroke-width: 1.25; }
+.vmlb-lens-edge-lit { stroke: var(--vmlb-lens-path, #0f5f5a); stroke-width: 2; }
+.vmlb-lens-node { stroke: var(--vmlb-lens-node-border, #b3a992); stroke-width: 1.25; fill: var(--vmlb-lens-node, #fff); }
+.vmlb-lens-path { fill: var(--vmlb-lens-path, #0f5f5a); opacity: 0.18; }
+.vmlb-lens-vote { fill: var(--vmlb-lens-vote, #7fb0ab); opacity: 0.16; }
+.vmlb-lens-vote-text { font-size: 9px; font-family: var(--vmlb-lens-font-mono, monospace); fill: var(--vmlb-text-muted, #6d6455); }
+.vmlb-lens-boundary { stroke: var(--vmlb-lens-boundary, #0b4a46); stroke-width: 2.5; }
+.vmlb-lens-margin { stroke: var(--vmlb-lens-margin, #7fb0ab); opacity: 0.55; stroke-width: 30; }
+.vmlb-lens-point { stroke: var(--vmlb-surface, #fffdf9); stroke-width: 1.25; }
+.vmlb-lens-point-noise { fill: var(--vmlb-lens-paper, #fffdf9); stroke: var(--vmlb-lens-noise, #b3a992); stroke-dasharray: 2 2; }
 .vmlb-lens-cluster-halo { fill: none; stroke-width: 1.5; opacity: 0.4; stroke-dasharray: 4 4; }
 .vmlb-lens-centroid { stroke-width: 2.5; }
-.vmlb-lens-track { fill: var(--vmlb-lens-grid, #eef0f3); }
-.vmlb-lens-tick { font-size: 9px; fill: var(--vmlb-text-muted, #6b7280); }
-.vmlb-lens-note { font-size: 10px; fill: var(--vmlb-text-muted, #6b7280); font-family: var(--vmlb-lens-font-mono, monospace); }
-.vmlb-lens-token { fill: var(--vmlb-surface, #fff); stroke: var(--vmlb-border-strong, #d1d5db); }
-.vmlb-lens-token-text { font-size: 11px; fill: var(--vmlb-text, #111827); font-family: var(--vmlb-lens-font-mono, monospace); }
+.vmlb-lens-track { fill: var(--vmlb-lens-grid, #e9e4d8); }
+.vmlb-lens-tick { font-size: 9px; fill: var(--vmlb-text-muted, #6d6455); }
+.vmlb-lens-note { font-size: 10px; fill: var(--vmlb-text-muted, #6d6455); font-family: var(--vmlb-lens-font-mono, monospace); }
+.vmlb-lens-token { fill: var(--vmlb-surface, #fffdf9); stroke: var(--vmlb-border-strong, #cdc5b2); }
+.vmlb-lens-token-text { font-size: 11px; fill: var(--vmlb-text, #1b1916); font-family: var(--vmlb-lens-font-mono, monospace); }
 .vmlb-lens-attention { stroke-linecap: round; }
-.vmlb-lens-caption { padding: 0.875rem; border-top: 1px solid var(--vmlb-border, #e5e7eb); background: var(--vmlb-surface, #fff); }
-.vmlb-lens-headline { font-size: 0.9375rem; font-weight: 600; color: var(--vmlb-text, #111827); }
-.vmlb-lens-reading { margin-top: 0.375rem; font-size: 0.8125rem; line-height: 1.5; color: var(--vmlb-text-muted, #4b5563); }
+.vmlb-lens-caption { padding: 0.875rem; border-top: 1px solid var(--vmlb-border, #e2dccd); background: var(--vmlb-surface, #fffdf9); }
+.vmlb-lens-headline { font-family: var(--vmlb-font-display, Georgia, serif); font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; color: var(--vmlb-text, #1b1916); }
+.vmlb-lens-reading { margin-top: 0.375rem; font-size: 0.8125rem; line-height: 1.55; color: var(--vmlb-text-muted, #6d6455); max-width: 62ch; }
 .vmlb-lens-legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-top: 0.75rem; list-style: none; padding: 0; }
 .vmlb-lens-legend li { display: flex; flex-direction: column; font-size: 0.6875rem; }
-.vmlb-lens-legend strong { color: var(--vmlb-lens-boundary, #4338ca); font-weight: 600; }
-.vmlb-lens-legend span { color: var(--vmlb-text-muted, #6b7280); }
+.vmlb-lens-legend strong { color: var(--vmlb-lens-boundary, #0b4a46); font-weight: 600; }
+.vmlb-lens-legend span { color: var(--vmlb-text-muted, #6d6455); }
 </style>
