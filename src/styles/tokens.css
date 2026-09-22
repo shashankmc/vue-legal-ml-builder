@@ -1,38 +1,151 @@
+/* =========================================================================
+   vue-legal-ml-builder — design tokens
+
+   Two tiers:
+     1. Raw palette   (--vmlb-raw-*): internal, not part of the public API.
+     2. Semantic tokens (--vmlb-*):  the public theming contract. Hosts override
+        these — never the raw layer.
+
+   Defaults are applied to both `:root` (backwards compatible) and the
+   `.vmlb-theme` wrapper scope, so a host can theme a single subtree:
+     <div class="vmlb-theme" data-vmlb-theme="dark"> …components… </div>
+   Presets live in `[data-vmlb-theme="…"]` blocks below.
+   ========================================================================= */
+
 :root {
-  --vmlb-surface: #ffffff;
-  --vmlb-surface-sunken: #f9fafb;
-  --vmlb-border: #e5e7eb;
-  --vmlb-border-strong: #d1d5db;
-  --vmlb-text: #111827;
-  --vmlb-text-muted: #6b7280;
-  --vmlb-primary: #4f46e5;
-  --vmlb-primary-soft: #eef2ff;
-  --vmlb-on-primary: #ffffff;
+  /* ---- Tier 1: raw palette (internal) ---------------------------------- */
+  --vmlb-raw-paper-50: #fffdf9;
+  --vmlb-raw-paper-100: #f7f4ec;
+  --vmlb-raw-paper-200: #f2eee3;
+  --vmlb-raw-paper-300: #e2dccd;
+  --vmlb-raw-paper-400: #cdc5b2;
+  --vmlb-raw-paper-500: #a89e88;
 
-  --vmlb-lens-ink: #1f2937;
-  --vmlb-lens-grid: #eef0f3;
-  --vmlb-lens-grid-strong: #d9dde3;
-  --vmlb-lens-paper: #fbfbfc;
-  --vmlb-lens-boundary: #4338ca;
-  --vmlb-lens-margin: #c7d2fe;
-  --vmlb-lens-margin-fill: rgba(199, 210, 254, 0.35);
-  --vmlb-lens-path: #4f46e5;
-  --vmlb-lens-node: #ffffff;
-  --vmlb-lens-node-border: #9ca3af;
-  --vmlb-lens-vote: #6366f1;
-  --vmlb-lens-noise: #9ca3af;
+  --vmlb-raw-ink-900: #1b1916;
+  --vmlb-raw-ink-700: #3d382f;
+  --vmlb-raw-ink-500: #6d6455;
+  --vmlb-raw-ink-300: #948a78;
 
-  --vmlb-lens-class-a: #2563eb;
-  --vmlb-lens-class-b: #d97706;
-  --vmlb-lens-class-c: #059669;
-  --vmlb-lens-class-d: #db2777;
-  --vmlb-lens-class-e: #7c3aed;
+  --vmlb-raw-teal-700: #0b4a46;
+  --vmlb-raw-teal-600: #0f5f5a;
+  --vmlb-raw-teal-300: #7fb0ab;
+  --vmlb-raw-teal-050: #e2eeec;
 
-  --vmlb-lens-error: #dc2626;
-  --vmlb-lens-error-soft: #fef2f2;
-  --vmlb-lens-ok: #15803d;
-  --vmlb-lens-warn: #b45309;
+  --vmlb-raw-forest-600: #2f6b46;
+  --vmlb-raw-forest-050: #e7efe6;
+  --vmlb-raw-ochre-600: #8a5a1a;
+  --vmlb-raw-ochre-050: #f4ecdd;
+  --vmlb-raw-brick-600: #9b2c2c;
+  --vmlb-raw-brick-050: #f6e7e5;
+}
 
-  --vmlb-lens-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  --vmlb-lens-radius: 0.75rem;
+/* ---- Tier 2 + aliases: semantic contract (ink / light default) ---------- */
+:root,
+.vmlb-theme {
+  --vmlb-canvas: var(--vmlb-raw-paper-200);
+  --vmlb-surface: var(--vmlb-raw-paper-50);
+  --vmlb-surface-sunken: var(--vmlb-raw-paper-100);
+  --vmlb-border: var(--vmlb-raw-paper-300);
+  --vmlb-border-strong: var(--vmlb-raw-paper-400);
+
+  --vmlb-text: var(--vmlb-raw-ink-900);
+  --vmlb-text-muted: var(--vmlb-raw-ink-500);
+  --vmlb-text-subtle: var(--vmlb-raw-ink-300);
+
+  --vmlb-accent: var(--vmlb-raw-teal-600);
+  --vmlb-accent-strong: var(--vmlb-raw-teal-700);
+  --vmlb-accent-soft: var(--vmlb-raw-teal-050);
+  --vmlb-on-accent: #f8faf8;
+
+  --vmlb-success: var(--vmlb-raw-forest-600);
+  --vmlb-success-soft: var(--vmlb-raw-forest-050);
+  --vmlb-warning: var(--vmlb-raw-ochre-600);
+  --vmlb-warning-soft: var(--vmlb-raw-ochre-050);
+  --vmlb-error: var(--vmlb-raw-brick-600);
+  --vmlb-error-soft: var(--vmlb-raw-brick-050);
+
+  /* Backwards-compatible aliases (older token names) */
+  --vmlb-primary: var(--vmlb-accent);
+  --vmlb-primary-soft: var(--vmlb-accent-soft);
+  --vmlb-on-primary: var(--vmlb-on-accent);
+
+  /* Type */
+  --vmlb-font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --vmlb-font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --vmlb-font-mono: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Shape */
+  --vmlb-radius-sm: 0.25rem;
+  --vmlb-radius-md: 0.5rem;
+  --vmlb-radius-lg: 0.875rem;
+
+  /* Warm-tinted elevation (single light source, top-down) */
+  --vmlb-shadow-sm: 0 1px 2px rgba(60, 48, 30, 0.06);
+  --vmlb-shadow-md: 0 1px 2px rgba(60, 48, 30, 0.06), 0 4px 12px rgba(60, 48, 30, 0.08);
+  --vmlb-shadow-lg: 0 2px 6px rgba(60, 48, 30, 0.07), 0 12px 32px rgba(60, 48, 30, 0.12);
+
+  /* Rhythm */
+  --vmlb-space-2xs: 0.25rem;
+  --vmlb-space-xs: 0.5rem;
+  --vmlb-space-sm: 0.75rem;
+  --vmlb-space-md: 1rem;
+  --vmlb-space-lg: 1.5rem;
+  --vmlb-space-xl: 2rem;
+  --vmlb-space-2xl: 3rem;
+  --vmlb-container: 72rem;
+  --vmlb-density: 1;
+
+  /* Motion */
+  --vmlb-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --vmlb-duration: 200ms;
+
+  /* Layering */
+  --vmlb-z-dropdown: 30;
+  --vmlb-z-sticky: 40;
+  --vmlb-z-modal: 50;
+  --vmlb-z-overlay: 60;
+
+  /* ---- Lens / diagram tokens (derived from the semantic layer so every
+     preset themes the diagrams consistently) ---------------------------- */
+  --vmlb-lens-ink: var(--vmlb-text);
+  --vmlb-lens-grid: var(--vmlb-border);
+  --vmlb-lens-grid-strong: var(--vmlb-border-strong);
+  --vmlb-lens-paper: var(--vmlb-surface);
+  --vmlb-lens-boundary: var(--vmlb-accent-strong);
+  --vmlb-lens-margin: color-mix(in srgb, var(--vmlb-accent) 42%, transparent);
+  --vmlb-lens-margin-fill: color-mix(in srgb, var(--vmlb-accent) 20%, transparent);
+  --vmlb-lens-path: var(--vmlb-accent);
+  --vmlb-lens-node: var(--vmlb-surface);
+  --vmlb-lens-node-border: var(--vmlb-border-strong);
+  --vmlb-lens-vote: var(--vmlb-accent);
+  --vmlb-lens-noise: var(--vmlb-text-subtle);
+
+  --vmlb-lens-class-a: #1f6f8b;
+  --vmlb-lens-class-b: #b06a2a;
+  --vmlb-lens-class-c: #4a7c59;
+  --vmlb-lens-class-d: #8b4a5c;
+  --vmlb-lens-class-e: #6a5a8c;
+
+  --vmlb-lens-error: var(--vmlb-error);
+  --vmlb-lens-error-soft: var(--vmlb-error-soft);
+  --vmlb-lens-ok: var(--vmlb-success);
+  --vmlb-lens-warn: var(--vmlb-warning);
+
+  --vmlb-lens-font-mono: var(--vmlb-font-mono);
+  --vmlb-lens-radius: var(--vmlb-radius-lg);
+}
+
+/* ---- Density variant ---------------------------------------------------- */
+.vmlb-theme--compact {
+  --vmlb-density: 0.78;
+}
+
+/* ---- Base -------------------------------------------------------------- */
+.vmlb-theme {
+  color: var(--vmlb-text);
+  font-family: var(--vmlb-font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
