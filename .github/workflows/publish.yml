@@ -27,6 +27,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Check bundle size
+        run: npm run check:size
+
       - name: Build library
         run: npm run build:lib
 
