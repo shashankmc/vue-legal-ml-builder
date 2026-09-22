@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, onUnmounted, watch } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { MLAdapter } from '../types'
 import { useTrainingCurves } from '../composables/useTrainingCurves'
 import PlotlyChart from './shared/PlotlyChart.vue'
@@ -9,6 +9,8 @@ const props = defineProps<{ adapter?: MLAdapter; jobId: string; jobStatus?: stri
 const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
 const adapter = computed(() => props.adapter ?? injectedAdapter)
 const { points, byMetric, start, stop, fetchNew } = useTrainingCurves(adapter.value as MLAdapter)
+
+const error = ref('')
 
 const isSettled = computed(() => ['completed', 'failed', 'cancelled'].includes(props.jobStatus ?? ''))
 const hasDenseCurve = computed(() => Object.values(byMetric.value).some((series) => series.length > 3))
@@ -24,6 +26,10 @@ const plotData = computed(() => {
 })
 
 onMounted(async () => {
+  if (!adapter.value) {
+    error.value = 'No adapter configured'
+    return
+  }
   await fetchNew(props.jobId)
   if (!isSettled.value) start(props.jobId, () => isSettled.value)
 })
@@ -40,13 +46,16 @@ onUnmounted(stop)
 
 <template>
   <div class="vmlb-curves">
-    <p v-if="points.length === 0" class="vmlb-muted">Waiting for the first metric point…</p>
+    <div v-if="error" class="vmlb-alert-error">{{ error }}</div>
     <template v-else>
-      <PlotlyChart :plot-data="plotData" plot-id="vmlb-training-curves" />
-      <p v-if="!hasDenseCurve" class="vmlb-hint">
-        This model type logs coarse phase markers (preprocessing/training start-done), not a dense
-        per-step curve — that level of detail is only available for LegalBERT/RoBERTa fine-tuning.
-      </p>
+      <p v-if="points.length === 0" class="vmlb-muted">Waiting for the first metric point…</p>
+      <template v-else>
+        <PlotlyChart :plot-data="plotData" plot-id="vmlb-training-curves" />
+        <p v-if="!hasDenseCurve" class="vmlb-hint">
+          This model type logs coarse phase markers (preprocessing/training start-done), not a dense
+          per-step curve — that level of detail is only available for LegalBERT/RoBERTa fine-tuning.
+        </p>
+      </template>
     </template>
   </div>
 </template>
@@ -54,4 +63,5 @@ onUnmounted(stop)
 <style scoped>
 .vmlb-muted { color: var(--vmlb-text-muted, #6b7280); font-size: 0.875rem; }
 .vmlb-hint { font-size: 0.75rem; color: var(--vmlb-text-muted, #9ca3af); margin-top: 0.5rem; }
+.vmlb-alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 0.75rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; }
 </style>
