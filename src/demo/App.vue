@@ -1,19 +1,16 @@
 <script setup lang="ts">
-import { provide, ref } from 'vue'
-import DatasetManager from '../components/DatasetManager.vue'
-import ModelCreateWizard from '../components/ModelCreateWizard.vue'
-import ModelList from '../components/ModelList.vue'
-import TrainingMonitor from '../components/TrainingMonitor.vue'
-import { createMockAdapter } from './mockAdapter'
+import { inject, ref } from 'vue'
+import type { MLAdapter } from '../types'
 
-const adapter = createMockAdapter()
-provide('vmlb:adapter', adapter)
+const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
 
 type View =
   | { name: 'datasets' }
   | { name: 'models' }
   | { name: 'create'; datasetId?: string }
   | { name: 'train'; modelId: string }
+  | { name: 'compare' }
+  | { name: 'detail'; modelId: string }
 
 const view = ref<View>({ name: 'datasets' })
 </script>
@@ -23,20 +20,21 @@ const view = ref<View>({ name: 'datasets' })
     <nav class="demo-nav">
       <button @click="view = { name: 'datasets' }">Datasets</button>
       <button @click="view = { name: 'models' }">Models</button>
+      <button @click="view = { name: 'compare' }">Compare</button>
     </nav>
 
     <main class="demo-main">
       <DatasetManager
         v-if="view.name === 'datasets'"
-        @create-model="(ds) => (view = { name: 'create', datasetId: ds.id })"
+        @create-model="(ds: any) => (view = { name: 'create', datasetId: ds.id })"
         @eda="() => {}"
         @view="() => {}"
       />
       <ModelList
         v-else-if="view.name === 'models'"
         @create="view = { name: 'create' }"
-        @view="() => {}"
-        @train="(m) => (view = { name: 'train', modelId: m.id })"
+        @view="(m: any) => (view = { name: 'detail', modelId: m.id })"
+        @train="(m: any) => (view = { name: 'train', modelId: m.id })"
       />
       <ModelCreateWizard
         v-else-if="view.name === 'create'"
@@ -45,6 +43,17 @@ const view = ref<View>({ name: 'datasets' })
         @cancel="view = { name: 'models' }"
       />
       <TrainingMonitor v-else-if="view.name === 'train'" :model-id="view.modelId" />
+      <ParameterPerformanceExplorer
+        v-else-if="view.name === 'compare'"
+        :adapter="injectedAdapter ?? undefined"
+        model-type="svm"
+      />
+      <ModelDetail
+        v-else-if="view.name === 'detail'"
+        :adapter="injectedAdapter ?? undefined"
+        :model-id="view.modelId"
+        @train="view = { name: 'train', modelId: view.modelId }"
+      />
     </main>
   </div>
 </template>
