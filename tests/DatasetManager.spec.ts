@@ -48,8 +48,7 @@ describe('DatasetManager', () => {
     expect(wrapper.emitted('createModel')?.[0][0]).toMatchObject({ id: 'ds-1' })
   })
 
-  it('deletes a dataset after confirmation', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+  it('deletes a dataset after inline confirmation', async () => {
     const adapter = createTestAdapter({
       listDatasets: vi.fn().mockResolvedValue([dataset()]),
       deleteDataset: vi.fn().mockResolvedValue(undefined),
@@ -58,6 +57,8 @@ describe('DatasetManager', () => {
     await flushPromises()
 
     await wrapper.find('.vmlb-icon-btn').trigger('click')
+    const del = wrapper.findAll('button').find((b) => b.text() === 'Delete')!
+    await del.trigger('click')
     await flushPromises()
 
     expect(adapter.deleteDataset).toHaveBeenCalledWith('ds-1')
@@ -65,7 +66,6 @@ describe('DatasetManager', () => {
   })
 
   it('does not delete when the confirmation is dismissed', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
     const adapter = createTestAdapter({
       listDatasets: vi.fn().mockResolvedValue([dataset()]),
       deleteDataset: vi.fn(),
@@ -74,6 +74,7 @@ describe('DatasetManager', () => {
     await flushPromises()
 
     await wrapper.find('.vmlb-icon-btn').trigger('click')
+    await wrapper.findAll('button').find((b) => b.text() === 'Cancel')!.trigger('click')
     expect(adapter.deleteDataset).not.toHaveBeenCalled()
   })
 })

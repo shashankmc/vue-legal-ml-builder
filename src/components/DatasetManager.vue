@@ -2,6 +2,7 @@
 import { computed, inject, onMounted, reactive, ref } from 'vue'
 import type { Dataset, MLAdapter } from '../types'
 import { useDatasets } from '../composables/useDatasets'
+import Icon from './shared/Icon.vue'
 
 const props = defineProps<{ adapter?: MLAdapter }>()
 const emit = defineEmits<{ view: [dataset: Dataset]; eda: [dataset: Dataset]; createModel: [dataset: Dataset] }>()
@@ -23,6 +24,7 @@ const TASK_TYPES = [
 ]
 
 const showUpload = ref(false)
+const confirmingId = ref<string | null>(null)
 const uploadState = reactive({ file: null as File | null, name: '', description: '', taskType: '', isLoading: false, error: '' })
 
 function onFileChange(e: Event) {
@@ -35,7 +37,7 @@ function onFileChange(e: Event) {
 
 async function submitUpload() {
   if (!uploadState.file || !uploadState.name || !uploadState.taskType) {
-    uploadState.error = 'Please fill in all required fields'
+    uploadState.error = 'Add a file, a name, and a task type before uploading.'
     return
   }
   try {
@@ -55,68 +57,98 @@ async function submitUpload() {
   }
 }
 
-async function onDelete(id: string) {
-  if (!confirm('Are you sure you want to delete this dataset?')) return
+async function confirmDelete(id: string) {
   await remove(id)
+  confirmingId.value = null
 }
 </script>
 
 <template>
   <div class="vmlb-list">
     <div class="vmlb-list-header">
-      <h2>Datasets</h2>
-      <button class="vmlb-btn-primary" @click="showUpload = true">+ Upload Dataset</button>
+      <div>
+        <h2 class="vmlb-display">Datasets</h2>
+        <p class="vmlb-muted">Raw material for training — upload a table and pick its task type.</p>
+      </div>
+      <button class="vmlb-btn-primary" @click="showUpload = true">
+        <Icon name="upload" /> Upload Dataset
+      </button>
     </div>
 
-    <div v-if="error" class="vmlb-alert-error">{{ error }}</div>
-    <div v-if="isLoading" class="vmlb-spinner-wrap"><div class="vmlb-spinner" /></div>
+    <div v-if="error" class="vmlb-alert-error">
+      <Icon name="alert" /> {{ error }}
+    </div>
+
+    <div v-if="isLoading" class="vmlb-grid" aria-label="Loading datasets">
+      <div v-for="i in 3" :key="i" class="vmlb-skeleton vmlb-skeleton-tile" />
+    </div>
 
     <div v-else-if="datasets.length === 0" class="vmlb-empty">
-      <p>No datasets yet. Upload a CSV, XLSX, or JSON file (max 10,000 rows) to get started.</p>
-      <button class="vmlb-btn-primary" @click="showUpload = true">Upload Your First Dataset</button>
+      <Icon name="dataset" size="2rem" class="vmlb-empty-icon" />
+      <p class="vmlb-empty-title">No datasets yet</p>
+      <p>Upload a CSV, XLSX, or JSON file (up to 10,000 rows) to get started.</p>
+      <button class="vmlb-btn-primary" @click="showUpload = true">Upload your first dataset</button>
     </div>
 
     <div v-else class="vmlb-grid">
-      <div v-for="ds in datasets" :key="ds.id" class="vmlb-model-tile">
+      <article v-for="ds in datasets" :key="ds.id" class="vmlb-tile">
         <div class="vmlb-tile-head">
           <div>
             <h3>{{ ds.name }}</h3>
-            <p class="vmlb-muted">{{ ds.task_type }}</p>
+            <p class="vmlb-muted vmlb-capitalize">{{ ds.task_type.replace(/_/g, ' ') }}</p>
           </div>
-          <button class="vmlb-icon-btn" title="Delete dataset" @click="onDelete(ds.id)">✕</button>
+          <button class="vmlb-icon-btn" title="Delete dataset" @click="confirmingId = ds.id">
+            <Icon name="close" />
+          </button>
         </div>
         <div class="vmlb-tile-body">
-          <div class="vmlb-row"><span class="vmlb-muted">Rows:</span><span>{{ ds.row_count.toLocaleString() }}</span></div>
-          <div class="vmlb-row"><span class="vmlb-muted">Columns:</span><span>{{ ds.columns?.length || 0 }}</span></div>
+          <div class="vmlb-row">
+            <span class="vmlb-muted">Rows</span>
+            <span class="vmlb-num">{{ ds.row_count.toLocaleString() }}</span>
+          </div>
+          <div class="vmlb-row">
+            <span class="vmlb-muted">Columns</span>
+            <span class="vmlb-num">{{ ds.columns?.length || 0 }}</span>
+          </div>
         </div>
-        <div class="vmlb-tile-actions">
+
+        <div v-if="confirmingId === ds.id" class="vmlb-confirm">
+          <span>Delete this dataset?</span>
+          <div class="vmlb-confirm-actions">
+            <button class="vmlb-btn-tertiary" @click="confirmingId = null">Cancel</button>
+            <button class="vmlb-btn-primary" @click="confirmDelete(ds.id)">Delete</button>
+          </div>
+        </div>
+        <div v-else class="vmlb-tile-actions">
           <button class="vmlb-btn-secondary" @click="emit('view', ds)">View</button>
           <button class="vmlb-btn-secondary" @click="emit('eda', ds)">EDA</button>
           <button class="vmlb-btn-primary" @click="emit('createModel', ds)">Create Model</button>
         </div>
-      </div>
+      </article>
     </div>
 
     <!-- Upload modal -->
     <div v-if="showUpload" class="vmlb-modal-backdrop" @click="showUpload = false">
       <div class="vmlb-modal" @click.stop>
         <div class="vmlb-modal-head">
-          <h3>Upload Dataset</h3>
-          <button class="vmlb-icon-btn" @click="showUpload = false">✕</button>
+          <h3>Upload dataset</h3>
+          <button class="vmlb-icon-btn" title="Close" @click="showUpload = false"><Icon name="close" /></button>
         </div>
 
-        <div v-if="uploadState.error" class="vmlb-alert-error">{{ uploadState.error }}</div>
+        <div v-if="uploadState.error" class="vmlb-alert-error">
+          <Icon name="alert" /> {{ uploadState.error }}
+        </div>
 
         <div class="vmlb-field">
-          <label>Dataset File *</label>
+          <label>Dataset file *</label>
           <input type="file" accept=".csv,.xlsx,.json" @change="onFileChange" />
         </div>
         <div class="vmlb-field">
-          <label>Dataset Name *</label>
-          <input v-model="uploadState.name" type="text" placeholder="e.g., Legal Contracts Q1 2026" />
+          <label>Dataset name *</label>
+          <input v-model="uploadState.name" type="text" placeholder="e.g., Lease agreements, Q1 2026" />
         </div>
         <div class="vmlb-field">
-          <label>Task Type *</label>
+          <label>Task type *</label>
           <select v-model="uploadState.taskType">
             <option value="">Choose a task type…</option>
             <option v-for="t in TASK_TYPES" :key="t.value" :value="t.value">{{ t.label }} — {{ t.desc }}</option>
@@ -130,7 +162,7 @@ async function onDelete(id: string) {
         <div class="vmlb-actions">
           <button class="vmlb-btn-secondary" @click="showUpload = false">Cancel</button>
           <button class="vmlb-btn-primary" :disabled="uploadState.isLoading" @click="submitUpload">
-            {{ uploadState.isLoading ? 'Uploading…' : 'Upload Dataset' }}
+            {{ uploadState.isLoading ? 'Uploading…' : 'Upload dataset' }}
           </button>
         </div>
       </div>
@@ -139,35 +171,17 @@ async function onDelete(id: string) {
 </template>
 
 <style scoped>
-.vmlb-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-.vmlb-list-header h2 { font-size: 1.5rem; font-weight: 700; }
-.vmlb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1.25rem; }
-.vmlb-model-tile { border: 1px solid var(--vmlb-border, #e5e7eb); border-radius: 0.75rem; padding: 1.25rem; background: var(--vmlb-surface, #fff); }
-.vmlb-tile-head { display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem; }
-.vmlb-tile-head h3 { font-weight: 600; }
-.vmlb-icon-btn { background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 1rem; }
-.vmlb-icon-btn:hover { color: #dc2626; }
-.vmlb-tile-body { display: flex; flex-direction: column; gap: 0.375rem; margin-bottom: 1rem; font-size: 0.875rem; }
-.vmlb-row { display: flex; justify-content: space-between; }
-.vmlb-tile-actions { display: flex; gap: 0.5rem; }
-.vmlb-tile-actions button { flex: 1; }
-.vmlb-empty { text-align: center; padding: 3rem 0; color: var(--vmlb-text-muted, #6b7280); }
-.vmlb-empty button { margin-top: 1rem; }
-.vmlb-btn-primary, .vmlb-btn-secondary { padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.875rem; cursor: pointer; border: 1px solid transparent; }
-.vmlb-btn-primary { background: var(--vmlb-primary, #4f46e5); color: #fff; }
-.vmlb-btn-primary:disabled { background: #d1d5db; cursor: not-allowed; }
-.vmlb-btn-secondary { background: #fff; color: #374151; border-color: var(--vmlb-border, #d1d5db); }
-.vmlb-alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 0.75rem 1rem; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.875rem; }
-.vmlb-muted { color: var(--vmlb-text-muted, #6b7280); }
-.vmlb-spinner-wrap { display: flex; justify-content: center; padding: 3rem 0; }
-.vmlb-spinner { width: 2.5rem; height: 2.5rem; border-radius: 999px; border: 3px solid #e5e7eb; border-bottom-color: var(--vmlb-primary, #4f46e5); animation: vmlb-spin 0.7s linear infinite; }
-@keyframes vmlb-spin { to { transform: rotate(360deg); } }
-.vmlb-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: flex-start; justify-content: center; padding-top: 5rem; z-index: 50; }
-.vmlb-modal { background: #fff; border-radius: 0.5rem; padding: 1.5rem; width: 90%; max-width: 32rem; }
-.vmlb-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.vmlb-modal-head h3 { font-weight: 600; font-size: 1.125rem; }
-.vmlb-field { margin-bottom: 1rem; }
-.vmlb-field label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; }
-.vmlb-field input, .vmlb-field select, .vmlb-field textarea { width: 100%; border: 1px solid var(--vmlb-border, #d1d5db); border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; }
-.vmlb-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem; }
+.vmlb-list-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
+.vmlb-list-header h2 { margin: 0 0 0.25rem; font-size: 1.75rem; }
+.vmlb-list-header .vmlb-muted { margin: 0; max-width: 48ch; }
+.vmlb-capitalize { text-transform: capitalize; }
+.vmlb-confirm {
+  display: flex; flex-direction: column; gap: 0.5rem; margin-top: auto;
+  padding-top: 0.75rem; border-top: 1px dashed var(--vmlb-border-strong);
+  font-size: 0.8125rem; color: var(--vmlb-text-muted);
+}
+.vmlb-confirm-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+@media (max-width: 40rem) {
+  .vmlb-list-header { flex-direction: column; align-items: flex-start; }
+}
 </style>
