@@ -3,6 +3,7 @@ import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { MLAdapter } from '../types'
 import { useTrainingCurves } from '../composables/useTrainingCurves'
 import PlotlyChart from './shared/PlotlyChart.vue'
+import Icon from './shared/Icon.vue'
 
 const props = defineProps<{ adapter?: MLAdapter; jobId: string; jobStatus?: string }>()
 
@@ -48,7 +49,9 @@ onUnmounted(stop)
   <div class="vmlb-curves">
     <div v-if="error" class="vmlb-alert-error">{{ error }}</div>
     <template v-else>
-      <p v-if="points.length === 0" class="vmlb-muted">Waiting for the first metric point…</p>
+      <p v-if="points.length === 0" class="vmlb-waiting">
+        <Icon name="spark" /> Waiting for the first metric point…
+      </p>
       <template v-else>
         <PlotlyChart :plot-data="plotData" plot-id="vmlb-training-curves" />
         <p v-if="!hasDenseCurve" class="vmlb-hint">
@@ -61,7 +64,10 @@ onUnmounted(stop)
 </template>
 
 <style scoped>
-.vmlb-muted { color: var(--vmlb-text-muted, #6b7280); font-size: 0.875rem; }
-.vmlb-hint { font-size: 0.75rem; color: var(--vmlb-text-muted, #9ca3af); margin-top: 0.5rem; }
-.vmlb-alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 0.75rem 1rem; border-radius: 0.5rem; font-size: 0.875rem; }
+.vmlb-curves { display: flex; flex-direction: column; gap: 0.5rem; }
+.vmlb-waiting {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 1rem; border-radius: var(--vmlb-radius-md);
+  background: var(--vmlb-surface-sunken); color: var(--vmlb-text-muted); font-size: 0.875rem;
+}
 </style>

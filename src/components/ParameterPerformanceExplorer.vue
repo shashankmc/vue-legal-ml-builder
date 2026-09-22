@@ -4,6 +4,7 @@ import type { MLAdapter } from '../types'
 import { useParameterComparison } from '../composables/useParameterComparison'
 import { parameterSchemas } from './modelCatalogData'
 import PlotlyChart from './shared/PlotlyChart.vue'
+import Icon from './shared/Icon.vue'
 
 const props = defineProps<{ adapter?: MLAdapter; modelType: string; metric?: string }>()
 
@@ -51,47 +52,58 @@ const paramExplanation = computed(() => {
 
 <template>
   <div class="vmlb-explorer">
-    <div class="vmlb-controls">
-      <label>
-        Parameter
-        <select v-model="selectedParam">
-          <option v-for="key in parameterKeys" :key="key" :value="key">{{ key }}</option>
-        </select>
-      </label>
-      <label>
-        Metric
-        <select v-model="metric">
-          <option value="accuracy">accuracy</option>
-          <option value="precision">precision</option>
-          <option value="recall">recall</option>
-          <option value="f1_score">f1_score</option>
-        </select>
-      </label>
+    <div class="vmlb-explorer-head">
+      <h2 class="vmlb-display">Parameter explorer</h2>
+      <div class="vmlb-controls">
+        <label>
+          <span class="vmlb-label">Parameter</span>
+          <select v-model="selectedParam" class="vmlb-input">
+            <option v-for="key in parameterKeys" :key="key" :value="key">{{ key }}</option>
+          </select>
+        </label>
+        <label>
+          <span class="vmlb-label">Metric</span>
+          <select v-model="metric" class="vmlb-input">
+            <option value="accuracy">accuracy</option>
+            <option value="precision">precision</option>
+            <option value="recall">recall</option>
+            <option value="f1_score">f1_score</option>
+          </select>
+        </label>
+      </div>
     </div>
 
-    <div v-if="error" class="vmlb-alert-error">{{ error }}</div>
-    <div v-if="isLoading" class="vmlb-spinner-wrap"><div class="vmlb-spinner" /></div>
+    <div v-if="error" class="vmlb-alert-error">
+      <Icon name="alert" /> {{ error }}
+    </div>
+    <div v-if="isLoading" class="vmlb-skeleton vmlb-skeleton-chart" />
 
     <template v-else>
-      <p v-if="points.length < 2" class="vmlb-muted">
-        Train at least 2 {{ modelType }} models to see how {{ selectedParam || 'a parameter' }} affects {{ metric }}.
-      </p>
+      <div v-if="points.length < 2" class="vmlb-empty">
+        <Icon name="chart" size="2rem" class="vmlb-empty-icon" />
+        <p class="vmlb-empty-title">Not enough runs yet</p>
+        <p>Train at least 2 {{ modelType }} models to see how {{ selectedParam || 'a parameter' }} affects {{ metric }}.</p>
+      </div>
       <template v-else>
         <PlotlyChart v-if="plotData" :plot-data="plotData" plot-id="vmlb-param-explorer" />
-        <p v-if="paramExplanation" class="vmlb-hint">{{ paramExplanation }}</p>
+        <p v-if="paramExplanation" class="vmlb-explorer-note">{{ paramExplanation }}</p>
       </template>
     </template>
   </div>
 </template>
 
 <style scoped>
-.vmlb-controls { display: flex; gap: 1rem; margin-bottom: 1rem; }
-.vmlb-controls label { display: flex; flex-direction: column; font-size: 0.75rem; font-weight: 500; gap: 0.25rem; color: var(--vmlb-text-muted, #6b7280); }
-.vmlb-controls select { border: 1px solid var(--vmlb-border, #d1d5db); border-radius: 0.375rem; padding: 0.375rem 0.5rem; font-size: 0.875rem; }
-.vmlb-hint { font-size: 0.8125rem; color: var(--vmlb-text-muted, #6b7280); background: #eef2ff; border-radius: 0.5rem; padding: 0.75rem; margin-top: 0.75rem; }
-.vmlb-muted { color: var(--vmlb-text-muted, #6b7280); font-size: 0.875rem; }
-.vmlb-alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 0.75rem 1rem; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.875rem; }
-.vmlb-spinner-wrap { display: flex; justify-content: center; padding: 3rem 0; }
-.vmlb-spinner { width: 2.5rem; height: 2.5rem; border-radius: 999px; border: 3px solid #e5e7eb; border-bottom-color: var(--vmlb-primary, #4f46e5); animation: vmlb-spin 0.7s linear infinite; }
-@keyframes vmlb-spin { to { transform: rotate(360deg); } }
+.vmlb-explorer { max-width: 62rem; margin: 0 auto; }
+.vmlb-explorer-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+.vmlb-explorer-head h2 { margin: 0; font-size: 1.75rem; }
+.vmlb-controls { display: flex; gap: 1rem; }
+.vmlb-controls label { display: flex; flex-direction: column; gap: 0.375rem; }
+.vmlb-controls select { min-width: 9rem; }
+.vmlb-explorer-note {
+  margin-top: 0.75rem; padding: 0.75rem 1rem;
+  background: var(--vmlb-surface-sunken);
+  border-left: 2px solid var(--vmlb-accent);
+  border-radius: var(--vmlb-radius-sm);
+  font-size: 0.8125rem; color: var(--vmlb-text-muted); line-height: 1.55;
+}
 </style>

@@ -3,6 +3,7 @@ import { computed, inject, onMounted, ref } from 'vue'
 import type { MLAdapter, MlModel, PredictionResult } from '../types'
 import ConfusionMatrix from './shared/ConfusionMatrix.vue'
 import PlotlyChart from './shared/PlotlyChart.vue'
+import Icon from './shared/Icon.vue'
 
 const props = defineProps<{ adapter?: MLAdapter; modelId: string }>()
 const emit = defineEmits<{ train: [] }>()
@@ -57,17 +58,25 @@ async function runPredict() {
 
 <template>
   <div class="vmlb-detail">
-    <div v-if="error" class="vmlb-alert-error">{{ error }}</div>
-    <div v-if="isLoading" class="vmlb-spinner-wrap"><div class="vmlb-spinner" /></div>
+    <div v-if="error" class="vmlb-alert-error">
+      <Icon name="alert" /> {{ error }}
+    </div>
+
+    <div v-if="isLoading" class="vmlb-detail-skeleton">
+      <div class="vmlb-skeleton vmlb-skeleton-line" style="width: 40%" />
+      <div class="vmlb-skeleton vmlb-skeleton-chart" />
+    </div>
 
     <template v-else-if="model">
-      <div class="vmlb-header">
+      <header class="vmlb-header">
         <div>
-          <h2>{{ model.name }}</h2>
-          <p class="vmlb-muted">{{ model.model_type }} · {{ model.status }}</p>
+          <h2 class="vmlb-display">{{ model.name }}</h2>
+          <p class="vmlb-muted vmlb-capitalize">{{ model.model_type.replace(/_/g, ' ') }} · {{ model.status }}</p>
         </div>
-        <button v-if="model.status === 'pending'" class="vmlb-btn-primary" @click="emit('train')">Train</button>
-      </div>
+        <button v-if="model.status === 'pending'" class="vmlb-btn-primary" @click="emit('train')">
+          <Icon name="play" /> Train
+        </button>
+      </header>
 
       <div v-if="model.status === 'completed'">
         <div v-if="performanceChart" class="vmlb-card">
@@ -83,8 +92,8 @@ async function runPredict() {
         </div>
 
         <div class="vmlb-card">
-          <h3>Try a prediction</h3>
-          <textarea v-model="predictText" rows="3" placeholder="Paste text to classify…" />
+          <h3 class="vmlb-card-title">Try a prediction</h3>
+          <textarea v-model="predictText" rows="3" placeholder="Paste a clause to classify…" />
           <button class="vmlb-btn-primary" :disabled="isPredicting || !predictText.trim()" @click="runPredict">
             {{ isPredicting ? 'Predicting…' : 'Predict' }}
           </button>
@@ -92,32 +101,41 @@ async function runPredict() {
           <div v-if="predictResults.length" class="vmlb-predictions">
             <div v-for="(r, i) in predictResults" :key="i" class="vmlb-prediction">
               <strong>{{ r.prediction }}</strong>
-              <span v-if="r.confidence !== undefined" class="vmlb-muted"> ({{ (r.confidence * 100).toFixed(1) }}% confidence)</span>
+              <span v-if="r.confidence !== undefined" class="vmlb-muted vmlb-num">
+                {{ (r.confidence * 100).toFixed(1) }}% confidence
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       <div v-else class="vmlb-card">
-        <p class="vmlb-muted">This model is {{ model.status }}. Train it to see performance and run predictions.</p>
+        <p class="vmlb-muted vmlb-capitalize">
+          This model is {{ model.status }}. Train it to see performance and run predictions.
+        </p>
       </div>
     </template>
   </div>
 </template>
 
 <style scoped>
-.vmlb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-.vmlb-header h2 { font-size: 1.5rem; font-weight: 700; }
-.vmlb-card { background: var(--vmlb-surface, #fff); border: 1px solid var(--vmlb-border, #e5e7eb); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.25rem; }
-.vmlb-card h3 { font-weight: 600; margin-bottom: 0.75rem; }
-.vmlb-card textarea { width: 100%; border: 1px solid var(--vmlb-border, #d1d5db); border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; margin-bottom: 0.75rem; }
-.vmlb-predictions { margin-top: 1rem; border-top: 1px solid var(--vmlb-border, #e5e7eb); padding-top: 1rem; }
-.vmlb-prediction { padding: 0.375rem 0; }
-.vmlb-btn-primary { padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.875rem; cursor: pointer; border: none; background: var(--vmlb-primary, #4f46e5); color: #fff; }
-.vmlb-btn-primary:disabled { background: #d1d5db; cursor: not-allowed; }
-.vmlb-alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 0.75rem 1rem; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.875rem; }
-.vmlb-muted { color: var(--vmlb-text-muted, #6b7280); }
-.vmlb-spinner-wrap { display: flex; justify-content: center; padding: 3rem 0; }
-.vmlb-spinner { width: 2.5rem; height: 2.5rem; border-radius: 999px; border: 3px solid #e5e7eb; border-bottom-color: var(--vmlb-primary, #4f46e5); animation: vmlb-spin 0.7s linear infinite; }
-@keyframes vmlb-spin { to { transform: rotate(360deg); } }
+.vmlb-detail { max-width: 62rem; margin: 0 auto; }
+.vmlb-detail-skeleton { display: flex; flex-direction: column; gap: 1.25rem; }
+.vmlb-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
+.vmlb-header h2 { margin: 0 0 0.25rem; font-size: 1.75rem; }
+.vmlb-header .vmlb-muted { margin: 0; }
+.vmlb-card { margin-bottom: 1.25rem; }
+.vmlb-card-title { margin-top: 0; }
+.vmlb-card .vmlb-card-title + textarea,
+.vmlb-card textarea {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid var(--vmlb-border-strong); border-radius: var(--vmlb-radius-md);
+  padding: 0.6rem 0.75rem; font-family: inherit; font-size: 0.875rem;
+  background: var(--vmlb-surface); color: var(--vmlb-text);
+  margin-bottom: 0.75rem; resize: vertical;
+}
+.vmlb-card textarea:focus { outline: none; border-color: var(--vmlb-accent); box-shadow: 0 0 0 3px var(--vmlb-accent-soft); }
+.vmlb-predictions { margin-top: 1rem; border-top: 1px solid var(--vmlb-border); padding-top: 1rem; }
+.vmlb-prediction { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 0.375rem 0; }
+.vmlb-capitalize { text-transform: capitalize; }
 </style>
