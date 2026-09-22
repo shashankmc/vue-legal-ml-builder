@@ -206,7 +206,6 @@ export function createMockAdapter(): MLAdapter {
               type: 'bar',
               x: ['accuracy', 'precision', 'recall', 'f1_score'],
               y: [0.91, 0.89, 0.9, 0.895],
-              marker: { color: '#4f46e5' },
             },
           ],
           layout: { title: 'Model performance', height: 360, yaxis: { range: [0, 1] } },
