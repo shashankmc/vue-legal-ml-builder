@@ -1,5 +1,6 @@
 import type { App } from 'vue'
 import './styles/tokens.css'
+import './styles/components.css'
 import { createSelfHostedAdapter } from './adapters/selfHosted'
 import AnnotationWorkspace from './components/AnnotationWorkspace.vue'
 import DatasetEda from './components/DatasetEda.vue'
@@ -12,8 +13,11 @@ import ParameterPerformanceExplorer from './components/ParameterPerformanceExplo
 import ConfusionMatrix from './components/shared/ConfusionMatrix.vue'
 import ModelLens from './components/shared/ModelLens.vue'
 import PlotlyChart from './components/shared/PlotlyChart.vue'
+import ThemeSwitcher from './components/shared/ThemeSwitcher.vue'
 import TrainingCurves from './components/TrainingCurves.vue'
 import TrainingMonitor from './components/TrainingMonitor.vue'
+import { MlBuilderThemeProvider, applyTheme, clearTheme, createTheme, ensurePresetStyles } from './theme'
+import type { MlBuilderTheme, ThemeConfig, ThemeOverrides, ThemePreset, ThemeToken } from './theme'
 import type { MLAdapter, MLBuilderPluginOptions } from './types'
 
 // ---------------------------------------------------------------------------
@@ -33,6 +37,10 @@ export const VueLegalMlBuilderPlugin = {
     const adapter = resolveAdapter(opts)
     app.provide('vmlb:adapter', adapter)
     app.provide('vmlb:pollInterval', opts.pollInterval ?? 3000)
+    if (opts.theme && typeof document !== 'undefined') {
+      applyTheme(opts.themeTarget ?? document.documentElement, opts.theme)
+    }
+    app.component('MlBuilderThemeProvider', MlBuilderThemeProvider)
     app.component('DatasetManager', DatasetManager)
     app.component('DatasetEda', DatasetEda)
     app.component('ModelList', ModelList)
@@ -46,6 +54,7 @@ export const VueLegalMlBuilderPlugin = {
     app.component('ConfusionMatrix', ConfusionMatrix)
     app.component('ModelLens', ModelLens)
     app.component('PlotlyChart', PlotlyChart)
+    app.component('ThemeSwitcher', ThemeSwitcher)
   },
 }
 
@@ -60,6 +69,7 @@ export {
   ConfusionMatrix,
   DatasetEda,
   DatasetManager,
+  MlBuilderThemeProvider,
   ModelCreateWizard,
   ModelDetail,
   ModelLens,
@@ -67,9 +77,15 @@ export {
   ModelQuestionTree,
   ParameterPerformanceExplorer,
   PlotlyChart,
+  ThemeSwitcher,
   TrainingCurves,
   TrainingMonitor,
 }
+
+export { applyTheme, clearTheme, createTheme, ensurePresetStyles, themeTokens } from './theme'
+export { PRESET_TOKENS, THEME_IDS, THEME_PRESETS, isThemeId, presetMeta } from './theme'
+export type { MlBuilderTheme, ThemeConfig, ThemeOverrides, ThemePreset, ThemeToken } from './theme'
+export type { ThemeId, ThemeMode, ThemePresetMeta } from './theme'
 
 export { createSelfHostedAdapter } from './adapters/selfHosted'
 export type { SelfHostedAdapterOptions } from './adapters/selfHosted'

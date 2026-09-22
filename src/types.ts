@@ -1,3 +1,5 @@
+import type { MlBuilderTheme } from './theme'
+
 // ---------------------------------------------------------------------------
 // Core entities — mirror legal-ml-core's `to_dict()` shapes.
 // Hand-kept in sync (no shared codegen yet) — a flagged drift risk.
@@ -233,4 +235,9 @@ export interface MLBuilderPluginOptions {
   /** A pre-built adapter instance, or preset name + connection info. */
   adapter: MLAdapter | { apiUrl: string; getAuthToken?: () => string | null | undefined }
   pollInterval?: number
+  /** Theme preset ('ink' | 'dark'), token overrides, or a preset + overrides.
+   * Applied to `themeTarget` (document root by default). */
+  theme?: MlBuilderTheme
+  /** Element the plugin writes theme tokens onto. Defaults to documentElement. */
+  themeTarget?: HTMLElement
 }
