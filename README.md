@@ -38,13 +38,86 @@ Or use components directly without the plugin, passing `adapter` explicitly:
 
 `DatasetManager`, `DatasetEda`, `ModelList`, `ModelCreateWizard`, `ModelDetail`,
 `TrainingMonitor` (composes `TrainingCurves`), `ParameterPerformanceExplorer`,
-`AnnotationWorkspace`, plus shared primitives `ConfusionMatrix`/`PlotlyChart`.
+`AnnotationWorkspace`, plus shared primitives `ConfusionMatrix`/`PlotlyChart`/
+`ModelLens`/`MlBuilderThemeProvider`.
 
 `TrainingCurves` and `ParameterPerformanceExplorer` are the experiment-monitoring
 pieces (mlop.ai-inspired): live per-training-job metric curves and cross-run
 hyperparameter-vs-performance comparison. Live curves are dense only for the
 LegalBERT/RoBERTa training path — classical sklearn algorithms only produce a
 few coarse phase-marker points (see `legal-ml-core`'s README for why).
+
+## Theming
+
+Styling is driven entirely by `--vmlb-*` CSS custom properties, so the package
+ships a curated set of named presets and lets hosts override any semantic token.
+
+| id | label | mode |
+| --- | --- | --- |
+| `ink` | Ink — warm paper, deep teal (default) | light |
+| `paper` | Paper — neutral white, graphite | light |
+| `sepia` | Sepia — aged parchment, burnt sienna | light |
+| `oxblood` | Oxblood — cool ivory, burgundy | light |
+| `forest` | Forest — soft paper, deep green | light |
+| `midnight` | Midnight — deep navy, steel cyan | dark |
+| `dark` | Charcoal — warm charcoal, teal | dark |
+| `contrast` | High contrast — accessibility | light |
+
+Four ways to configure it.
+
+**1. Plugin option** — a preset id, token overrides, or both:
+
+```ts
+app.use(VueLegalMlBuilderPlugin, {
+  adapter,
+  theme: 'midnight',
+  // or: theme: { accent: '#7a2e2e', 'radius-md': '3px' },
+  // or: theme: { preset: 'midnight', overrides: { accent: '#7ad1c4' } },
+})
+```
+
+**2. Let the user pick** — drop in the `ThemeSwitcher` (v-model of a preset id),
+or build your own picker from the exported `THEME_PRESETS` registry:
+
+```vue
+<ThemeSwitcher v-model="theme" />
+```
+
+```ts
+import { THEME_PRESETS, type ThemeId } from 'vue-legal-ml-builder'
+// THEME_PRESETS: { id, label, description, mode, swatches }[]
+```
+
+**3. Wrapper element** — scope a theme to a subtree (two themes on one page, no JS):
+
+```html
+<div class="vmlb-theme" data-vmlb-theme="midnight">
+  <ModelList :adapter="adapter" />
+</div>
+```
+
+**4. Plain CSS** — override the semantic tokens anywhere they cascade:
+
+```css
+:root {
+  --vmlb-accent: #7a2e2e;
+  --vmlb-font-display: "Fraunces", serif;
+}
+```
+
+For direct (non-plugin) imports use `<MlBuilderThemeProvider :theme="…">` or the
+`applyTheme(el, theme)` / `clearTheme(el)` / `createTheme(overrides)` helpers.
+Preset styles are emitted automatically; `ensurePresetStyles()` is exported if you
+need to inject them manually.
+
+**Token contract.** Override the semantic tokens — never the internal `--vmlb-raw-*`
+palette. The public keys (also exported as `themeTokens`, typed `ThemeToken`) are
+`canvas`, `surface`, `surface-sunken`, `border`, `border-strong`, `text`,
+`text-muted`, `text-subtle`, `accent`, `accent-strong`, `accent-soft`, `on-accent`,
+`success`/`warning`/`error` (+ `-soft`), `font-display`/`font-sans`/`font-mono`,
+`radius-sm`/`md`/`lg`, `shadow-sm`/`md`/`lg`, `space-2xs`…`space-2xl`, `container`,
+and `density`. Add `vmlb-theme--compact` for tighter density. Adding a preset is a
+data-only change in `src/theme/presets.ts`.
 
 ## Visualization & bundle size
 
