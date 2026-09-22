@@ -32,7 +32,48 @@ const datasets: Dataset[] = [
   },
 ]
 
-const models: MlModel[] = []
+const seedAt = new Date().toISOString()
+const models: MlModel[] = [
+  {
+    id: 'seed-svm-1',
+    user_id: 'demo-user',
+    dataset_id: 'ds-1',
+    project_id: null,
+    name: 'SVM C=0.1 (linear)',
+    model_type: 'svm',
+    parameters: { C: 0.1, kernel: 'linear' },
+    status: 'completed',
+    metrics: { accuracy: 0.84, precision: 0.83, recall: 0.84, f1_score: 0.83 },
+    created_at: seedAt,
+    updated_at: seedAt,
+  },
+  {
+    id: 'seed-svm-2',
+    user_id: 'demo-user',
+    dataset_id: 'ds-1',
+    project_id: null,
+    name: 'SVM C=1.0 (rbf)',
+    model_type: 'svm',
+    parameters: { C: 1.0, kernel: 'rbf' },
+    status: 'completed',
+    metrics: { accuracy: 0.91, precision: 0.9, recall: 0.91, f1_score: 0.9 },
+    created_at: seedAt,
+    updated_at: seedAt,
+  },
+  {
+    id: 'seed-svm-3',
+    user_id: 'demo-user',
+    dataset_id: 'ds-1',
+    project_id: null,
+    name: 'SVM C=10 (rbf)',
+    model_type: 'svm',
+    parameters: { C: 10, kernel: 'rbf' },
+    status: 'completed',
+    metrics: { accuracy: 0.88, precision: 0.87, recall: 0.88, f1_score: 0.87 },
+    created_at: seedAt,
+    updated_at: seedAt,
+  },
+]
 const jobs: Record<string, TrainingJob> = {}
 const metricPoints: Record<string, TrainingMetricPoint[]> = {}
 
@@ -157,7 +198,20 @@ export function createMockAdapter(): MLAdapter {
     },
 
     async getModelPerformance() {
-      return delay({ performance_data: { accuracy: 0.91, precision: 0.89, recall: 0.9, f1_score: 0.895 }, performance_chart: '' })
+      return delay({
+        performance_data: { accuracy: 0.91, precision: 0.89, recall: 0.9, f1_score: 0.895 },
+        performance_chart: JSON.stringify({
+          data: [
+            {
+              type: 'bar',
+              x: ['accuracy', 'precision', 'recall', 'f1_score'],
+              y: [0.91, 0.89, 0.9, 0.895],
+              marker: { color: '#4f46e5' },
+            },
+          ],
+          layout: { title: 'Model performance', height: 360, yaxis: { range: [0, 1] } },
+        }),
+      })
     },
     async getConfusionMatrix() {
       return delay({ confusion_matrix: [[42, 3], [5, 38]], labels: ['positive', 'negative'] })
