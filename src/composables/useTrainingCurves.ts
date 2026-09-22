@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import type { Id, MLAdapter, TrainingMetricPoint } from '../types'
+import { createPollLoop, type PollLoop } from '../utils/polling'
 
 /** Incrementally polls getTrainingMetrics and accumulates a reactive series —
  * the mlop.ai-style live-curve piece of experiment monitoring. Real per-step
@@ -11,7 +12,7 @@ export function useTrainingCurves(adapter: MLAdapter, pollIntervalMs = 3000) {
   const points = ref<TrainingMetricPoint[]>([])
   const byMetric = ref<Record<string, TrainingMetricPoint[]>>({})
   const isPolling = ref(false)
-  let timer: ReturnType<typeof setInterval> | null = null
+  let loop: PollLoop | null = null
   let lastStep = -1
 
   async function fetchNew(jobId: Id) {
@@ -29,15 +30,16 @@ export function useTrainingCurves(adapter: MLAdapter, pollIntervalMs = 3000) {
   function start(jobId: Id, stopWhen?: () => boolean) {
     stop()
     isPolling.value = true
-    timer = setInterval(async () => {
+    loop = createPollLoop(async () => {
       await fetchNew(jobId)
       if (stopWhen?.()) stop()
     }, pollIntervalMs)
+    loop.start()
   }
 
   function stop() {
-    if (timer) clearInterval(timer)
-    timer = null
+    loop?.stop()
+    loop = null
     isPolling.value = false
   }
 
