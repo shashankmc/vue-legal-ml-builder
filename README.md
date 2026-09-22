@@ -46,6 +46,20 @@ hyperparameter-vs-performance comparison. Live curves are dense only for the
 LegalBERT/RoBERTa training path — classical sklearn algorithms only produce a
 few coarse phase-marker points (see `legal-ml-core`'s README for why).
 
+## Visualization & bundle size
+
+Charts use [Plotly](https://plotly.com/javascript/) via `plotly.js-basic-dist`
+(the scatter + bar + pie partial build), dynamically imported and externalized
+from the library build. This is deliberate: the full `plotly.js-dist` bundle is
+~4.7 MB raw / ~1.4 MB gzipped, while the basic build is ~1.1 MB raw / ~380 KB
+gzipped — about 75% smaller for the trace types this package actually renders.
+`npm run check:size` builds the demo and enforces that budget in CI.
+
+This package renders **scatter** (training curves, parameter explorer) and
+**bar** (model performance) figures. EDA distributions are drawn as HTML by
+`DatasetEda`, not Plotly — so the even smaller `plotly.js-basic-dist` covers
+every figure that reaches a `PlotlyChart` here.
+
 ## Project association
 
 `Project` is generic app-level grouping owned by the host application, not
