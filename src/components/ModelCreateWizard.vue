@@ -4,6 +4,7 @@ import type { Dataset, MLAdapter } from '../types'
 import { allModelInfo, modelsByTaskType, parameterSchemas, taskTypeLabel } from './modelCatalogData'
 import ModelLens from './shared/ModelLens.vue'
 import ModelQuestionTree from './ModelQuestionTree.vue'
+import Icon from './shared/Icon.vue'
 
 const props = defineProps<{
   adapter?: MLAdapter
@@ -115,27 +116,32 @@ async function createModel() {
 
 <template>
   <div class="vmlb-wizard">
-    <div v-if="error" class="vmlb-alert-error">{{ error }}</div>
+    <div v-if="error" class="vmlb-alert-error">
+      <Icon name="alert" /> {{ error }}
+    </div>
 
-    <div v-if="isLoading" class="vmlb-spinner-wrap"><div class="vmlb-spinner" /></div>
+    <div v-if="isLoading" class="vmlb-wizard-skeleton">
+      <div class="vmlb-skeleton vmlb-skeleton-tile" />
+      <div class="vmlb-skeleton vmlb-skeleton-tile" />
+    </div>
 
     <template v-else>
       <!-- Step 1: dataset -->
-      <div class="vmlb-card">
-        <h2 class="vmlb-step-title"><span class="vmlb-step-num">1</span> Select Dataset</h2>
+      <section class="vmlb-card">
+        <h2 class="vmlb-step-title"><span class="vmlb-step-num">1</span> Select dataset</h2>
         <p v-if="datasets.length === 0" class="vmlb-muted">No datasets available. Upload one first.</p>
-        <select v-else v-model="selectedDataset" class="vmlb-select" @change="onDatasetChange">
+        <select v-else v-model="selectedDataset" class="vmlb-input" @change="onDatasetChange">
           <option :value="null">Choose a dataset…</option>
           <option v-for="ds in datasets" :key="ds.id" :value="ds">
             {{ ds.name }} ({{ ds.row_count.toLocaleString() }} rows, {{ ds.task_type }})
           </option>
         </select>
-      </div>
+      </section>
 
       <!-- Step 2: model type -->
-      <div v-if="selectedDataset" class="vmlb-card">
-        <h2 class="vmlb-step-title"><span class="vmlb-step-num">2</span> Select Model Type</h2>
-        <p class="vmlb-muted vmlb-indent">Available models for <strong>{{ taskLabel }}</strong> tasks:</p>
+      <section v-if="selectedDataset" class="vmlb-card">
+        <h2 class="vmlb-step-title"><span class="vmlb-step-num">2</span> Select model type</h2>
+        <p class="vmlb-muted vmlb-indent">Available models for <strong>{{ taskLabel }}</strong> tasks.</p>
 
         <ModelQuestionTree
           :task-type="selectedDataset.task_type"
@@ -164,30 +170,32 @@ async function createModel() {
             </button>
 
             <div v-if="expandedModelInfo === type" class="vmlb-model-info" @click.stop>
-              <p><strong>When to Select:</strong> {{ allModelInfo[type]?.whenToUse }}</p>
+              <p><strong>When to select:</strong> {{ allModelInfo[type]?.whenToUse }}</p>
               <p class="vmlb-italic">{{ allModelInfo[type]?.example }}</p>
               <ul>
-                <li v-for="s in allModelInfo[type]?.strengths" :key="s">✓ {{ s }}</li>
+                <li v-for="s in allModelInfo[type]?.strengths" :key="s">
+                  <Icon name="check" /> {{ s }}
+                </li>
               </ul>
               <p><strong>Best for:</strong> {{ allModelInfo[type]?.bestFor }}</p>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <!-- Step 3: configure -->
-      <div v-if="modelType" class="vmlb-card">
-        <h2 class="vmlb-step-title"><span class="vmlb-step-num">3</span> Configure Model</h2>
+      <section v-if="modelType" class="vmlb-card">
+        <h2 class="vmlb-step-title"><span class="vmlb-step-num">3</span> Configure model</h2>
 
         <div class="vmlb-configure">
           <div class="vmlb-configure-form">
             <div class="vmlb-field">
-              <label for="vmlb-model-name">Model Name *</label>
+              <label for="vmlb-model-name">Model name *</label>
               <input
                 id="vmlb-model-name"
                 v-model="modelName"
                 type="text"
-                placeholder="e.g., Decision Tree - Legal Contracts"
+                placeholder="e.g., Decision Tree — Lease agreements"
                 @input="modelNameEdited = true"
               />
             </div>
@@ -225,7 +233,7 @@ async function createModel() {
                       <code>{{ opt.value }}</code> <span>{{ opt.desc }}</span>
                     </div>
                   </div>
-                  <div class="vmlb-recommendation">💡 {{ param.recommendation }}</div>
+                  <div class="vmlb-recommendation"><Icon name="spark" /> {{ param.recommendation }}</div>
                 </div>
               </div>
             </div>
@@ -244,7 +252,7 @@ async function createModel() {
             </p>
           </aside>
         </div>
-      </div>
+      </section>
 
       <div v-if="modelType" class="vmlb-actions">
         <button type="button" class="vmlb-btn-secondary" @click="emit('cancel')">Cancel</button>
@@ -254,7 +262,7 @@ async function createModel() {
           :disabled="isCreating || !selectedDataset || !modelName.trim() || !modelType"
           @click="createModel"
         >
-          {{ isCreating ? 'Creating…' : 'Create Model' }}
+          {{ isCreating ? 'Creating…' : 'Create model' }}
         </button>
       </div>
     </template>
@@ -262,49 +270,76 @@ async function createModel() {
 </template>
 
 <style scoped>
-.vmlb-wizard { max-width: 60rem; margin: 0 auto; }
-.vmlb-card { background: var(--vmlb-surface, #fff); border: 1px solid var(--vmlb-border, #e5e7eb); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.25rem; }
-.vmlb-step-title { display: flex; align-items: center; gap: 0.75rem; font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; }
-.vmlb-step-num { width: 1.75rem; height: 1.75rem; border-radius: 999px; background: var(--vmlb-primary, #4f46e5); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; font-weight: 700; flex-shrink: 0; }
-.vmlb-muted { color: var(--vmlb-text-muted, #6b7280); font-size: 0.875rem; }
-.vmlb-small { font-size: 0.75rem; margin-top: 0.125rem; }
-.vmlb-indent { margin-left: 2.5rem; }
-.vmlb-select, .vmlb-field input, .vmlb-param-input select, .vmlb-param-input input {
-  width: 100%; border: 1px solid var(--vmlb-border, #d1d5db); border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem;
+.vmlb-wizard { max-width: 62rem; margin: 0 auto; }
+.vmlb-wizard-skeleton { display: grid; gap: 1.25rem; }
+.vmlb-step-title {
+  display: flex; align-items: center; gap: 0.75rem;
+  margin: 0 0 1rem;
+  font-family: var(--vmlb-font-display);
+  font-size: 1.1875rem; font-weight: 600; letter-spacing: -0.01em;
 }
-.vmlb-configure { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+.vmlb-step-num {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 1.6rem; height: 1.6rem;
+  border-radius: var(--vmlb-radius-sm);
+  background: var(--vmlb-accent); color: var(--vmlb-on-accent);
+  font-family: var(--vmlb-font-sans);
+  font-size: 0.8125rem; font-weight: 700;
+}
+.vmlb-indent { margin-left: 2.35rem; margin-top: -0.5rem; }
+.vmlb-configure { display: grid; grid-template-columns: 1fr 1fr; gap: 1.75rem; align-items: start; }
 .vmlb-configure-lens { position: sticky; top: 1rem; }
-.vmlb-lens-footnote { margin-top: 0.75rem; font-size: 0.75rem; color: var(--vmlb-text-muted, #6b7280); }
+.vmlb-lens-footnote { margin-top: 0.75rem; font-size: 0.75rem; color: var(--vmlb-text-subtle); max-width: 46ch; }
 @media (max-width: 46rem) { .vmlb-configure { grid-template-columns: 1fr; } .vmlb-configure-lens { position: static; } }
 .vmlb-model-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-.vmlb-model-card { border: 2px solid var(--vmlb-border, #e5e7eb); border-radius: 0.75rem; padding: 1rem; cursor: pointer; transition: border-color 0.15s; }
-.vmlb-model-card.vmlb-selected { border-color: var(--vmlb-primary, #4f46e5); background: #eef2ff; }
-.vmlb-model-card-head { display: flex; justify-content: space-between; align-items: start; }
-.vmlb-model-card-head h3 { font-size: 0.875rem; font-weight: 600; }
-.vmlb-badge { font-size: 0.75rem; font-weight: 500; color: var(--vmlb-primary, #4f46e5); background: #e0e7ff; padding: 0.125rem 0.5rem; border-radius: 0.25rem; }
-.vmlb-model-desc { font-size: 0.75rem; color: var(--vmlb-text-muted, #6b7280); margin: 0.25rem 0 0.5rem; }
-.vmlb-link-btn { color: var(--vmlb-primary, #4f46e5); font-size: 0.75rem; font-weight: 500; background: none; border: none; cursor: pointer; padding: 0; }
-.vmlb-model-info { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--vmlb-border, #e5e7eb); font-size: 0.75rem; color: #374151; }
-.vmlb-model-info ul { margin: 0.5rem 0; padding-left: 1rem; }
-.vmlb-italic { font-style: italic; color: var(--vmlb-text-muted, #6b7280); }
-.vmlb-field { margin-bottom: 1.5rem; }
-.vmlb-field label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem; }
-.vmlb-params { border: 1px solid var(--vmlb-border, #e5e7eb); border-radius: 0.5rem; overflow: hidden; }
-.vmlb-param-row { padding: 0.75rem 1rem; border-bottom: 1px solid var(--vmlb-border, #f3f4f6); display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+.vmlb-model-card {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--vmlb-border);
+  border-radius: var(--vmlb-radius-md);
+  padding: 1rem; background: var(--vmlb-surface);
+  cursor: pointer;
+  transition: border-color var(--vmlb-duration) var(--vmlb-ease),
+    background-color var(--vmlb-duration) var(--vmlb-ease),
+    transform var(--vmlb-duration) var(--vmlb-ease),
+    box-shadow var(--vmlb-duration) var(--vmlb-ease);
+}
+.vmlb-model-card:hover { border-color: var(--vmlb-border-strong); transform: translateY(-1px); box-shadow: var(--vmlb-shadow-sm); }
+.vmlb-model-card.vmlb-selected { border-color: var(--vmlb-accent); background: var(--vmlb-accent-soft); box-shadow: var(--vmlb-shadow-sm); }
+.vmlb-model-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.vmlb-model-card-head h3 { margin: 0; font-size: 0.9375rem; font-weight: 600; }
+.vmlb-model-desc { font-size: 0.75rem; color: var(--vmlb-text-muted); margin: 0.25rem 0 0.6rem; }
+.vmlb-model-info {
+  margin-top: 0.75rem; padding-top: 0.75rem;
+  border-top: 1px solid var(--vmlb-border);
+  font-size: 0.75rem; color: var(--vmlb-text-muted); line-height: 1.55;
+}
+.vmlb-model-info ul { margin: 0.5rem 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.25rem; }
+.vmlb-model-info li { display: flex; align-items: flex-start; gap: 0.35rem; }
+.vmlb-model-info li :deep(.vmlb-icon) { color: var(--vmlb-success); margin-top: 0.15rem; }
+.vmlb-italic { font-style: italic; color: var(--vmlb-text-subtle); }
+.vmlb-field { margin-bottom: 1.25rem; }
+.vmlb-params { border: 1px solid var(--vmlb-border); border-radius: var(--vmlb-radius-md); overflow: hidden; }
+.vmlb-param-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;
+  padding: 0.75rem 1rem; border-bottom: 1px solid var(--vmlb-border);
+}
 .vmlb-param-row:last-child { border-bottom: none; }
 .vmlb-param-head { flex: 1; min-width: 10rem; }
-.vmlb-param-input input, .vmlb-param-input select { width: auto; min-width: 7rem; }
-.vmlb-param-explain { flex-basis: 100%; background: #eef2ff; border-radius: 0.375rem; padding: 0.75rem; font-size: 0.8125rem; color: #374151; }
+.vmlb-param-input input, .vmlb-param-input select {
+  width: auto; min-width: 7rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--vmlb-border-strong);
+  border-radius: var(--vmlb-radius-sm);
+  background: var(--vmlb-surface); color: var(--vmlb-text); font-family: inherit; font-size: 0.875rem;
+}
+.vmlb-param-explain { flex-basis: 100%; background: var(--vmlb-surface-sunken); border-radius: var(--vmlb-radius-sm); padding: 0.75rem; font-size: 0.8125rem; color: var(--vmlb-text-muted); line-height: 1.55; }
 .vmlb-option-line { display: flex; gap: 0.5rem; margin: 0.25rem 0; }
-.vmlb-option-line code { background: #fff; border: 1px solid var(--vmlb-border, #e5e7eb); padding: 0.0625rem 0.375rem; border-radius: 0.25rem; font-size: 0.75rem; }
-.vmlb-recommendation { margin-top: 0.5rem; background: #fff; border: 1px solid #c7d2fe; border-radius: 0.375rem; padding: 0.5rem 0.75rem; font-size: 0.75rem; color: #4338ca; }
-.vmlb-actions { display: flex; justify-content: flex-end; gap: 0.75rem; }
-.vmlb-btn-primary, .vmlb-btn-secondary { padding: 0.625rem 1.25rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.875rem; cursor: pointer; border: 1px solid transparent; }
-.vmlb-btn-primary { background: var(--vmlb-primary, #4f46e5); color: #fff; }
-.vmlb-btn-primary:disabled { background: #d1d5db; cursor: not-allowed; }
-.vmlb-btn-secondary { background: #fff; color: #374151; border-color: var(--vmlb-border, #d1d5db); }
-.vmlb-alert-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 0.75rem 1rem; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.875rem; }
-.vmlb-spinner-wrap { display: flex; justify-content: center; padding: 3rem 0; }
-.vmlb-spinner { width: 2.5rem; height: 2.5rem; border-radius: 999px; border: 3px solid #e5e7eb; border-bottom-color: var(--vmlb-primary, #4f46e5); animation: vmlb-spin 0.7s linear infinite; }
-@keyframes vmlb-spin { to { transform: rotate(360deg); } }
+.vmlb-option-line code { background: var(--vmlb-surface); border: 1px solid var(--vmlb-border); padding: 0.0625rem 0.375rem; border-radius: var(--vmlb-radius-sm); font-size: 0.75rem; }
+.vmlb-recommendation {
+  display: flex; align-items: flex-start; gap: 0.4rem;
+  margin-top: 0.5rem; padding: 0.5rem 0.75rem;
+  background: var(--vmlb-accent-soft);
+  border-radius: var(--vmlb-radius-sm);
+  font-size: 0.75rem; color: var(--vmlb-accent-strong);
+}
 </style>

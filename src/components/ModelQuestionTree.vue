@@ -55,7 +55,7 @@ function choose(option: { label: string; next?: string; recommend?: string }) {
       <button
         v-else
         type="button"
-        class="vmlb-guide-use"
+        class="vmlb-btn-primary vmlb-guide-use"
         @click="emit('select', recommendation)"
       >
         Use {{ recommendedInfo.label }}
@@ -83,40 +83,41 @@ function choose(option: { label: string; next?: string; recommend?: string }) {
 
 <style scoped>
 .vmlb-guide-tree {
-  border: 1px solid var(--vmlb-border, #e5e7eb);
-  border-radius: 0.5rem;
-  background: var(--vmlb-lens-paper, #fbfbfc);
+  border: 1px solid var(--vmlb-border);
+  border-left: 3px solid var(--vmlb-accent);
+  border-radius: var(--vmlb-radius-md);
+  background: var(--vmlb-surface-sunken);
   padding: 1rem;
   margin-bottom: 1rem;
 }
 .vmlb-guide-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
-.vmlb-guide-title { font-weight: 600; font-size: 0.875rem; color: var(--vmlb-lens-boundary, #4338ca); }
-.vmlb-guide-restart { background: none; border: none; color: var(--vmlb-text-muted, #6b7280); font-size: 0.75rem; cursor: pointer; text-decoration: underline; padding: 0; }
+.vmlb-guide-title { margin: 0; font-family: var(--vmlb-font-display); font-weight: 600; font-size: 0.9375rem; color: var(--vmlb-accent-strong); }
+.vmlb-guide-restart { background: none; border: none; color: var(--vmlb-text-muted); font-size: 0.75rem; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; padding: 0; }
 .vmlb-guide-trail { list-style: none; padding: 0; margin: 0.75rem 0 0; display: flex; flex-direction: column; gap: 0.25rem; }
 .vmlb-guide-trail li { display: flex; gap: 0.5rem; font-size: 0.75rem; }
-.vmlb-guide-q { color: var(--vmlb-text-muted, #6b7280); }
-.vmlb-guide-a { color: var(--vmlb-lens-boundary, #4338ca); font-weight: 600; }
-.vmlb-guide-q::after { content: '→'; color: var(--vmlb-lens-grid-strong, #d9dde3); margin-left: 0.35rem; }
+.vmlb-guide-q { color: var(--vmlb-text-muted); }
+.vmlb-guide-a { color: var(--vmlb-accent-strong); font-weight: 600; }
+.vmlb-guide-q::after { content: '→'; color: var(--vmlb-border-strong); margin-left: 0.35rem; }
 .vmlb-guide-question { margin-top: 0.75rem; }
-.vmlb-guide-current-q { font-size: 0.9375rem; font-weight: 600; color: var(--vmlb-text, #111827); }
-.vmlb-guide-help { font-size: 0.75rem; color: var(--vmlb-text-muted, #6b7280); margin-top: 0.125rem; }
+.vmlb-guide-current-q { font-size: 0.9375rem; font-weight: 600; color: var(--vmlb-text); }
+.vmlb-guide-help { font-size: 0.75rem; color: var(--vmlb-text-muted); margin-top: 0.125rem; }
 .vmlb-guide-options { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.625rem; }
 .vmlb-guide-option {
   display: flex; flex-direction: column; gap: 0.125rem; text-align: left;
-  border: 1px solid var(--vmlb-border, #e5e7eb); border-radius: 0.5rem;
-  background: var(--vmlb-surface, #fff); padding: 0.625rem 0.75rem; cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  border: 1px solid var(--vmlb-border); border-radius: var(--vmlb-radius-md);
+  background: var(--vmlb-surface); padding: 0.625rem 0.75rem; cursor: pointer;
+  transition: border-color var(--vmlb-duration) var(--vmlb-ease),
+    background-color var(--vmlb-duration) var(--vmlb-ease),
+    transform var(--vmlb-duration) var(--vmlb-ease);
 }
-.vmlb-guide-option:hover { border-color: var(--vmlb-lens-boundary, #4338ca); background: var(--vmlb-primary-soft, #eef2ff); }
-.vmlb-guide-option-label { font-size: 0.8125rem; font-weight: 500; color: var(--vmlb-text, #111827); }
-.vmlb-guide-option-note { font-size: 0.6875rem; color: var(--vmlb-text-muted, #6b7280); }
-.vmlb-guide-result { margin-top: 0.75rem; border-top: 1px solid var(--vmlb-border, #e5e7eb); padding-top: 0.75rem; }
-.vmlb-guide-rec-label { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--vmlb-text-muted, #6b7280); }
-.vmlb-guide-rec-name { font-size: 1rem; font-weight: 700; color: var(--vmlb-text, #111827); margin-top: 0.125rem; }
-.vmlb-guide-rec-desc { font-size: 0.8125rem; color: var(--vmlb-text-muted, #6b7280); margin-top: 0.125rem; }
-.vmlb-guide-rec-current { margin-top: 0.5rem; font-size: 0.75rem; font-weight: 600; color: var(--vmlb-lens-ok, #15803d); }
-.vmlb-guide-use {
-  margin-top: 0.5rem; background: var(--vmlb-primary, #4f46e5); color: #fff; border: none;
-  border-radius: 0.5rem; padding: 0.5rem 1rem; font-size: 0.8125rem; font-weight: 600; cursor: pointer;
-}
+.vmlb-guide-option:hover { border-color: var(--vmlb-accent); background: var(--vmlb-accent-soft); transform: translateY(-1px); }
+.vmlb-guide-option:active { transform: scale(0.99); }
+.vmlb-guide-option-label { font-size: 0.8125rem; font-weight: 500; color: var(--vmlb-text); }
+.vmlb-guide-option-note { font-size: 0.6875rem; color: var(--vmlb-text-muted); }
+.vmlb-guide-result { margin-top: 0.75rem; border-top: 1px solid var(--vmlb-border); padding-top: 0.75rem; }
+.vmlb-guide-rec-label { margin: 0; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--vmlb-text-muted); }
+.vmlb-guide-rec-name { font-family: var(--vmlb-font-display); font-size: 1.125rem; font-weight: 600; color: var(--vmlb-text); margin-top: 0.125rem; }
+.vmlb-guide-rec-desc { font-size: 0.8125rem; color: var(--vmlb-text-muted); margin-top: 0.125rem; }
+.vmlb-guide-rec-current { margin-top: 0.5rem; font-size: 0.75rem; font-weight: 600; color: var(--vmlb-success); }
+.vmlb-guide-use { margin-top: 0.5rem; }
 </style>

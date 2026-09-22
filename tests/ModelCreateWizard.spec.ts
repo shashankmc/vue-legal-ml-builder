@@ -30,7 +30,7 @@ describe('ModelCreateWizard', () => {
     await flushPromises()
 
     // Selecting the dataset reveals step 2 (model type selection).
-    expect(wrapper.text()).toContain('Select Model Type')
+    expect(wrapper.text()).toContain('Select model type')
     expect(wrapper.text()).toContain('Support Vector Machine')
   })
 
@@ -51,7 +51,7 @@ describe('ModelCreateWizard', () => {
     const svmCard = wrapper.findAll('[role="button"]').find((c) => c.text().includes('Support Vector Machine'))
     await svmCard!.trigger('click')
 
-    expect(wrapper.text()).toContain('Configure Model')
+    expect(wrapper.text()).toContain('Configure model')
     const cInput = wrapper.find('input[type="number"]')
     expect((cInput.element as HTMLInputElement).value).toBe('1')
   })
