@@ -49,9 +49,6 @@
   "peerDependencies": {
     "vue": "^3.4.0"
   },
-  "dependencies": {
-    "plotly.js-dist": "^2.26.0"
-  },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@vitejs/plugin-vue": "^5.0.0",
@@ -63,5 +60,8 @@
     "vitest": "^1.5.0",
     "vue": "^3.4.0",
     "vue-tsc": "^2.0.0"
+  },
+  "dependencies": {
+    "plotly.js-basic-dist": "^2.35.3"
   }
 }

@@ -6,7 +6,7 @@ const props = defineProps<{
   plotId?: string
 }>()
 
-type PlotlyModule = typeof import('plotly.js-dist').default
+type PlotlyModule = typeof import('plotly.js-basic-dist').default
 
 const plotElement = ref<HTMLDivElement | null>(null)
 let plotly: PlotlyModule | null = null
@@ -28,7 +28,7 @@ async function renderPlot() {
 onMounted(async () => {
   if (!props.plotData) return
   try {
-    plotly = (await import('plotly.js-dist')).default
+    plotly = (await import('plotly.js-basic-dist')).default
     await renderPlot()
   } catch (err) {
     console.error('Error loading Plotly:', err)

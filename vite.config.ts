@@ -22,9 +22,9 @@ export default defineConfig({
           fileName: (format) => `vue-legal-ml-builder.${format}.js`,
         },
         rollupOptions: {
-          external: ['vue', 'plotly.js-dist'],
+          external: ['vue', 'plotly.js-basic-dist'],
           output: {
-            globals: { vue: 'Vue', 'plotly.js-dist': 'Plotly' },
+            globals: { vue: 'Vue', 'plotly.js-basic-dist': 'Plotly' },
             exports: 'named',
           },
         },
