@@ -1,0 +1,38 @@
+:root {
+  --vmlb-surface: #ffffff;
+  --vmlb-surface-sunken: #f9fafb;
+  --vmlb-border: #e5e7eb;
+  --vmlb-border-strong: #d1d5db;
+  --vmlb-text: #111827;
+  --vmlb-text-muted: #6b7280;
+  --vmlb-primary: #4f46e5;
+  --vmlb-primary-soft: #eef2ff;
+  --vmlb-on-primary: #ffffff;
+
+  --vmlb-lens-ink: #1f2937;
+  --vmlb-lens-grid: #eef0f3;
+  --vmlb-lens-grid-strong: #d9dde3;
+  --vmlb-lens-paper: #fbfbfc;
+  --vmlb-lens-boundary: #4338ca;
+  --vmlb-lens-margin: #c7d2fe;
+  --vmlb-lens-margin-fill: rgba(199, 210, 254, 0.35);
+  --vmlb-lens-path: #4f46e5;
+  --vmlb-lens-node: #ffffff;
+  --vmlb-lens-node-border: #9ca3af;
+  --vmlb-lens-vote: #6366f1;
+  --vmlb-lens-noise: #9ca3af;
+
+  --vmlb-lens-class-a: #2563eb;
+  --vmlb-lens-class-b: #d97706;
+  --vmlb-lens-class-c: #059669;
+  --vmlb-lens-class-d: #db2777;
+  --vmlb-lens-class-e: #7c3aed;
+
+  --vmlb-lens-error: #dc2626;
+  --vmlb-lens-error-soft: #fef2f2;
+  --vmlb-lens-ok: #15803d;
+  --vmlb-lens-warn: #b45309;
+
+  --vmlb-lens-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --vmlb-lens-radius: 0.75rem;
+}
