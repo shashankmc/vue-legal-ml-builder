@@ -35,10 +35,19 @@ const isCreating = ref(false)
 const error = ref('')
 const expandedModelInfo = ref<string | null>(null)
 const expandedParams = reactive<Record<string, boolean>>({})
+// Model types the backend reports as trainable for the selected dataset's task.
+// Falls back to the static catalog when the adapter can't answer (e.g. a
+// non-BAIGLE host), so the wizard still works standalone.
+const backendModels = ref<string[] | null>(null)
 
-const availableModels = computed<string[]>(() =>
-  selectedDataset.value ? (modelsByTaskType[selectedDataset.value.task_type] || Object.keys(allModelInfo)) : [],
+const staticModels = computed<string[]>(() =>
+  selectedDataset.value ? (modelsByTaskType[selectedDataset.value.task_type] || []) : [],
 )
+const availableModels = computed<string[]>(() => {
+  if (!selectedDataset.value) return []
+  if (backendModels.value && backendModels.value.length) return backendModels.value
+  return staticModels.value
+})
 const currentSchema = computed(() => parameterSchemas[modelType.value] || [])
 const taskLabel = computed(() => (selectedDataset.value ? taskTypeLabel(selectedDataset.value.task_type) : ''))
 const datasetLabels = computed(() => selectedDataset.value?.labels ?? null)
@@ -61,12 +70,26 @@ onMounted(async () => {
   }
 })
 
+async function loadBackendModels() {
+  backendModels.value = null
+  if (!adapter.value?.getAvailableModelTypes || !selectedDataset.value) return
+  try {
+    const catalog = await adapter.value.getAvailableModelTypes(selectedDataset.value.task_type)
+    const taskType = selectedDataset.value.task_type
+    const types = Object.keys(catalog?.[taskType] ?? {})
+    backendModels.value = types.length ? types : null
+  } catch {
+    backendModels.value = null
+  }
+}
+
 function onDatasetChange() {
   modelType.value = ''
   expandedModelInfo.value = null
   Object.keys(expandedParams).forEach((k) => delete expandedParams[k])
   modelNameEdited.value = false
   modelName.value = ''
+  loadBackendModels()
 }
 
 function selectModelType(type: string) {
@@ -146,6 +169,7 @@ async function createModel() {
         <ModelQuestionTree
           :task-type="selectedDataset.task_type"
           :current-model-type="modelType"
+          auto-apply
           @select="selectModelType"
         />
 

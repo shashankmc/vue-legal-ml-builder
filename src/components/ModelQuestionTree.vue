@@ -3,7 +3,10 @@ import { computed, ref, watch } from 'vue'
 import { allModelInfo } from './modelCatalogData'
 import { decisionTreeFor } from '../lens/modelGuide'
 
-const props = defineProps<{ taskType: string; currentModelType?: string }>()
+const props = defineProps<{ taskType: string; currentModelType?: string; autoApply?: boolean }>()
+// `select` applies the recommendation's model + default parameters. Emitted
+// automatically once a leaf is reached (when `autoApply`) and by the explicit
+// "Use …" button otherwise.
 const emit = defineEmits<{ select: [modelType: string] }>()
 
 const currentNodeId = ref<string>('')
@@ -27,6 +30,7 @@ function choose(option: { label: string; next?: string; recommend?: string }) {
   history.value = [...history.value, { question: currentNode.value.question, answer: option.label, nodeId: currentNodeId.value }]
   if (option.recommend) {
     recommendation.value = option.recommend
+    if (props.autoApply) emit('select', option.recommend)
     return
   }
   if (option.next) currentNodeId.value = option.next
@@ -51,7 +55,9 @@ function choose(option: { label: string; next?: string; recommend?: string }) {
       <p class="vmlb-guide-rec-label">Recommended model</p>
       <p class="vmlb-guide-rec-name">{{ recommendedInfo.label }}</p>
       <p class="vmlb-guide-rec-desc">{{ recommendedInfo.shortDesc }}</p>
-      <p v-if="currentModelType === recommendation" class="vmlb-guide-rec-current">Currently selected</p>
+      <p v-if="currentModelType === recommendation" class="vmlb-guide-rec-current">
+        {{ autoApply ? 'Applied — adjust below if needed' : 'Currently selected' }}
+      </p>
       <button
         v-else
         type="button"
