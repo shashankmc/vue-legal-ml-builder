@@ -17,7 +17,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  created: [model: unknown]
+  created: [model: unknown, info?: { trainingQueued: boolean }]
   cancel: []
 }>()
 
@@ -128,7 +128,19 @@ async function createModel() {
       parameters: { ...parameters },
       ...(props.projectId ? { project_id: props.projectId } : {}),
     })
-    emit('created', model)
+
+    // Create-and-train is one action: queue training immediately so the user
+    // does not have to find a separate "Train" step. If queuing fails, the
+    // model still exists and the user can start training from the model page.
+    let trainingQueued = false
+    try {
+      await adapter.value.startTraining(model.id)
+      trainingQueued = true
+    } catch {
+      trainingQueued = false
+    }
+
+    emit('created', model, { trainingQueued })
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to create model'
   } finally {
@@ -286,7 +298,7 @@ async function createModel() {
           :disabled="isCreating || !selectedDataset || !modelName.trim() || !modelType"
           @click="createModel"
         >
-          {{ isCreating ? 'Creating…' : 'Create model' }}
+          {{ isCreating ? 'Creating & starting training…' : 'Create & train' }}
         </button>
       </div>
     </template>

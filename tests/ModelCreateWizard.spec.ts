@@ -56,11 +56,12 @@ describe('ModelCreateWizard', () => {
     expect((cInput.element as HTMLInputElement).value).toBe('1')
   })
 
-  it('calls createModel with the configured payload and emits created', async () => {
+  it('creates the model, queues training and emits created', async () => {
     const createdModel = { id: 'm-1' }
     const adapter = createTestAdapter({
       listDatasets: vi.fn().mockResolvedValue([dataset()]),
       createModel: vi.fn().mockResolvedValue(createdModel),
+      startTraining: vi.fn().mockResolvedValue({ job_id: 'job-1' }),
     })
     const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
     await flushPromises()
@@ -75,6 +76,8 @@ describe('ModelCreateWizard', () => {
     expect(adapter.createModel).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'My SVM', dataset_id: 'ds-1', model_type: 'svm' }),
     )
-    expect(wrapper.emitted('created')?.[0]).toEqual([createdModel])
+    // Create-and-train: training is queued automatically right after creation.
+    expect(adapter.startTraining).toHaveBeenCalledWith('m-1')
+    expect(wrapper.emitted('created')?.[0]).toEqual([createdModel, { trainingQueued: true }])
   })
 })
