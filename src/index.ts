@@ -90,6 +90,9 @@ export type { ThemeId, ThemeMode, ThemePresetMeta } from './theme'
 export { createSelfHostedAdapter } from './adapters/selfHosted'
 export type { SelfHostedAdapterOptions } from './adapters/selfHosted'
 
+export { mountComponent } from './mount'
+export type { MountedComponent } from './mount'
+
 export { useAnnotation } from './composables/useAnnotation'
 export { useDatasets } from './composables/useDatasets'
 export { useEda } from './composables/useEda'
