@@ -48,9 +48,10 @@ Or use components directly without the plugin, passing `adapter` explicitly:
 ## Hiding annotation
 
 Hosts with their own annotation (Legal Blocks) can hide the builder's annotation
-views. Hidden views render nothing and never call the adapter's annotation
-operations (`getNextAnnotationTask`, `saveAnnotation`, `skipAnnotation`), so a
-host need not implement or proxy them. Default: shown (BAIGLE is unchanged).
+view. `AnnotationWorkspace` is the one component that reads the flag: hidden, it
+renders nothing and never calls the adapter's annotation operations
+(`getNextAnnotationTask`, `saveAnnotation`, `skipAnnotation`), so a host need
+not implement or proxy them. Default: shown (BAIGLE is unchanged).
 
 ```ts
 app.use(VueLegalMlBuilderPlugin, { adapter, hideAnnotation: true })
