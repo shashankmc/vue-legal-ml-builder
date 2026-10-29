@@ -1,5 +1,8 @@
 # vue-legal-ml-builder
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/shashankmc/vue-legal-ml-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/shashankmc/vue-legal-ml-builder/actions/workflows/ci.yml)
+
 Vue 3 component library for the BAIGLE legal-ML workbench — dataset
 management, model configuration/training/prediction, visualization,
 annotation, and experiment monitoring. Extracted from the
@@ -186,3 +189,28 @@ pushed. The tag must equal `v` + the `package.json` version. It needs an
 `NPM_TOKEN` repository secret (npm automation token). It runs tests, the bundle
 size check, the library build, and checks `dist/` is in the packed tarball
 before `npm publish --access public`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full release checklist and
+[CHANGELOG.md](CHANGELOG.md) for what changed in each version.
+
+## How to cite
+
+If you use vue-legal-ml-builder in research or teaching, please cite it. The
+citation metadata is in [`CITATION.cff`](CITATION.cff) (GitHub's "Cite this
+repository" button reads it); [`codemeta.json`](codemeta.json) carries the
+same metadata in CodeMeta form.
+
+> Chakravarthy, S. (2026). *vue-legal-ml-builder* (Version 0.2.0) [Computer
+> software]. Maastricht University. https://github.com/shashankmc/vue-legal-ml-builder
+
+**DOI:** not yet assigned. Once the repository is connected to Zenodo, each
+GitHub release will be archived there and its DOI (and a DOI badge) will be
+added to this section and to `CITATION.cff`.
+
+The reference backend for these components is
+[legal-ml-core](https://github.com/shashankmc/legal-ml-core); cite both if
+you use both.
+
+## License
+
+[MIT](LICENSE) © 2026 Shashank Chakravarthy, Maastricht University.

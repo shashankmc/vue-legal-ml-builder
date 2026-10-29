@@ -3,26 +3,36 @@
   "version": "0.2.0",
   "description": "Vue 3 component library for the BAIGLE legal-ML workbench — dataset management, model configuration/training/prediction, visualization, annotation, and experiment monitoring, driven entirely through a host-supplied backend adapter",
   "license": "MIT",
-  "homepage": "https://github.com/MaastrichtU-BISS/vue-legal-ml-builder#readme",
+  "author": {
+    "name": "Shashank Chakravarthy"
+  },
+  "homepage": "https://github.com/shashankmc/vue-legal-ml-builder#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MaastrichtU-BISS/vue-legal-ml-builder.git"
+    "url": "git+https://github.com/shashankmc/vue-legal-ml-builder.git"
   },
   "bugs": {
-    "url": "https://github.com/MaastrichtU-BISS/vue-legal-ml-builder/issues"
+    "url": "https://github.com/shashankmc/vue-legal-ml-builder/issues"
   },
   "keywords": [
     "vue",
     "legal",
+    "legal-nlp",
     "machine-learning",
     "ml",
+    "no-code",
+    "no-code-machine-learning",
+    "education",
+    "legal-blocks",
     "legalblocks"
   ],
   "type": "module",
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md",
+    "CITATION.cff"
   ],
   "main": "./dist/vue-legal-ml-builder.umd.js",
   "module": "./dist/vue-legal-ml-builder.es.js",

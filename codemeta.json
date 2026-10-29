@@ -1,0 +1,68 @@
+{
+  "@context": "https://w3id.org/codemeta/3.0",
+  "@type": "SoftwareSourceCode",
+  "name": "vue-legal-ml-builder",
+  "description": "Vue 3 component library providing the user interface of the Legal Blocks / BAIGLE no-code machine learning workbench for legal text: dataset management and EDA, a guided model-creation wizard, training with live experiment monitoring, prediction and LIME/SHAP explanation views, visualization, and annotation, driven entirely through a host-supplied backend adapter (reference backend: legal-ml-core).",
+  "version": "0.2.0",
+  "dateModified": "2026-10-29",
+  "datePublished": "2026-09-22",
+  "license": "https://spdx.org/licenses/MIT",
+  "codeRepository": "https://github.com/shashankmc/vue-legal-ml-builder",
+  "issueTracker": "https://github.com/shashankmc/vue-legal-ml-builder/issues",
+  "readme": "https://github.com/shashankmc/vue-legal-ml-builder/blob/main/README.md",
+  "programmingLanguage": [
+    {
+      "@type": "ComputerLanguage",
+      "name": "TypeScript",
+      "url": "https://www.typescriptlang.org"
+    },
+    {
+      "@type": "ComputerLanguage",
+      "name": "Vue",
+      "url": "https://vuejs.org"
+    }
+  ],
+  "runtimePlatform": [
+    "Web browser",
+    "Node.js 20 (build and test)"
+  ],
+  "softwareRequirements": [
+    "vue ^3.4.0 (peer dependency)",
+    "plotly.js-basic-dist ^2.35.3"
+  ],
+  "author": [
+    {
+      "@type": "Person",
+      "givenName": "Shashank",
+      "familyName": "Chakravarthy",
+      "affiliation": {
+        "@type": "Organization",
+        "name": "Maastricht University"
+      }
+    }
+  ],
+  "copyrightHolder": [
+    {
+      "@type": "Person",
+      "givenName": "Shashank",
+      "familyName": "Chakravarthy",
+      "affiliation": {
+        "@type": "Organization",
+        "name": "Maastricht University"
+      }
+    }
+  ],
+  "keywords": [
+    "legal NLP",
+    "no-code machine learning",
+    "education",
+    "Legal Blocks",
+    "Vue",
+    "explainable AI"
+  ],
+  "developmentStatus": "https://www.repostatus.org/#active",
+  "applicationCategory": "Legal informatics; Machine learning education",
+  "relatedLink": [
+    "https://github.com/shashankmc/legal-ml-core"
+  ]
+}
