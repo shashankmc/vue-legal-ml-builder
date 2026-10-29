@@ -6,11 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While the version is 0.x, minor releases may contain breaking changes.
 Versions 0.1.0 and 0.2.0 were not tagged; their links point at commits
-(0.2.0 is the `package.json` bump at `68959e2`).
+(0.2.0 is the `package.json` bump at `68959e2`). Releases from 0.3.0 on are
+tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
-Proposed next version: **0.3.0** (new features, no version bump yet).
+## [0.3.0] - 2026-10-29
 
 ### Added
 
@@ -85,6 +86,7 @@ Proposed next version: **0.3.0** (new features, no version bump yet).
   monitoring), extracted from the `reducing_digital_divide` SvelteKit frontend
   and driven through a host-supplied `MLAdapter`.
 
-[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/68959e2...HEAD
+[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/68959e2...v0.3.0
 [0.2.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/c9c724b...68959e2
 [0.1.0]: https://github.com/shashankmc/vue-legal-ml-builder/commits/c9c724b
