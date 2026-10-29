@@ -1,5 +1,8 @@
 name: Publish to npm
 
+# Publishes the built package to the PUBLIC npm registry when a version tag
+# (e.g. v0.3.0) is pushed. Installing needs no token; publishing uses the
+# NPM_TOKEN repository secret (an npm automation token).
 on:
   push:
     tags:
@@ -21,6 +24,14 @@ jobs:
           registry-url: "https://registry.npmjs.org"
           cache: "npm"
 
+      - name: Check tag matches package.json version
+        run: |
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "${GITHUB_REF_NAME}" != "v${PKG_VERSION}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package.json version v${PKG_VERSION}" >&2
+            exit 1
+          fi
+
       - name: Install dependencies
         run: npm ci
 
@@ -32,6 +43,17 @@ jobs:
 
       - name: Build library
         run: npm run build:lib
+
+      - name: Check packed contents include dist/
+        run: |
+          npm pack --dry-run --json > pack.json
+          node -e "
+            const files = require('./pack.json')[0].files.map(f => f.path);
+            const need = ['dist/vue-legal-ml-builder.es.js', 'dist/vue-legal-ml-builder.umd.js', 'dist/index.d.ts', 'dist/style.css'];
+            const missing = need.filter(f => !files.includes(f));
+            if (missing.length) { console.error('Missing from package:', missing); process.exit(1); }
+          "
+          rm pack.json
 
       - name: Publish to npm
         run: npm publish --access public

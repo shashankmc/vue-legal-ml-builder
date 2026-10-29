@@ -37,6 +37,7 @@ export const VueLegalMlBuilderPlugin = {
     const adapter = resolveAdapter(opts)
     app.provide('vmlb:adapter', adapter)
     app.provide('vmlb:pollInterval', opts.pollInterval ?? 3000)
+    app.provide('vmlb:hideAnnotation', opts.hideAnnotation ?? false)
     if (opts.theme && typeof document !== 'undefined') {
       applyTheme(opts.themeTarget ?? document.documentElement, opts.theme)
     }

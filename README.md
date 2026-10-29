@@ -14,8 +14,19 @@ plugin or passed as an explicit prop, is the entire backend contract.
 ## Install
 
 ```bash
-npm install vue-legal-ml-builder vue
+npm install vue-legal-ml-builder vue plotly.js-basic-dist
 ```
+
+Published to the public npm registry (no token needed to install). Pin an exact
+version (`vue-legal-ml-builder@x.y.z`) in host apps.
+
+**Host requirements.** `vue` (^3.4) is a peer dependency. `plotly.js-basic-dist`
+(^2.35) is externalized from the library build and loaded with a dynamic
+`import('plotly.js-basic-dist')` the first time a chart renders, so the host's
+bundler must be able to resolve it. Add it as a direct dependency of the host
+(Legal Blocks does this; strict installers such as pnpm and Nuxt/Vite
+pre-bundling otherwise may not see the transitive copy). Without it the chart
+components either break the host build (unresolved import) or render empty.
 
 ```ts
 import { createApp } from 'vue'
@@ -32,6 +43,23 @@ Or use components directly without the plugin, passing `adapter` explicitly:
 
 ```vue
 <ModelCreateWizard :adapter="adapter" :dataset-id="datasetId" @created="onCreated" />
+```
+
+## Hiding annotation
+
+Hosts with their own annotation (Legal Blocks) can hide the builder's annotation
+views. Hidden views render nothing and never call the adapter's annotation
+operations (`getNextAnnotationTask`, `saveAnnotation`, `skipAnnotation`), so a
+host need not implement or proxy them. Default: shown (BAIGLE is unchanged).
+
+```ts
+app.use(VueLegalMlBuilderPlugin, { adapter, hideAnnotation: true })
+```
+
+Or per component, for direct (non-plugin) usage; the prop overrides the plugin option:
+
+```vue
+<AnnotationWorkspace :adapter="adapter" :project-id="id" :hide-annotation="true" />
 ```
 
 ## Components
@@ -147,4 +175,13 @@ npm install
 npm run dev        # demo app with a mock adapter, at src/demo/
 npm test           # vitest
 npm run build:lib  # library build (ESM + UMD + generated .d.ts)
+npm pack --dry-run # confirm dist/ is in the package
 ```
+
+## Releasing
+
+`.github/workflows/publish.yml` publishes to public npm when a `v*` tag is
+pushed. The tag must equal `v` + the `package.json` version. It needs an
+`NPM_TOKEN` repository secret (npm automation token). It runs tests, the bundle
+size check, the library build, and checks `dist/` is in the packed tarball
+before `npm publish --access public`.

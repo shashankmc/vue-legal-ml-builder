@@ -240,4 +240,7 @@ export interface MLBuilderPluginOptions {
   theme?: MlBuilderTheme
   /** Element the plugin writes theme tokens onto. Defaults to documentElement. */
   themeTarget?: HTMLElement
+  /** Hide the builder's annotation views and skip annotation operations, for
+   * hosts with their own annotation (Legal Blocks). Default false (shown). */
+  hideAnnotation?: boolean
 }

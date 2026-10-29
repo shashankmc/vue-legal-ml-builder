@@ -4,15 +4,27 @@ import type { MLAdapter } from '../types'
 import { useAnnotation } from '../composables/useAnnotation'
 import Icon from './shared/Icon.vue'
 
-const props = defineProps<{ adapter?: MLAdapter; projectId: string; datasetId?: string; labels?: string[] }>()
+const props = withDefaults(defineProps<{
+  adapter?: MLAdapter
+  projectId: string
+  datasetId?: string
+  labels?: string[]
+  /** Hide this view and skip every annotation operation (hosts with their own
+   * annotation, e.g. Legal Blocks). Defaults to the plugin's `hideAnnotation`. */
+  hideAnnotation?: boolean
+}>(), { hideAnnotation: undefined })
 
 const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
+const injectedHide = inject<boolean>('vmlb:hideAnnotation', false)
 const adapter = computed(() => props.adapter ?? injectedAdapter)
+const hidden = computed(() => props.hideAnnotation ?? injectedHide)
 const { task, stats, isLoading, error, loadNext, save, skip } = useAnnotation(adapter.value as MLAdapter)
 
 const customLabel = ref('')
 
-onMounted(() => loadNext(props.projectId, props.datasetId))
+onMounted(() => {
+  if (!hidden.value) loadNext(props.projectId, props.datasetId)
+})
 
 async function onSelectLabel(label: string) {
   await save(label, props.projectId, props.datasetId)
@@ -30,7 +42,7 @@ async function onSkip() {
 </script>
 
 <template>
-  <div class="vmlb-annotate">
+  <div v-if="!hidden" class="vmlb-annotate">
     <div v-if="stats" class="vmlb-progress">
       <div class="vmlb-progress-head">
         <span class="vmlb-label">Annotation progress</span>
