@@ -11,6 +11,14 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+### Changed
+
+- `ModelCreateWizard` is shorter: the chooser questions start closed under "Help
+  me choose a model", and only the chosen model shows until "Show all N models".
+- Task types read in words in the wizard and `DatasetManager`, and `taskTypeLabel`
+  says "text classification". User-facing copy follows UK spelling, such as "Topic
+  Modelling" and "Analyse".
+
 ## [0.4.0] - 2026-10-30
 
 ### Added

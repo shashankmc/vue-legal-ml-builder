@@ -36,6 +36,8 @@ const isLoading = ref(true)
 const isCreating = ref(false)
 const error = ref('')
 const expandedModelInfo = ref<string | null>(null)
+// One model is always chosen, so the rest of the grid stays folded until asked for.
+const showAllModels = ref(false)
 const expandedParams = reactive<Record<string, boolean>>({})
 // Model types the backend reports as trainable for the selected dataset's task.
 // Falls back to the static catalog when the adapter can't answer (e.g. a
@@ -53,6 +55,9 @@ const availableModels = computed<string[]>(() => {
   if (backendModels.value && backendModels.value.length) return backendModels.value
   return staticModels.value
 })
+const visibleModels = computed<string[]>(() =>
+  !showAllModels.value && availableModels.value.includes(modelType.value) ? [modelType.value] : availableModels.value,
+)
 const currentSchema = computed(() => parameterSchemas[modelType.value] || [])
 const taskLabel = computed(() => (selectedDataset.value ? taskTypeLabel(selectedDataset.value.task_type) : ''))
 const datasetLabels = computed(() => (selectedDataset.value?.labels?.length ? selectedDataset.value.labels : overviewLabels.value))
@@ -119,6 +124,7 @@ async function prepareDataset() {
 
 function onDatasetChange() {
   modelType.value = ''
+  showAllModels.value = false
   expandedModelInfo.value = null
   Object.keys(expandedParams).forEach((k) => delete expandedParams[k])
   modelNameEdited.value = false
@@ -202,7 +208,7 @@ async function createModel() {
         <select v-else v-model="selectedDataset" class="vmlb-input" @change="onDatasetChange">
           <option :value="null">Choose a dataset…</option>
           <option v-for="ds in datasets" :key="ds.id" :value="ds">
-            {{ ds.name }} ({{ ds.row_count.toLocaleString() }} rows, {{ ds.task_type }})
+            {{ ds.name }} ({{ ds.row_count.toLocaleString('en-GB') }} rows, {{ taskTypeLabel(ds.task_type) }})
           </option>
         </select>
       </section>
@@ -212,16 +218,19 @@ async function createModel() {
         <h2 class="vmlb-step-title"><span class="vmlb-step-num">{{ firstStep + 1 }}</span> Select model type</h2>
         <p class="vmlb-muted vmlb-indent">Available models for <strong>{{ taskLabel }}</strong> tasks.</p>
 
-        <ModelQuestionTree
-          :task-type="selectedDataset.task_type"
-          :current-model-type="modelType"
-          auto-apply
-          @select="selectModelType"
-        />
+        <details class="vmlb-advanced vmlb-chooser">
+          <summary>Help me choose a model</summary>
+          <ModelQuestionTree
+            :task-type="selectedDataset.task_type"
+            :current-model-type="modelType"
+            auto-apply
+            @select="selectModelType"
+          />
+        </details>
 
         <div class="vmlb-model-grid">
           <div
-            v-for="type in availableModels"
+            v-for="type in visibleModels"
             :key="type"
             class="vmlb-model-card"
             :class="{ 'vmlb-selected': modelType === type }"
@@ -251,6 +260,14 @@ async function createModel() {
             </div>
           </div>
         </div>
+        <button
+          v-if="visibleModels.length < availableModels.length"
+          type="button"
+          class="vmlb-link-btn vmlb-show-models"
+          @click="showAllModels = true"
+        >
+          Show all {{ availableModels.length }} models
+        </button>
       </section>
 
       <!-- Step 3: configure -->
@@ -392,6 +409,8 @@ async function createModel() {
 .vmlb-model-info li :deep(.vmlb-icon) { color: var(--vmlb-success); margin-top: 0.15rem; }
 .vmlb-italic { font-style: italic; color: var(--vmlb-text-subtle); }
 .vmlb-field { margin-bottom: 1.25rem; }
+.vmlb-show-models { margin-top: 0.75rem; }
+.vmlb-chooser { margin-bottom: 1rem; }
 .vmlb-advanced summary { cursor: pointer; font-size: 0.875rem; font-weight: 600; color: var(--vmlb-text); }
 .vmlb-advanced[open] summary { margin-bottom: 0.5rem; }
 .vmlb-advanced .vmlb-params { margin-top: 0.75rem; }

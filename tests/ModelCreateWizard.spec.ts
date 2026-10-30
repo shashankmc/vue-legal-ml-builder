@@ -31,7 +31,7 @@ describe('ModelCreateWizard', () => {
 
     // Selecting the dataset reveals step 2 (model type selection).
     expect(wrapper.text()).toContain('Select model type')
-    expect(wrapper.text()).toContain('Support Vector Machine')
+    expect(wrapper.text()).toContain('Logistic Regression')
   })
 
   it('only shows model types valid for the dataset task_type', async () => {
@@ -43,11 +43,56 @@ describe('ModelCreateWizard', () => {
     expect(wrapper.text()).not.toContain('Support Vector Machine')
   })
 
+  it('names the task type in words, never the raw value', async () => {
+    const adapter = createTestAdapter({ listDatasets: vi.fn().mockResolvedValue([dataset({ row_count: 1567 })]) })
+    const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+    await flushPromises()
+
+    expect(wrapper.find('select option:nth-child(2)').text()).toBe('Contracts (1,567 rows, text classification)')
+    expect(wrapper.text()).toContain('Available models for text classification tasks.')
+  })
+
+  it('shows only the chosen model until asked for the rest', async () => {
+    const adapter = createTestAdapter({ listDatasets: vi.fn().mockResolvedValue([dataset()]) })
+    const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+    await flushPromises()
+
+    expect(wrapper.findAll('.vmlb-model-card').map((c) => c.find('h3').text())).toEqual(['Logistic Regression'])
+
+    await wrapper.find('.vmlb-show-models').trigger('click')
+
+    expect(wrapper.text()).toContain('Support Vector Machine')
+    expect(wrapper.findAll('.vmlb-model-card').length).toBeGreaterThan(1)
+  })
+
+  it('keeps every model on show while the user compares them', async () => {
+    const adapter = createTestAdapter({ listDatasets: vi.fn().mockResolvedValue([dataset()]) })
+    const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+    await flushPromises()
+    await wrapper.find('.vmlb-show-models').trigger('click')
+    const count = wrapper.findAll('.vmlb-model-card').length
+
+    await wrapper.findAll('.vmlb-model-card').find((c) => c.text().includes('Support Vector Machine'))!.trigger('click')
+
+    expect(wrapper.findAll('.vmlb-model-card').length).toBe(count)
+  })
+
+  it('tucks the chooser questions away, closed', async () => {
+    const adapter = createTestAdapter({ listDatasets: vi.fn().mockResolvedValue([dataset()]) })
+    const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+    await flushPromises()
+
+    const chooser = wrapper.find('details.vmlb-chooser')
+    expect(chooser.attributes('open')).toBeUndefined()
+    expect(chooser.find('summary').text()).toBe('Help me choose a model')
+  })
+
   it('populates default parameters when a model type is selected', async () => {
     const adapter = createTestAdapter({ listDatasets: vi.fn().mockResolvedValue([dataset()]) })
     const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
     await flushPromises()
 
+    await wrapper.find('.vmlb-show-models').trigger('click')
     const svmCard = wrapper.findAll('[role="button"]').find((c) => c.text().includes('Support Vector Machine'))
     await svmCard!.trigger('click')
 
@@ -66,6 +111,7 @@ describe('ModelCreateWizard', () => {
     const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
     await flushPromises()
 
+    await wrapper.find('.vmlb-show-models').trigger('click')
     const svmCard = wrapper.findAll('[role="button"]').find((c) => c.text().includes('Support Vector Machine'))
     await svmCard!.trigger('click')
 
@@ -132,8 +178,9 @@ describe('ModelCreateWizard', () => {
       })
       const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
       await flushPromises()
+      await wrapper.find('.vmlb-show-models').trigger('click')
 
-      expect(wrapper.text()).toContain('LDA (Topic Modeling)')
+      expect(wrapper.text()).toContain('LDA (Topic Modelling)')
     })
 
     it('tucks settings away, closed, and still sends their defaults', async () => {
@@ -146,7 +193,7 @@ describe('ModelCreateWizard', () => {
       const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
       await flushPromises()
 
-      const advanced = wrapper.find('details')
+      const advanced = wrapper.find('.vmlb-configure-form details')
       expect(advanced.find('summary').text()).toBe('Advanced settings')
       expect(advanced.attributes('open')).toBeUndefined()
       expect(advanced.text()).toContain('Solver')
