@@ -138,7 +138,8 @@ every figure that reaches a `PlotlyChart` here.
 `Project` is generic app-level grouping owned by the host application, not
 this package — `ModelCreateWizard` and `AnnotationWorkspace` accept a
 `projectId` prop the host resolves itself rather than implementing project
-selection/creation UI here.
+selection/creation UI here. A host that asks for the project as a step of its own
+can pass `firstStep` to `ModelCreateWizard` to continue the numbering.
 
 ## Development
 
