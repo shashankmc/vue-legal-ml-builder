@@ -90,7 +90,6 @@ function choose(option: { label: string; next?: string; recommend?: string }) {
 <style scoped>
 .vmlb-guide-tree {
   border: 1px solid var(--vmlb-border);
-  border-left: 3px solid var(--vmlb-accent);
   border-radius: var(--vmlb-radius-md);
   background: var(--vmlb-surface-sunken);
   padding: 1rem;
