@@ -11,6 +11,8 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-30
+
 ### Added
 
 - `AnnotationWorkspace` reaches parity with BAIGLE's annotation screen: choose a
@@ -127,7 +129,8 @@ tagged `vX.Y.Z`.
   monitoring), extracted from the `reducing_digital_divide` SvelteKit frontend
   and driven through a host-supplied `MLAdapter`.
 
-[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/68959e2...v0.3.0
 [0.2.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/c9c724b...68959e2
