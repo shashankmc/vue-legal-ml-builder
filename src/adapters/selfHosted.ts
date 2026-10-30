@@ -215,6 +215,9 @@ export function createSelfHostedAdapter(opts: SelfHostedAdapterOptions): MLAdapt
     async setActiveLearningStrategy(datasetId: Id, strategy: string): Promise<ActiveLearningState> {
       return put(`/active-learning/datasets/${datasetId}/strategy`, { strategy })
     },
+    async correctActiveLearningLabel(datasetId: Id, from: string, to: string): Promise<ActiveLearningState> {
+      return put(`/active-learning/datasets/${datasetId}/labels`, { from, to })
+    },
     async retrainActiveLearning(datasetId: Id): Promise<{ job_id: Id | null }> {
       const data = await post(`/active-learning/datasets/${datasetId}/retrain`)
       return { job_id: data.job_id }

@@ -12,6 +12,8 @@ export function useActiveLearning(adapter: MLAdapter, pollIntervalMs = 3000, onR
   const isBusy = ref(false)
   const supported = !!adapter.getActiveLearningState
   let loop: PollLoop | null = null
+  /** The Dataset on screen. A reply about any other is dropped. */
+  let currentId: Id | null = null
 
   const activeLoop = computed(() => (state.value?.active ? state.value : null))
 
@@ -29,6 +31,7 @@ export function useActiveLearning(adapter: MLAdapter, pollIntervalMs = 3000, onR
     const roundBefore = (state.value as ActiveLearningState).round.number
     loop = createPollLoop(async () => {
       const next = await adapter.getActiveLearningState!(datasetId)
+      if (datasetId !== currentId) return
       state.value = next
       if (isRunning(next)) return
       stopPolling()
@@ -51,11 +54,22 @@ export function useActiveLearning(adapter: MLAdapter, pollIntervalMs = 3000, onR
 
   async function refresh(datasetId: Id) {
     if (!supported) return
+    if (datasetId !== currentId) stopPolling()
+    currentId = datasetId
     await run(async () => {
-      state.value = await adapter.getActiveLearningState!(datasetId)
+      const next = await adapter.getActiveLearningState!(datasetId)
+      if (datasetId !== currentId) return
+      state.value = next
       settings.value ??= (await adapter.getActiveLearningSettings?.()) ?? null
       pollIfRunning(datasetId)
     }, 'Failed to load active learning')
+  }
+
+  /** After a saved label. A running poll already reads the state, and without a
+   * loop there are no counts to update. */
+  function refreshCounts(datasetId: Id) {
+    if (!activeLoop.value || loop) return
+    return refresh(datasetId)
   }
 
   function start(datasetId: Id, options: ActiveLearningStartOptions) {
@@ -68,6 +82,12 @@ export function useActiveLearning(adapter: MLAdapter, pollIntervalMs = 3000, onR
     return run(async () => {
       state.value = await adapter.setActiveLearningStrategy!(datasetId, strategy)
     }, 'Failed to change how items are chosen')
+  }
+
+  function correctLabel(datasetId: Id, from: string, to: string) {
+    return run(async () => {
+      state.value = await adapter.correctActiveLearningLabel!(datasetId, from, to)
+    }, 'Failed to correct the label')
   }
 
   function retrain(datasetId: Id) {
@@ -86,6 +106,7 @@ export function useActiveLearning(adapter: MLAdapter, pollIntervalMs = 3000, onR
       let ticks = 0
       loop = createPollLoop(async () => {
         const next = await adapter.getActiveLearningState!(datasetId)
+        if (datasetId !== currentId) return
         state.value = next
         ticks += 1
         const done = next.active && next.holdout.verification === 'holdout'
@@ -99,5 +120,5 @@ export function useActiveLearning(adapter: MLAdapter, pollIntervalMs = 3000, onR
 
   onUnmounted(stopPolling)
 
-  return { state, activeLoop, settings, error, isBusy, supported, refresh, start, setStrategy, retrain, verify }
+  return { state, activeLoop, settings, error, isBusy, supported, refresh, refreshCounts, start, setStrategy, correctLabel, retrain, verify }
 }

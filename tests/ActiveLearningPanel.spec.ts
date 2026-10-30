@@ -24,6 +24,7 @@ function loopState(overrides: Partial<ActiveLearningState> = {}): ActiveLearning
     model_id: null,
     round: { number: 0, status: 'labelling', strategy: 'random', model_id: null, job_id: null, labels_used: null, metrics: null, error: null, created_at: '', completed_at: null },
     label_counts: {},
+    typed_labels: false,
     retrain: { new_labels: 0, allowed: false, suggested: false, classes_short: {}, needs_second_label: false },
     holdout: { percent: 20, size: 10, labelled: 0, needed: 10, verification: null },
     ...overrides,
@@ -43,6 +44,7 @@ async function mounted(state: ActiveLearningState | { active: false }, overrides
     setActiveLearningStrategy: vi.fn().mockResolvedValue(loopState({ strategy: 'random' })),
     retrainActiveLearning: vi.fn().mockResolvedValue({ job_id: 'j1' }),
     verifyActiveLearning: vi.fn().mockResolvedValue(undefined),
+    correctActiveLearningLabel: vi.fn().mockResolvedValue(loopState()),
     ...overrides,
   })
   const wrapper = mount(AnnotationWorkspace, { props: { adapter, projectId: 'p1', datasetId: 'ds-1', ...props } })
@@ -152,6 +154,58 @@ describe('the running loop', () => {
     expect(adapter.getActiveLearningState).toHaveBeenCalledTimes(2)
   })
 
+  it('does not reread the state after a save while a poll already does', async () => {
+    vi.useFakeTimers()
+    const { adapter, wrapper } = await mounted(loopState({ round: { ...loopState().round, status: 'scoring' } }))
+
+    await button(wrapper, 'Civil')!.trigger('click')
+    await button(wrapper, 'Save & Next')!.trigger('click')
+    await flushPromises()
+
+    expect(adapter.getActiveLearningState).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not reread the state after a save with no loop', async () => {
+    const { adapter, wrapper } = await mounted({ active: false })
+
+    await button(wrapper, 'Civil')!.trigger('click')
+    await button(wrapper, 'Save & Next')!.trigger('click')
+    await flushPromises()
+
+    expect(adapter.getActiveLearningState).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops polling the old Dataset when the Dataset changes', async () => {
+    vi.useFakeTimers()
+    const running = loopState({ round: { ...loopState().round, status: 'training' } })
+    const { adapter, wrapper } = await mounted(running)
+
+    await wrapper.setProps({ datasetId: 'ds-2' })
+    await flushPromises()
+    ;(adapter.getActiveLearningState as ReturnType<typeof vi.fn>).mockClear()
+    await vi.advanceTimersByTimeAsync(7000)
+    await flushPromises()
+
+    const polled = (adapter.getActiveLearningState as ReturnType<typeof vi.fn>).mock.calls.map(([id]) => id)
+    expect(polled.length).toBeGreaterThan(0)
+    expect(new Set(polled)).toEqual(new Set(['ds-2']))
+  })
+
+  it('drops a reply about the old Dataset that lands after a change', async () => {
+    let answer: (value: ActiveLearningState) => void = () => {}
+    const late = new Promise<ActiveLearningState>((resolve) => { answer = resolve })
+    const { wrapper } = await mounted(loopState(), {
+      getActiveLearningState: vi.fn().mockReturnValueOnce(late).mockResolvedValue({ active: false }),
+    })
+
+    await wrapper.setProps({ datasetId: 'ds-2' })
+    await flushPromises()
+    answer(loopState({ retrain: { new_labels: 20, allowed: true, suggested: true, classes_short: {}, needs_second_label: false } }))
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('20 new labels, retrain?')
+  })
+
   it('reloads the queue when a rescore finishes', async () => {
     vi.useFakeTimers()
     const training = loopState({ round: { ...loopState().round, status: 'scoring' } })
@@ -180,6 +234,26 @@ describe('the running loop', () => {
     await flushPromises()
 
     expect(adapter.setActiveLearningStrategy).toHaveBeenCalledWith('ds-1', 'random')
+  })
+})
+
+describe('a mistyped label', () => {
+  const short = { new_labels: 9, allowed: false, suggested: false, classes_short: { crimnal: 4 }, needs_second_label: false }
+
+  it('can be corrected where labels are typed', async () => {
+    const { adapter, wrapper } = await mounted(loopState({ typed_labels: true, label_counts: { civil: 8, crimnal: 1 }, retrain: short }))
+
+    await wrapper.find('.vmlb-al-correct input').setValue('criminal')
+    await wrapper.find('.vmlb-al-correct').trigger('submit')
+    await flushPromises()
+
+    expect(adapter.correctActiveLearningLabel).toHaveBeenCalledWith('ds-1', 'crimnal', 'criminal')
+  })
+
+  it('is not offered where the Dataset names its labels', async () => {
+    const { wrapper } = await mounted(loopState({ retrain: short }))
+
+    expect(wrapper.find('.vmlb-al-correct').exists()).toBe(false)
   })
 })
 

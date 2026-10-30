@@ -24,7 +24,7 @@ const emit = defineEmits<{
 }>()
 
 const pollInterval = inject<number>('vmlb:pollInterval', 3000)
-const { state, activeLoop, settings, error, isBusy, refresh, start, setStrategy, retrain, verify } = useActiveLearning(
+const { state, activeLoop, settings, error, isBusy, refresh, refreshCounts, start, setStrategy, correctLabel, retrain, verify } = useActiveLearning(
   props.adapter,
   pollInterval,
   () => emit('reordered'),
@@ -35,6 +35,8 @@ const holdoutOn = ref(true)
 const holdoutPercent = ref(20)
 const batchSize = ref(20)
 const minPerClass = ref(5)
+const correctFrom = ref('')
+const correctTo = ref('')
 
 const prompt = computed(() => (activeLoop.value ? retrainPrompt(activeLoop.value) : null))
 const verification = computed(() => (activeLoop.value ? verificationText(activeLoop.value) : ''))
@@ -51,6 +53,16 @@ const canCheck = computed(() => {
   return !!loop?.model_id && loop.holdout.size > 0 && !holdoutMissing.value && loop.holdout.verification !== 'holdout'
 })
 
+/** Labels that hold retraining back, which a typo always does. */
+const correctable = computed(() => {
+  const loop = activeLoop.value
+  return loop?.typed_labels && props.adapter.correctActiveLearningLabel ? Object.keys(loop.retrain.classes_short) : []
+})
+
+watch(correctable, (names) => {
+  if (!names.includes(correctFrom.value)) correctFrom.value = names[0] ?? ''
+}, { immediate: true })
+
 watch(settings, (value) => {
   if (!value) return
   strategy.value = value.default_strategy
@@ -64,8 +76,13 @@ watch(activeLoop, (value) => {
 })
 
 onMounted(() => refresh(props.datasetId))
-watch(() => props.labelsVersion, () => refresh(props.datasetId))
+watch(() => props.labelsVersion, () => refreshCounts(props.datasetId))
 watch(() => props.datasetId, (id) => refresh(id))
+
+async function onCorrect() {
+  await correctLabel(props.datasetId, correctFrom.value, correctTo.value.trim())
+  correctTo.value = ''
+}
 
 async function onStart() {
   await start(props.datasetId, {
@@ -151,6 +168,23 @@ async function onStart() {
         </button>
       </div>
 
+      <form v-if="correctable.length" class="vmlb-al-correct vmlb-muted" @submit.prevent="onCorrect">
+        <label>
+          Typed a label wrong? Change
+          <select v-model="correctFrom" :disabled="isBusy">
+            <option v-for="name in correctable" :key="name" :value="name">{{ name }}</option>
+          </select>
+        </label>
+        <label>
+          to
+          <input v-model="correctTo" type="text" :disabled="isBusy" list="vmlb-al-labels" />
+        </label>
+        <datalist id="vmlb-al-labels">
+          <option v-for="name in Object.keys(activeLoop.label_counts)" :key="name" :value="name" />
+        </datalist>
+        <button class="vmlb-btn-secondary" type="submit" :disabled="isBusy || !correctTo.trim()">Correct</button>
+      </form>
+
       <div class="vmlb-al-holdout">
         <span v-if="verification" class="vmlb-badge" :class="{ 'vmlb-al-unverified': activeLoop.holdout.verification !== 'holdout' }">{{ verification }}</span>
         <span v-if="activeLoop.holdout.size" class="vmlb-muted">
@@ -174,6 +208,9 @@ async function onStart() {
 .vmlb-al-strategy select { font: inherit; color: var(--vmlb-text); background: var(--vmlb-surface); border: 1px solid var(--vmlb-border-strong); border-radius: var(--vmlb-radius-sm); padding: 0.1rem 0.25rem; }
 .vmlb-al-prompt { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: 0.75rem; font-size: 0.875rem; }
 .vmlb-al-prompt-ask { padding: 0.65rem 0.85rem; border-radius: var(--vmlb-radius-md); background: var(--vmlb-accent-soft); font-weight: 600; }
+.vmlb-al-correct { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-top: 0.75rem; font-size: 0.8125rem; }
+.vmlb-al-correct select,
+.vmlb-al-correct input { font: inherit; color: var(--vmlb-text); background: var(--vmlb-surface); border: 1px solid var(--vmlb-border-strong); border-radius: var(--vmlb-radius-sm); padding: 0.1rem 0.25rem; }
 .vmlb-al-holdout { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.85rem; margin-top: 0.75rem; font-size: 0.8125rem; }
 .vmlb-al-unverified { background: var(--vmlb-surface-sunken); color: var(--vmlb-text); }
 .vmlb-al-advanced { margin: 0.75rem 0; font-size: 0.875rem; }

@@ -20,6 +20,8 @@ tagged `vX.Y.Z`.
 - `ActiveLearningPanel`: start a loop, the retrain prompt, held-back items and
   "Not independently verified". Strategies are named in plain language under
   Advanced. The LLM seed is shown disabled until LLM assistance lands.
+- A label typed wrong can be corrected from the panel, through the optional
+  `correctActiveLearningLabel` adapter method.
 - Optional adapter methods for active learning and `listAnnotationTasks`. Without
   them the workspace is plain annotation.
 - `annotationState`, `labelledRows`, `retrainPrompt` and related helpers exported.

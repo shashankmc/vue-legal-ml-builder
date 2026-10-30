@@ -151,6 +151,8 @@ export interface ActiveLearningState {
   model_id: Id | null
   round: ActiveLearningRound
   label_counts: Record<string, number>
+  /** The Dataset names no labels, so one can be typed wrong and corrected. */
+  typed_labels: boolean
   retrain: {
     new_labels: number
     allowed: boolean
@@ -304,6 +306,7 @@ export interface MLAdapter {
   getActiveLearningState?(datasetId: Id): Promise<ActiveLearningState | { active: false }>
   startActiveLearning?(datasetId: Id, options: ActiveLearningStartOptions): Promise<ActiveLearningState>
   setActiveLearningStrategy?(datasetId: Id, strategy: string): Promise<ActiveLearningState>
+  correctActiveLearningLabel?(datasetId: Id, from: string, to: string): Promise<ActiveLearningState>
   retrainActiveLearning?(datasetId: Id): Promise<{ job_id: Id | null }>
   verifyActiveLearning?(datasetId: Id): Promise<void>
 }
