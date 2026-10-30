@@ -23,6 +23,8 @@ export interface SelfHostedAdapterOptions {
   apiUrl: string
   /** Called on every request to get the current bearer token; return null/undefined to omit it. */
   getAuthToken?: () => string | null | undefined
+  /** Called when a request comes back 401; return a fresh token to retry it once, or nothing to give up. */
+  refreshAuthToken?: () => Promise<string | null | undefined>
 }
 
 function buildHeaders(getAuthToken?: () => string | null | undefined, extra: HeadersInit = {}): HeadersInit {
@@ -42,30 +44,43 @@ async function parseOrThrow(res: Response) {
 
 export function createSelfHostedAdapter(opts: SelfHostedAdapterOptions): MLAdapter {
   const base = opts.apiUrl.replace(/\/$/, '')
-  const { getAuthToken } = opts
+  const { getAuthToken, refreshAuthToken } = opts
+  let refreshing: Promise<string | null | undefined> | null = null
+
+  // One refresh serves every request that expired together.
+  function refreshOnce() {
+    refreshing ??= refreshAuthToken!().finally(() => {
+      refreshing = null
+    })
+    return refreshing
+  }
+
+  async function send(path: string, init: RequestInit = {}, headers: HeadersInit = {}) {
+    const url = `${base}${path}`
+    const res = await fetch(url, { ...init, headers: buildHeaders(getAuthToken, headers) })
+    if (res.status !== 401 || !refreshAuthToken) return res
+    const token = await refreshOnce()
+    return token ? fetch(url, { ...init, headers: buildHeaders(() => token, headers) }) : res
+  }
 
   function get(path: string) {
-    return fetch(`${base}${path}`, { headers: buildHeaders(getAuthToken) }).then(parseOrThrow)
+    return send(path).then(parseOrThrow)
   }
 
   function del(path: string) {
-    return fetch(`${base}${path}`, { method: 'DELETE', headers: buildHeaders(getAuthToken) }).then(parseOrThrow)
+    return send(path, { method: 'DELETE' }).then(parseOrThrow)
   }
 
   function put(path: string, body: unknown) {
-    return fetch(`${base}${path}`, {
-      method: 'PUT',
-      headers: buildHeaders(getAuthToken, { 'Content-Type': 'application/json' }),
-      body: JSON.stringify(body),
-    }).then(parseOrThrow)
+    return send(path, { method: 'PUT', body: JSON.stringify(body) }, { 'Content-Type': 'application/json' }).then(parseOrThrow)
   }
 
   function post(path: string, body?: unknown) {
-    return fetch(`${base}${path}`, {
-      method: 'POST',
-      headers: buildHeaders(getAuthToken, { 'Content-Type': 'application/json' }),
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    }).then(parseOrThrow)
+    return send(
+      path,
+      { method: 'POST', body: body !== undefined ? JSON.stringify(body) : undefined },
+      { 'Content-Type': 'application/json' },
+    ).then(parseOrThrow)
   }
 
   return {
@@ -87,11 +102,7 @@ export function createSelfHostedAdapter(opts: SelfHostedAdapterOptions): MLAdapt
       if (meta.annotation_mode !== undefined) formData.append('annotation_mode', String(meta.annotation_mode))
       if (meta.labels?.length) formData.append('labels', meta.labels.join(','))
 
-      const res = await fetch(`${base}/datasets/upload`, {
-        method: 'POST',
-        headers: buildHeaders(getAuthToken),
-        body: formData,
-      })
+      const res = await send('/datasets/upload', { method: 'POST', body: formData })
       const data = await parseOrThrow(res)
       return data.dataset
     },
