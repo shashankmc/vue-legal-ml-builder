@@ -92,8 +92,79 @@ export interface AnnotationTask {
   text: string
   annotation_label?: string | null
   status: 'pending' | 'annotated' | 'skipped'
+  label_source?: string | null
+  score?: number | null
+  is_holdout?: boolean
   created_at: string
   updated_at: string
+}
+
+export interface AnnotationStats {
+  total: number
+  annotated: number
+  percentage: number
+  /** Held-back items still without a label. The queue never serves these. */
+  holdout_remaining?: number
+}
+
+// ---------------------------------------------------------------------------
+// Active learning — mirrors legal-ml-core's /api/active-learning responses.
+// ---------------------------------------------------------------------------
+
+export interface ActiveLearningSettings {
+  strategies: string[]
+  default_strategy: string
+  default_batch_size: number
+  min_per_class: number
+  default_holdout_percent: number
+  max_holdout_percent: number
+  seed_sources: { random: boolean; llm: boolean }
+}
+
+export interface ActiveLearningStartOptions {
+  strategy?: string
+  batch_size?: number
+  min_per_class?: number
+  holdout_percent?: number
+  seed_source?: 'random' | 'llm'
+}
+
+export interface ActiveLearningRound {
+  number: number
+  status: 'labelling' | 'training' | 'scoring' | 'completed'
+  strategy: string
+  model_id: Id | null
+  job_id: Id | null
+  labels_used: number | null
+  metrics: Record<string, unknown> | null
+  error: string | null
+  created_at: string
+  completed_at: string | null
+}
+
+export interface ActiveLearningState {
+  active: true
+  strategy: string
+  seed_source: string
+  batch_size: number
+  min_per_class: number
+  model_id: Id | null
+  round: ActiveLearningRound
+  label_counts: Record<string, number>
+  retrain: {
+    new_labels: number
+    allowed: boolean
+    suggested: boolean
+    classes_short: Record<string, number>
+    needs_second_label: boolean
+  }
+  holdout: {
+    percent: number
+    size: number
+    labelled: number
+    needed: number
+    verification: 'holdout' | 'not_independently_verified' | null
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -222,9 +293,19 @@ export interface MLAdapter {
   getParameterComparison(modelType: string, metric: string): Promise<ParameterComparisonPoint[]>
 
   // Annotation
-  getNextAnnotationTask(projectId: Id, datasetId?: Id): Promise<{ task: AnnotationTask | null; stats: { total: number; annotated: number; percentage: number } }>
+  getNextAnnotationTask(projectId: Id, datasetId?: Id, options?: { holdout?: boolean }): Promise<{ task: AnnotationTask | null; stats: AnnotationStats }>
   saveAnnotation(taskId: Id, label: unknown): Promise<AnnotationTask>
   skipAnnotation(taskId: Id): Promise<AnnotationTask>
+  /** Optional: lets a user return to skipped items. */
+  listAnnotationTasks?(projectId: Id, filter: { status?: string; datasetId?: Id }): Promise<AnnotationTask[]>
+
+  // Active learning. Optional: without these the workspace is plain annotation.
+  getActiveLearningSettings?(): Promise<ActiveLearningSettings>
+  getActiveLearningState?(datasetId: Id): Promise<ActiveLearningState | { active: false }>
+  startActiveLearning?(datasetId: Id, options: ActiveLearningStartOptions): Promise<ActiveLearningState>
+  setActiveLearningStrategy?(datasetId: Id, strategy: string): Promise<ActiveLearningState>
+  retrainActiveLearning?(datasetId: Id): Promise<{ job_id: Id | null }>
+  verifyActiveLearning?(datasetId: Id): Promise<void>
 }
 
 // ---------------------------------------------------------------------------

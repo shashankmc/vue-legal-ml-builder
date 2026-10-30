@@ -2,6 +2,7 @@ import type { App } from 'vue'
 import './styles/tokens.css'
 import './styles/components.css'
 import { createSelfHostedAdapter } from './adapters/selfHosted'
+import ActiveLearningPanel from './components/ActiveLearningPanel.vue'
 import AnnotationWorkspace from './components/AnnotationWorkspace.vue'
 import DatasetEda from './components/DatasetEda.vue'
 import DatasetManager from './components/DatasetManager.vue'
@@ -52,6 +53,7 @@ export const VueLegalMlBuilderPlugin = {
     app.component('TrainingCurves', TrainingCurves)
     app.component('ParameterPerformanceExplorer', ParameterPerformanceExplorer)
     app.component('AnnotationWorkspace', AnnotationWorkspace)
+    app.component('ActiveLearningPanel', ActiveLearningPanel)
     app.component('ConfusionMatrix', ConfusionMatrix)
     app.component('ModelLens', ModelLens)
     app.component('PlotlyChart', PlotlyChart)
@@ -66,6 +68,7 @@ export default VueLegalMlBuilderPlugin
 // ---------------------------------------------------------------------------
 
 export {
+  ActiveLearningPanel,
   AnnotationWorkspace,
   ConfusionMatrix,
   DatasetEda,
@@ -94,6 +97,7 @@ export type { SelfHostedAdapterOptions } from './adapters/selfHosted'
 export { mountComponent } from './mount'
 export type { MountedComponent } from './mount'
 
+export { useActiveLearning } from './composables/useActiveLearning'
 export { useAnnotation } from './composables/useAnnotation'
 export { useDatasets } from './composables/useDatasets'
 export { useEda } from './composables/useEda'
@@ -106,9 +110,17 @@ export { allModelInfo, modelsByTaskType, parameterSchemas, quickGuideFor, taskTy
 export { classColor, defaultLabels, lensCopy, lensFamily } from './lens/modelLens'
 export type { LensCopy, LensFamily, LensPoint } from './lens/modelLens'
 export { decisionTreeFor } from './lens/modelGuide'
+export { ANNOTATION_STATE, annotationControls, annotationState, canSaveAnnotation, labelledRows, nothingToAnnotateReason } from './annotation/annotationState'
+export type { AnnotationControls, AnnotationScreenState, EntitySpan } from './annotation/annotationState'
+export { STRATEGY_COPY, retrainPrompt, verificationText } from './annotation/activeLearning'
 export type { DecisionTree, GuideNode, GuideOption } from './lens/modelGuide'
 
 export type {
+  ActiveLearningRound,
+  ActiveLearningSettings,
+  ActiveLearningStartOptions,
+  ActiveLearningState,
+  AnnotationStats,
   AnnotationTask,
   Dataset,
   DatasetUploadMeta,

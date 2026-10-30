@@ -11,6 +11,25 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `AnnotationWorkspace` reaches parity with BAIGLE's annotation screen: choose a
+  label then Save & Next, multi-label, NER span tagging, guidelines, S and N keys,
+  skipped-item review, and honest end states. New props: `taskType`, `projectName`,
+  `guidelines`, `rowCount`, `unlabelledRows`, `backHref`, `createModelHref`.
+- `ActiveLearningPanel`: start a loop, the retrain prompt, held-back items and
+  "Not independently verified". Strategies are named in plain language under
+  Advanced. The LLM seed is shown disabled until LLM assistance lands.
+- Optional adapter methods for active learning and `listAnnotationTasks`. Without
+  them the workspace is plain annotation.
+- `annotationState`, `labelledRows`, `retrainPrompt` and related helpers exported.
+
+### Changed
+
+- Clicking a label selects it. Saving takes Save & Next, so it no longer saves on
+  click.
+- Needs `legal-ml-core` with `/api/active-learning` for the loop.
+
 ## [0.3.1] - 2026-10-30
 
 ### Added

@@ -1,0 +1,235 @@
+import { mount, flushPromises } from '@vue/test-utils'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import AnnotationWorkspace from '../src/components/AnnotationWorkspace.vue'
+import { createTestAdapter } from './testAdapter'
+import type { ActiveLearningState } from '../src/types'
+
+const SETTINGS = {
+  strategies: ['prediction_entropy', 'random'],
+  default_strategy: 'prediction_entropy',
+  default_batch_size: 20,
+  min_per_class: 5,
+  default_holdout_percent: 20,
+  max_holdout_percent: 50,
+  seed_sources: { random: true, llm: false },
+}
+
+function loopState(overrides: Partial<ActiveLearningState> = {}): ActiveLearningState {
+  return {
+    active: true,
+    strategy: 'prediction_entropy',
+    seed_source: 'random',
+    batch_size: 20,
+    min_per_class: 5,
+    model_id: null,
+    round: { number: 0, status: 'labelling', strategy: 'random', model_id: null, job_id: null, labels_used: null, metrics: null, error: null, created_at: '', completed_at: null },
+    label_counts: {},
+    retrain: { new_labels: 0, allowed: false, suggested: false, classes_short: {}, needs_second_label: false },
+    holdout: { percent: 20, size: 10, labelled: 0, needed: 10, verification: null },
+    ...overrides,
+  }
+}
+
+const TASK = { id: 't1', dataset_id: 'ds-1', item_index: 0, text: 'Clause.', status: 'pending' as const, created_at: '', updated_at: '' }
+
+async function mounted(state: ActiveLearningState | { active: false }, overrides = {}, props = {}) {
+  const adapter = createTestAdapter({
+    getNextAnnotationTask: vi.fn().mockResolvedValue({ task: TASK, stats: { total: 4, annotated: 1, percentage: 25 } }),
+    getDataset: vi.fn().mockResolvedValue({ labels: ['Civil', 'Criminal'] }),
+    saveAnnotation: vi.fn().mockResolvedValue({}),
+    getActiveLearningSettings: vi.fn().mockResolvedValue(SETTINGS),
+    getActiveLearningState: vi.fn().mockResolvedValue(state),
+    startActiveLearning: vi.fn().mockResolvedValue(loopState()),
+    setActiveLearningStrategy: vi.fn().mockResolvedValue(loopState({ strategy: 'random' })),
+    retrainActiveLearning: vi.fn().mockResolvedValue({ job_id: 'j1' }),
+    verifyActiveLearning: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  })
+  const wrapper = mount(AnnotationWorkspace, { props: { adapter, projectId: 'p1', datasetId: 'ds-1', ...props } })
+  await flushPromises()
+  return { adapter, wrapper }
+}
+
+function button(wrapper: Awaited<ReturnType<typeof mounted>>['wrapper'], text: string) {
+  return wrapper.findAll('button').find((b) => b.text() === text)
+}
+
+afterEach(() => vi.useRealTimers())
+
+describe('starting the loop', () => {
+  it('offers it with sensible defaults and sends them', async () => {
+    const { adapter, wrapper } = await mounted({ active: false })
+
+    await button(wrapper, 'Start')!.trigger('click')
+    await flushPromises()
+
+    expect(adapter.startActiveLearning).toHaveBeenCalledWith('ds-1', {
+      strategy: 'prediction_entropy',
+      batch_size: 20,
+      min_per_class: 5,
+      holdout_percent: 20,
+      seed_source: 'random',
+    })
+    expect(adapter.getNextAnnotationTask).toHaveBeenCalledTimes(2)
+  })
+
+  it('names strategies in plain language and only the hosts', async () => {
+    const { wrapper } = await mounted({ active: false })
+
+    expect(wrapper.text()).toContain('Hardest cases first')
+    expect(wrapper.text()).toContain('Random order')
+    expect(wrapper.text()).not.toContain('Closest calls first')
+    expect(wrapper.text()).not.toContain('entropy')
+  })
+
+  it('keeps the LLM seed visible but disabled', async () => {
+    const { wrapper } = await mounted({ active: false })
+
+    const radios = wrapper.findAll('input[name="vmlb-seed"]')
+    expect(wrapper.text()).toContain('Suggested by an LLM (not available yet)')
+    expect(radios[1].attributes('disabled')).toBeDefined()
+  })
+
+  it('warns what turning the holdout off means, and sends 0', async () => {
+    const { adapter, wrapper } = await mounted({ active: false })
+
+    await wrapper.find('input[type="checkbox"]').setValue(false)
+    expect(wrapper.text()).toContain('Not independently verified')
+
+    await button(wrapper, 'Start')!.trigger('click')
+    await flushPromises()
+    expect(adapter.startActiveLearning).toHaveBeenCalledWith('ds-1', expect.objectContaining({ holdout_percent: 0 }))
+  })
+
+  it('does not offer to start with nothing to label', async () => {
+    const { wrapper } = await mounted(
+      { active: false },
+      { getNextAnnotationTask: vi.fn().mockResolvedValue({ task: null, stats: { total: 0, annotated: 0, percentage: 0 } }) },
+    )
+
+    expect(button(wrapper, 'Start')).toBeUndefined()
+  })
+
+  it('is left out where the adapter has no loop, and for NER', async () => {
+    const { wrapper } = await mounted({ active: false }, { getActiveLearningState: undefined })
+    expect(button(wrapper, 'Start')).toBeUndefined()
+
+    const ner = await mounted({ active: false }, {}, { taskType: 'ner' })
+    expect(ner.adapter.getActiveLearningState).not.toHaveBeenCalled()
+  })
+})
+
+describe('the running loop', () => {
+  it('prompts to retrain and nothing happens until the user does', async () => {
+    const { adapter, wrapper } = await mounted(
+      loopState({ retrain: { new_labels: 20, allowed: true, suggested: true, classes_short: {}, needs_second_label: false } }),
+    )
+
+    expect(wrapper.text()).toContain('20 new labels, retrain?')
+    expect(adapter.retrainActiveLearning).not.toHaveBeenCalled()
+
+    await button(wrapper, 'Retrain')!.trigger('click')
+    await flushPromises()
+    expect(adapter.retrainActiveLearning).toHaveBeenCalledWith('ds-1')
+  })
+
+  it('shows what a short label still needs, with no Retrain button', async () => {
+    const { wrapper } = await mounted(
+      loopState({ retrain: { new_labels: 8, allowed: false, suggested: false, classes_short: { Civil: 3 }, needs_second_label: false } }),
+    )
+
+    expect(wrapper.text()).toContain('Before the first training: 3 more Civil.')
+    expect(button(wrapper, 'Retrain')).toBeUndefined()
+  })
+
+  it('refreshes the counts after a saved label', async () => {
+    const { adapter, wrapper } = await mounted(loopState())
+
+    await button(wrapper, 'Civil')!.trigger('click')
+    await button(wrapper, 'Save & Next')!.trigger('click')
+    await flushPromises()
+
+    expect(adapter.getActiveLearningState).toHaveBeenCalledTimes(2)
+  })
+
+  it('reloads the queue when a rescore finishes', async () => {
+    vi.useFakeTimers()
+    const training = loopState({ round: { ...loopState().round, status: 'scoring' } })
+    const next = loopState({ round: { ...loopState().round, number: 1 } })
+    const { adapter } = await mounted(training, {
+      getActiveLearningState: vi.fn().mockResolvedValueOnce(training).mockResolvedValue(next),
+    })
+    const before = (adapter.getNextAnnotationTask as ReturnType<typeof vi.fn>).mock.calls.length
+
+    await vi.advanceTimersByTimeAsync(3100)
+    await flushPromises()
+
+    expect((adapter.getNextAnnotationTask as ReturnType<typeof vi.fn>).mock.calls.length).toBe(before + 1)
+  })
+
+  it('shows a training failure with its reason', async () => {
+    const { wrapper } = await mounted(loopState({ round: { ...loopState().round, error: 'Ran out of memory' } }))
+
+    expect(wrapper.text()).toContain('Ran out of memory')
+  })
+
+  it('changes the strategy', async () => {
+    const { adapter, wrapper } = await mounted(loopState())
+
+    await wrapper.find('.vmlb-al-strategy select').setValue('random')
+    await flushPromises()
+
+    expect(adapter.setActiveLearningStrategy).toHaveBeenCalledWith('ds-1', 'random')
+  })
+})
+
+describe('the holdout', () => {
+  it('reads "Not independently verified" without a grade', async () => {
+    const { wrapper } = await mounted(
+      loopState({ model_id: 'm1', holdout: { percent: 0, size: 0, labelled: 0, needed: 0, verification: 'not_independently_verified' } }),
+    )
+
+    expect(wrapper.text()).toContain('Not independently verified')
+    expect(wrapper.text()).toContain('No items are held back.')
+    expect(button(wrapper, 'Check the score')).toBeUndefined()
+  })
+
+  it('labels held-back items only when asked, then returns to the queue', async () => {
+    const { adapter, wrapper } = await mounted(loopState())
+
+    await button(wrapper, 'Label held-back items')!.trigger('click')
+    await flushPromises()
+
+    expect(adapter.getNextAnnotationTask).toHaveBeenLastCalledWith('p1', 'ds-1', { holdout: true })
+    expect(wrapper.text()).toContain('never trained on')
+    expect(button(wrapper, 'Skip')).toBeUndefined()
+
+    await button(wrapper, 'Back to the queue')!.trigger('click')
+    await flushPromises()
+    expect(adapter.getNextAnnotationTask).toHaveBeenLastCalledWith('p1', 'ds-1')
+  })
+
+  it('offers the check once enough held-back items are labelled', async () => {
+    const { adapter, wrapper } = await mounted(
+      loopState({ model_id: 'm1', holdout: { percent: 20, size: 10, labelled: 10, needed: 10, verification: 'not_independently_verified' } }),
+    )
+
+    await button(wrapper, 'Check the score')!.trigger('click')
+    await flushPromises()
+
+    expect(adapter.verifyActiveLearning).toHaveBeenCalledWith('ds-1')
+  })
+
+  it('reports a check that never finishes instead of waiting for ever', async () => {
+    vi.useFakeTimers()
+    const { wrapper } = await mounted(
+      loopState({ model_id: 'm1', holdout: { percent: 20, size: 10, labelled: 10, needed: 10, verification: 'not_independently_verified' } }),
+    )
+
+    await button(wrapper, 'Check the score')!.trigger('click')
+    await vi.advanceTimersByTimeAsync(40 * 3100)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('The score could not be checked. Try again.')
+  })
+})

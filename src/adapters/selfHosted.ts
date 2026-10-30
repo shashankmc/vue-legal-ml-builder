@@ -1,4 +1,7 @@
 import type {
+  ActiveLearningSettings,
+  ActiveLearningStartOptions,
+  ActiveLearningState,
   AnnotationTask,
   Dataset,
   DatasetUploadMeta,
@@ -47,6 +50,14 @@ export function createSelfHostedAdapter(opts: SelfHostedAdapterOptions): MLAdapt
 
   function del(path: string) {
     return fetch(`${base}${path}`, { method: 'DELETE', headers: buildHeaders(getAuthToken) }).then(parseOrThrow)
+  }
+
+  function put(path: string, body: unknown) {
+    return fetch(`${base}${path}`, {
+      method: 'PUT',
+      headers: buildHeaders(getAuthToken, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    }).then(parseOrThrow)
   }
 
   function post(path: string, body?: unknown) {
@@ -167,8 +178,11 @@ export function createSelfHostedAdapter(opts: SelfHostedAdapterOptions): MLAdapt
     },
 
     // Annotation
-    async getNextAnnotationTask(projectId: Id, datasetId?: Id) {
-      const query = datasetId ? `?dataset=${encodeURIComponent(String(datasetId))}` : ''
+    async getNextAnnotationTask(projectId: Id, datasetId?: Id, options?: { holdout?: boolean }) {
+      const params = new URLSearchParams()
+      if (datasetId) params.set('dataset', String(datasetId))
+      if (options?.holdout) params.set('holdout', '1')
+      const query = params.toString() ? `?${params}` : ''
       const data = await get(`/annotation/projects/${projectId}/queue/next${query}`)
       return { task: data.task, stats: data.stats }
     },
@@ -179,6 +193,34 @@ export function createSelfHostedAdapter(opts: SelfHostedAdapterOptions): MLAdapt
     async skipAnnotation(taskId: Id): Promise<AnnotationTask> {
       const data = await post(`/annotation/tasks/${taskId}/skip`)
       return data.task
+    },
+    async listAnnotationTasks(projectId: Id, filter): Promise<AnnotationTask[]> {
+      const params = new URLSearchParams()
+      if (filter.status) params.set('status', filter.status)
+      if (filter.datasetId) params.set('dataset_id', String(filter.datasetId))
+      const data = await get(`/annotation/projects/${projectId}/tasks?${params}`)
+      return data.tasks
+    },
+
+    // Active learning
+    async getActiveLearningSettings(): Promise<ActiveLearningSettings> {
+      return get('/active-learning/settings')
+    },
+    async getActiveLearningState(datasetId: Id): Promise<ActiveLearningState | { active: false }> {
+      return get(`/active-learning/datasets/${datasetId}`)
+    },
+    async startActiveLearning(datasetId: Id, options: ActiveLearningStartOptions): Promise<ActiveLearningState> {
+      return post(`/active-learning/datasets/${datasetId}/start`, options)
+    },
+    async setActiveLearningStrategy(datasetId: Id, strategy: string): Promise<ActiveLearningState> {
+      return put(`/active-learning/datasets/${datasetId}/strategy`, { strategy })
+    },
+    async retrainActiveLearning(datasetId: Id): Promise<{ job_id: Id | null }> {
+      const data = await post(`/active-learning/datasets/${datasetId}/retrain`)
+      return { job_id: data.job_id }
+    },
+    async verifyActiveLearning(datasetId: Id): Promise<void> {
+      await post(`/active-learning/datasets/${datasetId}/verify`)
     },
   }
 }
