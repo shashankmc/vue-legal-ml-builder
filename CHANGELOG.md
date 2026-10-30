@@ -20,6 +20,9 @@ tagged `vX.Y.Z`.
 - `ActiveLearningPanel`: start a loop, the retrain prompt, held-back items and
   "Not independently verified". Strategies are named in plain language under
   Advanced. The LLM seed is shown disabled until LLM assistance lands.
+- The panel warns by name when training opens with labels short of their minimum,
+  through `trainingWarning`, and counts held-back items by label through
+  `holdoutClassText`.
 - A label typed wrong can be corrected from the panel, through the optional
   `correctActiveLearningLabel` adapter method.
 - Optional adapter methods for active learning and `listAnnotationTasks`. Without
