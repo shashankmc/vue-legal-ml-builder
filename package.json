@@ -1,6 +1,6 @@
 {
   "name": "vue-legal-ml-builder",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Vue 3 component library for the BAIGLE legal-ML workbench — dataset management, model configuration/training/prediction, visualization, annotation, and experiment monitoring, driven entirely through a host-supplied backend adapter",
   "license": "MIT",
   "author": {
