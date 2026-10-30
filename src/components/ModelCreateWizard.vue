@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, reactive, ref } from 'vue'
 import type { Dataset, MLAdapter } from '../types'
-import { allModelInfo, modelsByTaskType, parameterSchemas, taskTypeLabel } from './modelCatalogData'
+import { allModelInfo, defaultModelFor, modelsByTaskType, parameterSchemas, taskTypeLabel } from './modelCatalogData'
 import ModelLens from './shared/ModelLens.vue'
 import ModelQuestionTree from './ModelQuestionTree.vue'
 import Icon from './shared/Icon.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   adapter?: MLAdapter
   /** Pre-select a dataset (e.g. navigated here from a dataset's "Create Model" button). */
   datasetId?: string
@@ -14,7 +14,9 @@ const props = defineProps<{
    * host app's own concern (generic CRUD, not part of this package's adapter) —
    * pass the id the host already resolved, or omit for an unassociated model. */
   projectId?: string
-}>()
+  /** Number of the first step, for a host that puts its own steps before these. */
+  firstStep?: number
+}>(), { firstStep: 1 })
 
 const emit = defineEmits<{
   created: [model: unknown, info?: { trainingQueued: boolean }]
@@ -39,6 +41,9 @@ const expandedParams = reactive<Record<string, boolean>>({})
 // Falls back to the static catalog when the adapter can't answer (e.g. a
 // non-BAIGLE host), so the wizard still works standalone.
 const backendModels = ref<string[] | null>(null)
+// Label names from the dataset's overview, for datasets uploaded with their
+// labels in a column rather than declared up front.
+const overviewLabels = ref<string[] | null>(null)
 
 const staticModels = computed<string[]>(() =>
   selectedDataset.value ? (modelsByTaskType[selectedDataset.value.task_type] || []) : [],
@@ -50,7 +55,7 @@ const availableModels = computed<string[]>(() => {
 })
 const currentSchema = computed(() => parameterSchemas[modelType.value] || [])
 const taskLabel = computed(() => (selectedDataset.value ? taskTypeLabel(selectedDataset.value.task_type) : ''))
-const datasetLabels = computed(() => selectedDataset.value?.labels ?? null)
+const datasetLabels = computed(() => (selectedDataset.value?.labels?.length ? selectedDataset.value.labels : overviewLabels.value))
 
 onMounted(async () => {
   if (!adapter.value) {
@@ -62,6 +67,7 @@ onMounted(async () => {
     datasets.value = await adapter.value.listDatasets()
     if (props.datasetId) {
       selectedDataset.value = datasets.value.find((d) => d.id === props.datasetId) ?? null
+      prepareDataset()
     }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load datasets'
@@ -72,15 +78,43 @@ onMounted(async () => {
 
 async function loadBackendModels() {
   backendModels.value = null
-  if (!adapter.value?.getAvailableModelTypes || !selectedDataset.value) return
+  const dataset = selectedDataset.value
+  if (!adapter.value?.getAvailableModelTypes || !dataset) return
   try {
-    const catalog = await adapter.value.getAvailableModelTypes(selectedDataset.value.task_type)
-    const taskType = selectedDataset.value.task_type
-    const types = Object.keys(catalog?.[taskType] ?? {})
+    const catalog = await adapter.value.getAvailableModelTypes(dataset.task_type)
+    if (selectedDataset.value !== dataset) return
+    const types = Object.keys(catalog?.[dataset.task_type] ?? {})
     backendModels.value = types.length ? types : null
   } catch {
     backendModels.value = null
   }
+}
+
+async function loadOverviewLabels() {
+  overviewLabels.value = null
+  const dataset = selectedDataset.value
+  if (!adapter.value || !dataset || dataset.labels?.length) return
+  try {
+    const eda = await adapter.value.getEdaData(dataset.id)
+    if (selectedDataset.value !== dataset) return
+    const distribution = (eda?.task_specific_analysis?.label_distribution ?? {}) as Record<string, number>
+    const labels = Object.entries(distribution).sort(([, a], [, b]) => b - a).map(([label]) => label)
+    overviewLabels.value = labels.length ? labels : null
+  } catch {
+    overviewLabels.value = null // the generic wording still reads correctly
+  }
+}
+
+async function prepareDataset() {
+  const dataset = selectedDataset.value
+  loadOverviewLabels()
+  await loadBackendModels()
+  // Not if the user picked a model, or another dataset, while the catalogue loaded.
+  if (selectedDataset.value !== dataset || modelType.value) return
+  const type = defaultModelFor(availableModels.value)
+  if (!type) return
+  selectModelType(type)
+  expandedModelInfo.value = null
 }
 
 function onDatasetChange() {
@@ -89,7 +123,7 @@ function onDatasetChange() {
   Object.keys(expandedParams).forEach((k) => delete expandedParams[k])
   modelNameEdited.value = false
   modelName.value = ''
-  loadBackendModels()
+  prepareDataset()
 }
 
 function selectModelType(type: string) {
@@ -163,7 +197,7 @@ async function createModel() {
     <template v-else>
       <!-- Step 1: dataset -->
       <section class="vmlb-card">
-        <h2 class="vmlb-step-title"><span class="vmlb-step-num">1</span> Select dataset</h2>
+        <h2 class="vmlb-step-title"><span class="vmlb-step-num">{{ firstStep }}</span> Select dataset</h2>
         <p v-if="datasets.length === 0" class="vmlb-muted">No datasets available. Upload one first.</p>
         <select v-else v-model="selectedDataset" class="vmlb-input" @change="onDatasetChange">
           <option :value="null">Choose a dataset…</option>
@@ -175,7 +209,7 @@ async function createModel() {
 
       <!-- Step 2: model type -->
       <section v-if="selectedDataset" class="vmlb-card">
-        <h2 class="vmlb-step-title"><span class="vmlb-step-num">2</span> Select model type</h2>
+        <h2 class="vmlb-step-title"><span class="vmlb-step-num">{{ firstStep + 1 }}</span> Select model type</h2>
         <p class="vmlb-muted vmlb-indent">Available models for <strong>{{ taskLabel }}</strong> tasks.</p>
 
         <ModelQuestionTree
@@ -221,7 +255,7 @@ async function createModel() {
 
       <!-- Step 3: configure -->
       <section v-if="modelType" class="vmlb-card">
-        <h2 class="vmlb-step-title"><span class="vmlb-step-num">3</span> Configure model</h2>
+        <h2 class="vmlb-step-title"><span class="vmlb-step-num">{{ firstStep + 2 }}</span> Configure model</h2>
 
         <div class="vmlb-configure">
           <div class="vmlb-configure-form">
@@ -236,43 +270,47 @@ async function createModel() {
               />
             </div>
 
-            <div v-if="currentSchema.length" class="vmlb-params">
-              <div v-for="param in currentSchema" :key="param.key" class="vmlb-param-row">
-                <div class="vmlb-param-head">
-                  <button type="button" class="vmlb-link-btn" @click="toggleParam(param.key)">
-                    {{ param.label }}
-                  </button>
-                  <p class="vmlb-muted vmlb-small">{{ param.shortDesc }}</p>
-                </div>
-                <div class="vmlb-param-input">
-                  <select v-if="param.type === 'select'" v-model="parameters[param.key]">
-                    <option v-for="opt in param.options" :key="opt" :value="opt">{{ opt }}</option>
-                  </select>
-                  <select v-else-if="param.type === 'boolean'" v-model="parameters[param.key]">
-                    <option :value="true">true</option>
-                    <option :value="false">false</option>
-                  </select>
-                  <input
-                    v-else
-                    v-model.number="parameters[param.key]"
-                    type="number"
-                    :step="param.step ?? 'any'"
-                    :min="param.min"
-                    :max="param.max"
-                    :placeholder="param.default === null ? 'unlimited' : String(param.default)"
-                  />
-                </div>
-                <div v-if="expandedParams[param.key]" class="vmlb-param-explain">
-                  <p>{{ param.explanation }}</p>
-                  <div v-if="param.optionsExplained">
-                    <div v-for="opt in param.optionsExplained" :key="opt.value" class="vmlb-option-line">
-                      <code>{{ opt.value }}</code> <span>{{ opt.desc }}</span>
-                    </div>
+            <details v-if="currentSchema.length" class="vmlb-advanced">
+              <summary>Advanced settings</summary>
+              <p class="vmlb-muted vmlb-small">Sensible defaults are already applied. Change these only if you want to.</p>
+              <div class="vmlb-params">
+                <div v-for="param in currentSchema" :key="param.key" class="vmlb-param-row">
+                  <div class="vmlb-param-head">
+                    <button type="button" class="vmlb-link-btn" @click="toggleParam(param.key)">
+                      {{ param.label }}
+                    </button>
+                    <p class="vmlb-muted vmlb-small">{{ param.shortDesc }}</p>
                   </div>
-                  <div class="vmlb-recommendation"><Icon name="spark" /> {{ param.recommendation }}</div>
+                  <div class="vmlb-param-input">
+                    <select v-if="param.type === 'select'" v-model="parameters[param.key]">
+                      <option v-for="opt in param.options" :key="opt" :value="opt">{{ opt }}</option>
+                    </select>
+                    <select v-else-if="param.type === 'boolean'" v-model="parameters[param.key]">
+                      <option :value="true">true</option>
+                      <option :value="false">false</option>
+                    </select>
+                    <input
+                      v-else
+                      v-model.number="parameters[param.key]"
+                      type="number"
+                      :step="param.step ?? 'any'"
+                      :min="param.min"
+                      :max="param.max"
+                      :placeholder="param.default === null ? 'unlimited' : String(param.default)"
+                    />
+                  </div>
+                  <div v-if="expandedParams[param.key]" class="vmlb-param-explain">
+                    <p>{{ param.explanation }}</p>
+                    <div v-if="param.optionsExplained">
+                      <div v-for="opt in param.optionsExplained" :key="opt.value" class="vmlb-option-line">
+                        <code>{{ opt.value }}</code> <span>{{ opt.desc }}</span>
+                      </div>
+                    </div>
+                    <div class="vmlb-recommendation"><Icon name="spark" /> {{ param.recommendation }}</div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </details>
           </div>
 
           <aside class="vmlb-configure-lens">
@@ -284,7 +322,7 @@ async function createModel() {
               :dataset-name="selectedDataset?.name"
             />
             <p class="vmlb-lens-footnote">
-              Change a setting on the left and watch the diagram redraw — that is the model changing how it decides.
+              Change an advanced setting and watch the diagram redraw — that is the model changing how it decides.
             </p>
           </aside>
         </div>
@@ -354,6 +392,9 @@ async function createModel() {
 .vmlb-model-info li :deep(.vmlb-icon) { color: var(--vmlb-success); margin-top: 0.15rem; }
 .vmlb-italic { font-style: italic; color: var(--vmlb-text-subtle); }
 .vmlb-field { margin-bottom: 1.25rem; }
+.vmlb-advanced summary { cursor: pointer; font-size: 0.875rem; font-weight: 600; color: var(--vmlb-text); }
+.vmlb-advanced[open] summary { margin-bottom: 0.5rem; }
+.vmlb-advanced .vmlb-params { margin-top: 0.75rem; }
 .vmlb-params { border: 1px solid var(--vmlb-border); border-radius: var(--vmlb-radius-md); overflow: hidden; }
 .vmlb-param-row {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;

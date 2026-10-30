@@ -12,6 +12,12 @@ export const modelsByTaskType: Record<string, string[]> = {
   summarization: ['legalbert', 'roberta'],
 }
 
+/** The model a no-code user starts from: Logistic Regression where it applies,
+ * else the first model the catalogue lists for the task. */
+export function defaultModelFor(available: string[]): string {
+  return available.includes('logistic_regression') ? 'logistic_regression' : (available[0] ?? '')
+}
+
 export const quickGuides: Record<string, Array<{ q: string; a: string }>> = {
   classification: [
     { q: 'Need explainability?', a: 'Decision Tree or Logistic Regression' },
