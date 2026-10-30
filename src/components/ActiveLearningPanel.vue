@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, ref, watch } from 'vue'
-import { STRATEGY_COPY, retrainPrompt, verificationText } from '../annotation/activeLearning'
+import { STRATEGY_COPY, holdoutClassText, retrainPrompt, trainingWarning, verificationText } from '../annotation/activeLearning'
 import { count } from '../annotation/annotationState'
 import { useActiveLearning } from '../composables/useActiveLearning'
 import type { Id, MLAdapter } from '../types'
@@ -39,6 +39,8 @@ const correctFrom = ref('')
 const correctTo = ref('')
 
 const prompt = computed(() => (activeLoop.value ? retrainPrompt(activeLoop.value) : null))
+const warning = computed(() => (activeLoop.value ? trainingWarning(activeLoop.value) : ''))
+const holdoutClasses = computed(() => (activeLoop.value ? holdoutClassText(activeLoop.value) : ''))
 const verification = computed(() => (activeLoop.value ? verificationText(activeLoop.value) : ''))
 const holdoutMissing = computed(() => {
   const holdout = activeLoop.value?.holdout
@@ -168,6 +170,8 @@ async function onStart() {
         </button>
       </div>
 
+      <p v-if="warning" class="vmlb-al-warning" role="status"><Icon name="alert" /> {{ warning }}</p>
+
       <form v-if="correctable.length" class="vmlb-al-correct vmlb-muted" @submit.prevent="onCorrect">
         <label>
           Typed a label wrong? Change
@@ -191,6 +195,7 @@ async function onStart() {
           {{ activeLoop.holdout.labelled }} of {{ count(activeLoop.holdout.size, 'held-back item') }} labelled
         </span>
         <span v-else class="vmlb-muted">No items are held back.</span>
+        <span v-if="holdoutClasses" class="vmlb-muted">{{ holdoutClasses }}</span>
         <button v-if="holdoutToLabel && !labellingHoldout" class="vmlb-btn-tertiary" @click="emit('label-holdout')">
           Label held-back items
         </button>
@@ -208,6 +213,7 @@ async function onStart() {
 .vmlb-al-strategy select { font: inherit; color: var(--vmlb-text); background: var(--vmlb-surface); border: 1px solid var(--vmlb-border-strong); border-radius: var(--vmlb-radius-sm); padding: 0.1rem 0.25rem; }
 .vmlb-al-prompt { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: 0.75rem; font-size: 0.875rem; }
 .vmlb-al-prompt-ask { padding: 0.65rem 0.85rem; border-radius: var(--vmlb-radius-md); background: var(--vmlb-accent-soft); font-weight: 600; }
+.vmlb-al-warning { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0.75rem 0 0; padding: 0.65rem 0.85rem; border-radius: var(--vmlb-radius-md); background: var(--vmlb-warning-soft); color: var(--vmlb-text); font-size: 0.875rem; }
 .vmlb-al-correct { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-top: 0.75rem; font-size: 0.8125rem; }
 .vmlb-al-correct select,
 .vmlb-al-correct input { font: inherit; color: var(--vmlb-text); background: var(--vmlb-surface); border: 1px solid var(--vmlb-border-strong); border-radius: var(--vmlb-radius-sm); padding: 0.1rem 0.25rem; }

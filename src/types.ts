@@ -159,11 +159,22 @@ export interface ActiveLearningState {
     suggested: boolean
     classes_short: Record<string, number>
     needs_second_label: boolean
+    labels_total: number
+    /** Past this many labels, a short label no longer holds training back. */
+    label_cap: number
+    /** Labels with one example: training leaves them out. */
+    classes_left_out: string[]
+    /** Labels the Dataset names, with no examples yet. */
+    classes_unseen: string[]
+    classes_to_train: number
+    /** Examples still needed for the split to show each label once. */
+    labels_needed: number
   }
   holdout: {
     percent: number
     size: number
     labelled: number
+    label_counts: Record<string, number>
     needed: number
     verification: 'holdout' | 'not_independently_verified' | null
   }

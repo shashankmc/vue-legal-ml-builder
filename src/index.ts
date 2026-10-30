@@ -112,7 +112,7 @@ export type { LensCopy, LensFamily, LensPoint } from './lens/modelLens'
 export { decisionTreeFor } from './lens/modelGuide'
 export { ANNOTATION_STATE, annotationControls, annotationState, canSaveAnnotation, labelledRows, nothingToAnnotateReason } from './annotation/annotationState'
 export type { AnnotationControls, AnnotationScreenState, EntitySpan } from './annotation/annotationState'
-export { STRATEGY_COPY, retrainPrompt, verificationText } from './annotation/activeLearning'
+export { STRATEGY_COPY, holdoutClassText, retrainPrompt, trainingWarning, verificationText } from './annotation/activeLearning'
 export type { DecisionTree, GuideNode, GuideOption } from './lens/modelGuide'
 
 export type {

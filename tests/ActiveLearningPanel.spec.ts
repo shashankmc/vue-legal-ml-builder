@@ -14,6 +14,8 @@ const SETTINGS = {
   seed_sources: { random: true, llm: false },
 }
 
+const READINESS = { labels_total: 40, label_cap: 100, classes_left_out: [], classes_unseen: [], classes_to_train: 2, labels_needed: 0 }
+
 function loopState(overrides: Partial<ActiveLearningState> = {}): ActiveLearningState {
   return {
     active: true,
@@ -25,8 +27,8 @@ function loopState(overrides: Partial<ActiveLearningState> = {}): ActiveLearning
     round: { number: 0, status: 'labelling', strategy: 'random', model_id: null, job_id: null, labels_used: null, metrics: null, error: null, created_at: '', completed_at: null },
     label_counts: {},
     typed_labels: false,
-    retrain: { new_labels: 0, allowed: false, suggested: false, classes_short: {}, needs_second_label: false },
-    holdout: { percent: 20, size: 10, labelled: 0, needed: 10, verification: null },
+    retrain: { new_labels: 0, allowed: false, suggested: false, classes_short: {}, needs_second_label: false, ...READINESS },
+    holdout: { percent: 20, size: 10, labelled: 0, label_counts: {}, needed: 10, verification: null },
     ...overrides,
   }
 }
@@ -124,7 +126,7 @@ describe('starting the loop', () => {
 describe('the running loop', () => {
   it('prompts to retrain and nothing happens until the user does', async () => {
     const { adapter, wrapper } = await mounted(
-      loopState({ retrain: { new_labels: 20, allowed: true, suggested: true, classes_short: {}, needs_second_label: false } }),
+      loopState({ retrain: { new_labels: 20, allowed: true, suggested: true, classes_short: {}, needs_second_label: false, ...READINESS } }),
     )
 
     expect(wrapper.text()).toContain('20 new labels, retrain?')
@@ -135,12 +137,29 @@ describe('the running loop', () => {
     expect(adapter.retrainActiveLearning).toHaveBeenCalledWith('ds-1')
   })
 
-  it('shows what a short label still needs, with no Retrain button', async () => {
+  it('warns by name when training is open with a label short', async () => {
     const { wrapper } = await mounted(
-      loopState({ retrain: { new_labels: 8, allowed: false, suggested: false, classes_short: { Civil: 3 }, needs_second_label: false } }),
+      loopState({ label_counts: { Common: 98, Rare: 2 }, retrain: { new_labels: 100, allowed: true, suggested: true, classes_short: { Rare: 3 }, needs_second_label: false, ...READINESS, labels_total: 100 } }),
     )
 
-    expect(wrapper.text()).toContain('Before the first training: 3 more Civil.')
+    expect(wrapper.text()).toContain('Few examples of Rare (2), so the Model may miss it.')
+    expect(button(wrapper, 'Retrain')).toBeDefined()
+  })
+
+  it('counts the held-back items by label', async () => {
+    const { wrapper } = await mounted(
+      loopState({ holdout: { percent: 20, size: 20, labelled: 10, label_counts: { Verbot: 8, Gebot: 2 }, needed: 10, verification: null } }),
+    )
+
+    expect(wrapper.text()).toContain('Held back so far: 8 Verbot, 2 Gebot.')
+  })
+
+  it('shows what a short label still needs, with no Retrain button', async () => {
+    const { wrapper } = await mounted(
+      loopState({ retrain: { new_labels: 8, allowed: false, suggested: false, classes_short: { Civil: 3 }, needs_second_label: false, ...READINESS } }),
+    )
+
+    expect(wrapper.text()).toContain('Before the first training: 3 more Civil, or 100 labels in all (40 so far).')
     expect(button(wrapper, 'Retrain')).toBeUndefined()
   })
 
@@ -200,7 +219,7 @@ describe('the running loop', () => {
 
     await wrapper.setProps({ datasetId: 'ds-2' })
     await flushPromises()
-    answer(loopState({ retrain: { new_labels: 20, allowed: true, suggested: true, classes_short: {}, needs_second_label: false } }))
+    answer(loopState({ retrain: { new_labels: 20, allowed: true, suggested: true, classes_short: {}, needs_second_label: false, ...READINESS } }))
     await flushPromises()
 
     expect(wrapper.text()).not.toContain('20 new labels, retrain?')
@@ -238,7 +257,7 @@ describe('the running loop', () => {
 })
 
 describe('a mistyped label', () => {
-  const short = { new_labels: 9, allowed: false, suggested: false, classes_short: { crimnal: 4 }, needs_second_label: false }
+  const short = { new_labels: 9, allowed: false, suggested: false, classes_short: { crimnal: 4 }, needs_second_label: false, ...READINESS }
 
   it('can be corrected where labels are typed', async () => {
     const { adapter, wrapper } = await mounted(loopState({ typed_labels: true, label_counts: { civil: 8, crimnal: 1 }, retrain: short }))
@@ -260,7 +279,7 @@ describe('a mistyped label', () => {
 describe('the holdout', () => {
   it('reads "Not independently verified" without a grade', async () => {
     const { wrapper } = await mounted(
-      loopState({ model_id: 'm1', holdout: { percent: 0, size: 0, labelled: 0, needed: 0, verification: 'not_independently_verified' } }),
+      loopState({ model_id: 'm1', holdout: { percent: 0, size: 0, labelled: 0, label_counts: {}, needed: 0, verification: 'not_independently_verified' } }),
     )
 
     expect(wrapper.text()).toContain('Not independently verified')
@@ -285,7 +304,7 @@ describe('the holdout', () => {
 
   it('offers the check once enough held-back items are labelled', async () => {
     const { adapter, wrapper } = await mounted(
-      loopState({ model_id: 'm1', holdout: { percent: 20, size: 10, labelled: 10, needed: 10, verification: 'not_independently_verified' } }),
+      loopState({ model_id: 'm1', holdout: { percent: 20, size: 10, labelled: 10, label_counts: {}, needed: 10, verification: 'not_independently_verified' } }),
     )
 
     await button(wrapper, 'Check the score')!.trigger('click')
@@ -297,7 +316,7 @@ describe('the holdout', () => {
   it('reports a check that never finishes instead of waiting for ever', async () => {
     vi.useFakeTimers()
     const { wrapper } = await mounted(
-      loopState({ model_id: 'm1', holdout: { percent: 20, size: 10, labelled: 10, needed: 10, verification: 'not_independently_verified' } }),
+      loopState({ model_id: 'm1', holdout: { percent: 20, size: 10, labelled: 10, label_counts: {}, needed: 10, verification: 'not_independently_verified' } }),
     )
 
     await button(wrapper, 'Check the score')!.trigger('click')
