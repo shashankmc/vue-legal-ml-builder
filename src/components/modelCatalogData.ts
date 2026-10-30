@@ -56,7 +56,7 @@ export const allModelInfo: Record<string, ModelInfo> = {
     whenToUse: 'Select this if you want to see clear reasoning behind each prediction',
     example: '"Why is this case classified as relevant? Based on jurisdiction, issue type, and year."',
     strengths: ['Highly interpretable — shows the decision path', 'Easy to explain to non-technical stakeholders', 'Works well with categorical features'],
-    bestFor: 'Legal research categorization, case relevance filtering, regulatory compliance checks',
+    bestFor: 'Legal research categorisation, case relevance filtering, regulatory compliance checks',
   },
   logistic_regression: {
     label: 'Logistic Regression',
@@ -78,7 +78,7 @@ export const allModelInfo: Record<string, ModelInfo> = {
     label: 'Random Forest',
     shortDesc: 'Ensemble of decision trees for robust classification',
     whenToUse: 'Best when accuracy is the priority and you have enough data',
-    example: '"Analyze jurisdiction, precedent, and issue type together to predict outcomes."',
+    example: '"Analyse jurisdiction, precedent, and issue type together to predict outcomes."',
     strengths: ['High accuracy on complex datasets', 'Resistant to overfitting', 'Handles many features naturally'],
     bestFor: 'Judgment prediction, multi-factor legal analysis, complex document classification',
   },
@@ -88,7 +88,7 @@ export const allModelInfo: Record<string, ModelInfo> = {
     whenToUse: 'Best for text classification with high-dimensional TF-IDF features',
     example: '"Find the boundary between contracts and non-contracts in a large document set."',
     strengths: ['Excellent with TF-IDF text features', 'Handles high-dimensional data well', 'Strong performance on legal text'],
-    bestFor: 'Document classification, similarity-based categorization, binary legal tasks',
+    bestFor: 'Document classification, similarity-based categorisation, binary legal tasks',
   },
   kmeans: {
     label: 'K-Means Clustering',
@@ -115,7 +115,7 @@ export const allModelInfo: Record<string, ModelInfo> = {
     bestFor: 'Anomaly detection in legal documents, outlier contract identification',
   },
   lda: {
-    label: 'LDA (Topic Modeling)',
+    label: 'LDA (Topic Modelling)',
     shortDesc: 'Latent Dirichlet Allocation for topic discovery',
     whenToUse: 'Best for discovering hidden topics across a large collection of documents',
     example: '"Find the 10 main topics discussed across 5000 court opinions."',
@@ -123,7 +123,7 @@ export const allModelInfo: Record<string, ModelInfo> = {
     bestFor: 'Case law topic discovery, legal corpus analysis, document grouping by theme',
   },
   nmf: {
-    label: 'NMF (Topic Modeling)',
+    label: 'NMF (Topic Modelling)',
     shortDesc: 'Non-negative Matrix Factorization for topics',
     whenToUse: 'Best when you want cleaner, more distinct topics than LDA',
     example: '"Extract the dominant themes from a legislative corpus."',
@@ -140,11 +140,11 @@ export const allModelInfo: Record<string, ModelInfo> = {
   },
   roberta: {
     label: 'RoBERTa',
-    shortDesc: 'Robustly optimized BERT for general text',
+    shortDesc: 'Robustly optimised BERT for general text',
     whenToUse: 'Best as a strong general-purpose baseline when LegalBERT is unavailable',
     example: '"Classify legal documents with a strong general-purpose language model."',
     strengths: ['State-of-the-art general NLP performance', 'Robust training procedure', 'Strong zero-shot capability'],
-    bestFor: 'General legal text tasks, cross-domain transfer, when labeled data is limited',
+    bestFor: 'General legal text tasks, cross-domain transfer, when labelled data is limited',
   },
 }
 
@@ -165,7 +165,7 @@ export interface ParameterFieldSchema {
 
 export const parameterSchemas: Record<string, ParameterFieldSchema[]> = {
   svm: [
-    { key: 'C', label: 'Regularization (C)', shortDesc: 'Controls how strictly the model fits training data', type: 'number', default: 1.0, step: 0.1, min: 0.001, explanation: 'A higher C tries to classify all training examples correctly but may overfit. A lower C allows more misclassifications for a smoother boundary.', recommendation: 'Start with 1.0. If overfitting, try 0.1 or 0.01.' },
+    { key: 'C', label: 'Regularisation (C)', shortDesc: 'Controls how strictly the model fits training data', type: 'number', default: 1.0, step: 0.1, min: 0.001, explanation: 'A higher C tries to classify all training examples correctly but may overfit. A lower C allows more misclassifications for a smoother boundary.', recommendation: 'Start with 1.0. If overfitting, try 0.1 or 0.01.' },
     { key: 'kernel', label: 'Kernel', shortDesc: 'Mathematical function that transforms data for classification', type: 'select', default: 'rbf', options: ['rbf', 'linear', 'poly', 'sigmoid'], explanation: 'The kernel determines how the decision boundary is drawn in the feature space.', optionsExplained: [{ value: 'rbf', desc: 'Handles non-linear data well. Most commonly used.' }, { value: 'linear', desc: 'Best for linearly separable text data. Faster.' }, { value: 'poly', desc: 'Polynomial boundaries. Rarely needed for text.' }, { value: 'sigmoid', desc: 'Similar to neural network activation. Less common.' }], recommendation: 'Start with "rbf". Use "linear" if training is slow.' },
     { key: 'gamma', label: 'Gamma', shortDesc: 'Influence radius of each training sample', type: 'select', default: 'scale', options: ['scale', 'auto'], explanation: 'Controls how far the influence of a single training example reaches. Low gamma = far reach, high gamma = close reach.', optionsExplained: [{ value: 'scale', desc: 'Automatically scales with number of features. Recommended.' }, { value: 'auto', desc: 'Uses 1/n_features. Older default.' }], recommendation: 'Use "scale" (default).' },
     { key: 'degree', label: 'Degree', shortDesc: 'Polynomial degree — only applies when kernel is "poly"', type: 'number', default: 3, step: 1, min: 1, explanation: 'Only relevant when kernel="poly". Higher degree = more complex decision boundary.', recommendation: 'Ignore unless using poly kernel.' },
@@ -187,8 +187,8 @@ export const parameterSchemas: Record<string, ParameterFieldSchema[]> = {
     { key: 'fit_prior', label: 'Learn Class Probabilities', shortDesc: 'Whether to learn class prior probabilities from data', type: 'boolean', default: true, explanation: 'If true, learns the probability of each class from the training data. If false, assumes all classes are equally likely.', recommendation: 'Keep as true unless classes are perfectly balanced.' },
   ],
   logistic_regression: [
-    { key: 'C', label: 'Regularization (C)', shortDesc: 'Inverse of regularization strength — smaller = stronger regularization', type: 'number', default: 1.0, step: 0.1, min: 0.001, explanation: 'Smaller C = stronger regularization = simpler model. Larger C = model fits training data more closely.', recommendation: 'Start with 1.0. Try 0.1 if the model is overfitting.' },
-    { key: 'penalty', label: 'Penalty', shortDesc: 'Type of regularization applied to the model', type: 'select', default: 'l2', options: ['l2', 'l1', 'elasticnet', 'none'], explanation: 'Regularization penalizes large coefficient values to prevent overfitting.', optionsExplained: [{ value: 'l2', desc: 'Ridge. Shrinks all coefficients. Works for most cases.' }, { value: 'l1', desc: 'Lasso. Produces sparse models (many zero coefficients).' }, { value: 'elasticnet', desc: 'Combination of l1 and l2. Requires solver=saga.' }, { value: 'none', desc: 'No regularization. Risk of overfitting on small datasets.' }], recommendation: '"l2" is the best default for legal text classification.' },
+    { key: 'C', label: 'Regularisation (C)', shortDesc: 'Inverse of regularisation strength — smaller = stronger regularisation', type: 'number', default: 1.0, step: 0.1, min: 0.001, explanation: 'Smaller C = stronger regularisation = simpler model. Larger C = model fits training data more closely.', recommendation: 'Start with 1.0. Try 0.1 if the model is overfitting.' },
+    { key: 'penalty', label: 'Penalty', shortDesc: 'Type of regularisation applied to the model', type: 'select', default: 'l2', options: ['l2', 'l1', 'elasticnet', 'none'], explanation: 'Regularisation penalizes large coefficient values to prevent overfitting.', optionsExplained: [{ value: 'l2', desc: 'Ridge. Shrinks all coefficients. Works for most cases.' }, { value: 'l1', desc: 'Lasso. Produces sparse models (many zero coefficients).' }, { value: 'elasticnet', desc: 'Combination of l1 and l2. Requires solver=saga.' }, { value: 'none', desc: 'No regularisation. Risk of overfitting on small datasets.' }], recommendation: '"l2" is the best default for legal text classification.' },
     { key: 'solver', label: 'Solver', shortDesc: 'Optimization algorithm used to find the best model', type: 'select', default: 'lbfgs', options: ['lbfgs', 'newton-cg', 'liblinear', 'sag', 'saga'], explanation: 'The algorithm used internally to find optimal model parameters.', optionsExplained: [{ value: 'lbfgs', desc: 'Good general-purpose solver for small/medium datasets.' }, { value: 'newton-cg', desc: 'Similar to lbfgs. Good for multiclass problems.' }, { value: 'liblinear', desc: 'Efficient for small datasets. Supports l1 penalty.' }, { value: 'sag', desc: 'Fast for large datasets.' }, { value: 'saga', desc: 'Fast for large datasets. Supports all penalties including elasticnet.' }], recommendation: '"lbfgs" for most cases. Use "liblinear" with l1, "saga" for elasticnet.' },
   ],
   kmeans: [
@@ -216,8 +216,8 @@ export const parameterSchemas: Record<string, ParameterFieldSchema[]> = {
   nmf: [
     { key: 'n_components', label: 'Number of Topics', shortDesc: 'How many topics to extract', type: 'number', default: 10, step: 1, min: 2, explanation: 'The number of distinct topics (components) to extract from the corpus.', recommendation: 'Try 5–15 topics. Start small and increase if themes seem too broad.' },
     { key: 'max_iter', label: 'Max Iterations', shortDesc: 'Maximum training iterations', type: 'number', default: 1000, step: 100, min: 100, explanation: 'Maximum number of iterations for NMF convergence.', recommendation: '1000 is usually sufficient.' },
-    { key: 'alpha', label: 'Alpha (Regularization)', shortDesc: 'Regularization strength', type: 'number', default: 0.0, step: 0.1, min: 0, explanation: 'Controls regularization applied to the factorization matrices. 0 = no regularization.', recommendation: '0.0 is a good starting point.' },
-    { key: 'l1_ratio', label: 'L1 Ratio', shortDesc: 'Mix of L1 vs L2 regularization (0=L2, 1=L1)', type: 'number', default: 0.0, step: 0.1, min: 0, max: 1, explanation: '0 = pure L2 regularization. 1 = pure L1. Only matters when alpha > 0.', recommendation: 'Keep at 0.0 when alpha is 0.' },
+    { key: 'alpha', label: 'Alpha (Regularisation)', shortDesc: 'Regularisation strength', type: 'number', default: 0.0, step: 0.1, min: 0, explanation: 'Controls regularisation applied to the factorization matrices. 0 = no regularisation.', recommendation: '0.0 is a good starting point.' },
+    { key: 'l1_ratio', label: 'L1 Ratio', shortDesc: 'Mix of L1 vs L2 regularisation (0=L2, 1=L1)', type: 'number', default: 0.0, step: 0.1, min: 0, max: 1, explanation: '0 = pure L2 regularisation. 1 = pure L1. Only matters when alpha > 0.', recommendation: 'Keep at 0.0 when alpha is 0.' },
     { key: 'random_state', label: 'Random Seed', shortDesc: 'Seed for reproducibility', type: 'number', default: 42, step: 1, min: 0, explanation: 'Ensures the same factorization is found each run.', recommendation: 'Keep at 42.' },
   ],
   legalbert: [
@@ -234,14 +234,14 @@ export const parameterSchemas: Record<string, ParameterFieldSchema[]> = {
 
 export function taskTypeLabel(taskType: string): string {
   const labels: Record<string, string> = {
-    classification: 'classification',
+    classification: 'text classification',
     document_classification: 'document classification',
     judgment_prediction: 'judgment prediction',
     clustering: 'clustering',
-    topic_modeling: 'topic modeling',
+    topic_modeling: 'topic modelling',
     ner: 'named entity recognition',
     named_entity_recognition: 'named entity recognition',
-    summarization: 'summarization',
+    summarization: 'text summarisation',
   }
   return labels[taskType] || taskType
 }

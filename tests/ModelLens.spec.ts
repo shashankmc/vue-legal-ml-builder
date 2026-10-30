@@ -49,7 +49,7 @@ describe('ModelQuestionTree', () => {
     const wrapper = mount(ModelQuestionTree, { props: { taskType: 'topic_modeling', currentModelType: 'lda' } })
     const probabilistic = wrapper.findAll('button').find((b) => b.text().includes('probabilistic topic mix'))
     await probabilistic!.trigger('click')
-    expect(wrapper.text()).toContain('LDA (Topic Modeling)')
+    expect(wrapper.text()).toContain('LDA (Topic Modelling)')
     expect(wrapper.text()).toContain('Currently selected')
     expect(wrapper.find('button.vmlb-guide-use').exists()).toBe(false)
   })

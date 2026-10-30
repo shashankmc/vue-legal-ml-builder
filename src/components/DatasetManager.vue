@@ -2,6 +2,7 @@
 import { computed, inject, onMounted, reactive, ref } from 'vue'
 import type { Dataset, MLAdapter } from '../types'
 import { useDatasets } from '../composables/useDatasets'
+import { taskTypeLabel } from './modelCatalogData'
 import Icon from './shared/Icon.vue'
 
 const props = defineProps<{ adapter?: MLAdapter }>()
@@ -17,8 +18,8 @@ const TASK_TYPES = [
   { value: 'classification', label: 'Text Classification', desc: 'Required columns: text, label' },
   { value: 'document_classification', label: 'Document Classification', desc: 'Required columns: text, label' },
   { value: 'ner', label: 'Named Entity Recognition', desc: 'Required columns: text, entities' },
-  { value: 'summarization', label: 'Text Summarization', desc: 'Required columns: text, summary' },
-  { value: 'topic_modeling', label: 'Topic Modeling', desc: 'Required columns: text' },
+  { value: 'summarization', label: 'Text Summarisation', desc: 'Required columns: text, summary' },
+  { value: 'topic_modeling', label: 'Topic Modelling', desc: 'Required columns: text' },
   { value: 'clustering', label: 'Document Clustering', desc: 'Required columns: text' },
   { value: 'judgment_prediction', label: 'Judgment Prediction', desc: 'Required columns: text, judgment' },
 ]
@@ -95,7 +96,7 @@ async function confirmDelete(id: string) {
         <div class="vmlb-tile-head">
           <div>
             <h3>{{ ds.name }}</h3>
-            <p class="vmlb-muted vmlb-capitalize">{{ ds.task_type.replace(/_/g, ' ') }}</p>
+            <p class="vmlb-muted vmlb-capitalize">{{ taskTypeLabel(ds.task_type) }}</p>
           </div>
           <button class="vmlb-icon-btn" title="Delete dataset" @click="confirmingId = ds.id">
             <Icon name="close" />
