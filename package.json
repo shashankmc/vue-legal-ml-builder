@@ -54,8 +54,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:size": "npm run build:demo && node scripts/check-bundle-size.mjs",
-    "prepublishOnly": "npm run build:lib",
-    "prepare": "npm run build:lib"
+    "prepublishOnly": "npm run build:lib 1>&2",
+    "prepare": "npm run build:lib 1>&2"
   },
   "peerDependencies": {
     "vue": "^3.4.0"
