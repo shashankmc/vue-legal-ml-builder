@@ -11,6 +11,23 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-30
+
+### Added
+
+- Wizard preselects a model (Logistic Regression for classification, otherwise
+  the catalogue default) and tucks settings under a closed Advanced section.
+- `firstStep` prop so a host can continue its own step numbering.
+
+### Changed
+
+- Label names load for any selected dataset, not only a preselected one.
+
+### Fixed
+
+- A preselected dataset now loads the backend catalogue.
+- Removed the left stripe from the model chooser tile.
+
 ## [0.3.0] - 2026-10-29
 
 ### Added
@@ -86,7 +103,8 @@ tagged `vX.Y.Z`.
   monitoring), extracted from the `reducing_digital_divide` SvelteKit frontend
   and driven through a host-supplied `MLAdapter`.
 
-[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/68959e2...v0.3.0
 [0.2.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/c9c724b...68959e2
 [0.1.0]: https://github.com/shashankmc/vue-legal-ml-builder/commits/c9c724b
