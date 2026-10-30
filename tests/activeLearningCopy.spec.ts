@@ -12,6 +12,7 @@ function state(overrides: Partial<ActiveLearningState> = {}): ActiveLearningStat
     model_id: null,
     round: { number: 0, status: 'labelling', strategy: 'random', model_id: null, job_id: null, labels_used: null, metrics: null, error: null, created_at: '', completed_at: null },
     label_counts: {},
+    typed_labels: false,
     retrain: { new_labels: 0, allowed: false, suggested: false, classes_short: {}, needs_second_label: false },
     holdout: { percent: 20, size: 10, labelled: 0, needed: 10, verification: null },
     ...overrides,
@@ -70,5 +71,13 @@ describe('verificationText', () => {
   it('names what the score was checked on', () => {
     const holdout = { percent: 20, size: 10, labelled: 10, needed: 10, verification: 'holdout' as const }
     expect(verificationText(state({ holdout }))).toBe('Checked on 10 held-back items')
+  })
+})
+
+describe('retrainPrompt on later rounds', () => {
+  it('does not call a retrain the first training', () => {
+    const round = { ...state().round, number: 2 }
+    const retrain = { new_labels: 3, allowed: false, suggested: false, classes_short: { Civil: 3 }, needs_second_label: false }
+    expect(retrainPrompt(state({ round, retrain })).message).toBe('Before retraining: 3 more Civil.')
   })
 })

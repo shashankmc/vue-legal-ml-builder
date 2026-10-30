@@ -18,7 +18,8 @@ export function retrainPrompt(state: ActiveLearningState) {
   if (!newLabels) return { message: '', canRetrain: false, emphasised: false }
   if (Object.keys(short).length) {
     const missing = Object.entries(short).map(([name, n]) => `${n} more ${name}`)
-    return { message: `Before the first training: ${missing.join(', ')}.`, canRetrain: false, emphasised: false }
+    const when = state.round.number === 0 ? 'Before the first training' : 'Before retraining'
+    return { message: `${when}: ${missing.join(', ')}.`, canRetrain: false, emphasised: false }
   }
   if (secondLabel) return { message: 'Training needs examples of at least two labels.', canRetrain: false, emphasised: false }
   const labels = count(newLabels, 'new label')
