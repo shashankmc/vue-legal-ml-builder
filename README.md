@@ -70,8 +70,10 @@ Or per component, for direct (non-plugin) usage; the prop overrides the plugin o
 
 `DatasetManager`, `DatasetEda`, `ModelList`, `ModelCreateWizard`, `ModelDetail`,
 `TrainingMonitor` (composes `TrainingCurves`), `ParameterPerformanceExplorer`,
-`AnnotationWorkspace`, plus shared primitives `ConfusionMatrix`/`PlotlyChart`/
-`ModelLens`/`MlBuilderThemeProvider`.
+`AnnotationWorkspace` (composes `ActiveLearningPanel` when the adapter has the
+optional active learning methods and the task is single-label classification),
+plus shared primitives `ConfusionMatrix`/`PlotlyChart`/`ModelLens`/
+`MlBuilderThemeProvider`.
 
 `TrainingCurves` and `ParameterPerformanceExplorer` are the experiment-monitoring
 pieces (mlop.ai-inspired): live per-training-job metric curves and cross-run
