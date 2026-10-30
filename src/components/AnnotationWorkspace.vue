@@ -28,6 +28,8 @@ const props = withDefaults(defineProps<{
   /** Label names. Left out, they come from the Dataset. */
   labels?: string[]
   taskType?: string
+  /** How the host names `taskType`. Left out, the package's own wording. */
+  taskTypeName?: string
   projectName?: string
   guidelines?: string
   /** Rows of the Dataset, and those without a label, as the host counts them. */
@@ -220,7 +222,7 @@ async function onLabelHoldout() {
   <div v-if="!hidden" class="vmlb-annotate">
     <header v-if="projectName" class="vmlb-annotate-head">
       <h1>{{ projectName }}</h1>
-      <span class="vmlb-badge">{{ taskTypeLabel(taskType) }}</span>
+      <span class="vmlb-badge">{{ taskTypeName ?? taskTypeLabel(taskType) }}</span>
     </header>
 
     <div v-if="stats && (rowCount || stats.total)" class="vmlb-progress">

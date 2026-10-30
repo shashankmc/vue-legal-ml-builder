@@ -180,6 +180,13 @@ describe('AnnotationWorkspace parity with the host screen', () => {
     wrapper.unmount()
   })
 
+  it('uses the host\'s name for the task type', async () => {
+    const { wrapper } = await mounted({}, { projectName: 'Cases', taskTypeName: 'Text Classification' })
+
+    expect(wrapper.find('.vmlb-annotate-head').text()).toContain('Text Classification')
+    wrapper.unmount()
+  })
+
   it('shows guidelines and the row number', async () => {
     const { wrapper } = await mounted({}, { guidelines: 'Label by court.' })
 
