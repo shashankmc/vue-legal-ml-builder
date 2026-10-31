@@ -139,6 +139,7 @@ export type {
   ParameterFieldSchema,
   ParameterFieldType,
   PredictionResult,
+  RefusalError,
   TrainingJob,
   TrainingJobStatus,
   TrainingMetricPoint,

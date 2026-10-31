@@ -286,6 +286,12 @@ export interface ExplanationResult {
   error?: string
 }
 
+/** An adapter's rejection when the backend names the parameter at fault. An
+ * adapter need not set `field`: the refusal is then shown without marking one. */
+export interface RefusalError extends Error {
+  field?: string
+}
+
 export interface MLAdapter {
   // Datasets
   listDatasets(): Promise<Dataset[]>
@@ -298,6 +304,7 @@ export interface MLAdapter {
   listModels(datasetId?: Id): Promise<MlModel[]>
   getModel(id: Id): Promise<MlModel>
   getAvailableModelTypes(taskType?: string): Promise<ModelCatalog>
+  /** Rejects with an Error, a `RefusalError` when a refusal names a setting. */
   createModel(config: { name: string; dataset_id: Id; model_type: string; parameters: Record<string, unknown>; project_id?: Id }): Promise<MlModel>
   deleteModel(id: Id): Promise<void>
 

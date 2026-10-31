@@ -69,4 +69,27 @@ describe('createSelfHostedAdapter', () => {
 
     await expect(adapter.listDatasets()).rejects.toThrow('Access token has expired.')
   })
+
+  const create = { name: 'M', dataset_id: 'd1', model_type: 'svm', parameters: { C: -1 } }
+
+  it('keeps the field a refusal names', async () => {
+    stubFetch(() => reply(400, { error: 'Regularisation (C) must be between 0.001 and 100.', field: 'C' }))
+    const adapter = createSelfHostedAdapter({ apiUrl: '/api' })
+
+    const refused = await adapter.createModel(create).catch((err) => err)
+
+    expect(refused).toBeInstanceOf(Error)
+    expect(refused.message).toBe('Regularisation (C) must be between 0.001 and 100.')
+    expect(refused.field).toBe('C')
+  })
+
+  it('adds no field for a backend that sends none', async () => {
+    stubFetch(() => reply(400, { error: 'Invalid model type' }))
+    const adapter = createSelfHostedAdapter({ apiUrl: '/api' })
+
+    const refused = await adapter.createModel(create).catch((err) => err)
+
+    expect(refused.message).toBe('Invalid model type')
+    expect('field' in refused).toBe(false)
+  })
 })

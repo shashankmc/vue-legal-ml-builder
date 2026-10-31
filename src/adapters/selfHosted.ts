@@ -14,6 +14,7 @@ import type {
   ModelComparison,
   ParameterComparisonPoint,
   PredictionResult,
+  RefusalError,
   TrainingJob,
   TrainingMetricPoint,
 } from '../types'
@@ -37,7 +38,9 @@ function buildHeaders(getAuthToken?: () => string | null | undefined, extra: Hea
 async function parseOrThrow(res: Response) {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    throw new Error(data.error || `Request failed: ${res.status} ${res.statusText}`)
+    const error: RefusalError = new Error(data.error || `Request failed: ${res.status} ${res.statusText}`)
+    if (typeof data.field === 'string') error.field = data.field
+    throw error
   }
   return data
 }
