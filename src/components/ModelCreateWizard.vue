@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, reactive, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type { Dataset, MLAdapter, ModelTypeInfo } from '../types'
 import { allModelInfo, defaultModelFor, modelsByTaskType, parameterRules, parameterSchemas, taskTypeLabel } from './modelCatalogData'
 import { allowedOptions, mergeSchema, reconcileChoices } from './parameterOptions'
@@ -40,6 +40,7 @@ const error = ref('')
 // Why Create & train did not go through, shown beside that button. The backend
 // answers with a sentence and names no field, so no setting can be marked.
 const refusal = ref('')
+const actions = ref<HTMLElement | null>(null)
 const expandedModelInfo = ref<string | null>(null)
 // One model is always chosen, so the rest of the grid stays folded until asked for.
 const showAllModels = ref(false)
@@ -222,6 +223,9 @@ async function createModel() {
     emit('created', model, { trainingQueued })
   } catch (err) {
     refusal.value = err instanceof Error ? err.message : 'Failed to create model'
+    // The alert grows above the buttons, which can push both past the viewport.
+    await nextTick()
+    actions.value?.scrollIntoView({ block: 'nearest' })
   } finally {
     isCreating.value = false
   }
@@ -399,7 +403,7 @@ async function createModel() {
           <Icon name="alert" /> {{ refusal }}
         </div>
       </div>
-      <div v-if="modelType" class="vmlb-actions">
+      <div v-if="modelType" ref="actions" class="vmlb-actions">
         <button type="button" class="vmlb-btn-secondary" @click="emit('cancel')">Cancel</button>
         <button
           type="button"

@@ -1,5 +1,5 @@
-import { mount, flushPromises } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, mount, flushPromises } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ModelCreateWizard from '../src/components/ModelCreateWizard.vue'
 import { createTestAdapter } from './testAdapter'
 import type { Dataset } from '../src/types'
@@ -128,6 +128,12 @@ describe('ModelCreateWizard', () => {
   })
 
   describe('when the backend refuses', () => {
+    const scrollIntoView = vi.fn()
+    beforeEach(() => {
+      scrollIntoView.mockClear()
+      Element.prototype.scrollIntoView = scrollIntoView // not in this test DOM
+    })
+
     const message = 'Regularization Strength (C) must be at most 1000.'
     const mountRefused = async (createModel = vi.fn().mockRejectedValue(new Error(message))) => {
       const adapter = createTestAdapter({
@@ -148,6 +154,13 @@ describe('ModelCreateWizard', () => {
       expect(wrapper.find('.vmlb-actions').element.previousElementSibling).toBe(wrapper.find('[role="alert"]').element)
       expect(alertText(wrapper)).toBe(message)
       expect(wrapper.text().split(message)).toHaveLength(2)
+    })
+
+    it('brings the buttons into view, as the alert above them pushes them down', async () => {
+      const wrapper = await mountRefused()
+
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+      expect(scrollIntoView.mock.instances[0]).toBe(wrapper.find('.vmlb-actions').element)
     })
 
     it('keeps the alert in the page beforehand, so screen readers announce what arrives in it', async () => {

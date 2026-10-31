@@ -11,6 +11,10 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+### Fixed
+
+- A refusal keeps Create & train in view when the alert pushes the buttons past the viewport.
+
 ## [0.5.2] - 2026-10-31
 
 ### Fixed
