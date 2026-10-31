@@ -11,6 +11,10 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- A refusal that names a setting offers a "Go to" button, so that setting can be reached on a phone.
+
 ## [0.5.4] - 2026-10-31
 
 ### Added

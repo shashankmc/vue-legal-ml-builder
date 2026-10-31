@@ -105,7 +105,17 @@ function clearRefusal() {
 }
 
 const refusalMark = (key: string) =>
-  refusedField.value === key ? { 'aria-invalid': 'true' as const, 'aria-describedby': 'vmlb-refusal' } : {}
+  refusedField.value === key
+    ? { id: 'vmlb-refused-field', 'aria-invalid': 'true' as const, 'aria-describedby': 'vmlb-refusal' }
+    : {}
+const refusedLabel = computed(() => currentSchema.value.find((p) => p.key === refusedField.value)?.label)
+
+// On a phone the setting can be a long way above the alert, which stays by the buttons.
+function goToRefusedField() {
+  const control = document.getElementById('vmlb-refused-field')
+  control?.scrollIntoView({ block: 'center' })
+  control?.focus({ preventScroll: true })
+}
 
 onMounted(async () => {
   if (!adapter.value) {
@@ -415,7 +425,13 @@ async function createModel() {
            alert it already knows. Above the buttons, so it lands where the user is. -->
       <div v-if="modelType" id="vmlb-refusal" role="alert" class="vmlb-refusal">
         <div v-if="refusal" class="vmlb-alert-error">
-          <Icon name="alert" /> {{ refusal }}
+          <Icon name="alert" />
+          <span>
+            {{ refusal }}
+            <button v-if="refusedLabel" type="button" class="vmlb-link-btn vmlb-refusal-link" @click="goToRefusedField">
+              Go to {{ refusedLabel }}
+            </button>
+          </span>
         </div>
       </div>
       <div v-if="modelType" ref="actions" class="vmlb-actions">
@@ -484,6 +500,7 @@ async function createModel() {
 .vmlb-field { margin-bottom: 1.25rem; }
 .vmlb-show-models { margin-top: 0.75rem; }
 .vmlb-refusal .vmlb-alert-error { margin: var(--vmlb-space-md) 0 0; }
+.vmlb-refusal-link { display: block; min-height: 44px; color: inherit; text-decoration: underline; }
 .vmlb-chooser { margin-bottom: 1rem; }
 .vmlb-advanced summary { cursor: pointer; font-size: 0.875rem; font-weight: 600; color: var(--vmlb-text); }
 .vmlb-advanced[open] summary { margin-bottom: 0.5rem; }

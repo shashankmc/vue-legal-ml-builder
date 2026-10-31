@@ -135,12 +135,15 @@ describe('ModelCreateWizard', () => {
     })
 
     const message = 'Regularization Strength (C) must be at most 1000.'
-    const mountRefused = async (createModel = vi.fn().mockRejectedValue(new Error(message))) => {
+    const mountRefused = async (
+      createModel = vi.fn().mockRejectedValue(new Error(message)),
+      options: { attachTo?: HTMLElement } = {},
+    ) => {
       const adapter = createTestAdapter({
         listDatasets: vi.fn().mockResolvedValue([dataset(), dataset({ id: 'ds-2', name: 'Leases' })]),
         createModel,
       })
-      const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+      const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' }, ...options })
       await flushPromises()
       await wrapper.find('.vmlb-btn-primary').trigger('click')
       await flushPromises()
@@ -224,6 +227,25 @@ describe('ModelCreateWizard', () => {
         expect(marked.attributes('aria-describedby')).toBe(alert.attributes('id'))
       })
 
+      it('offers a way to that setting, so a phone user can reach it', async () => {
+        const wrapper = await mountRefused(refuseField('C'), { attachTo: document.body })
+        scrollIntoView.mockClear()
+
+        await wrapper.find('[role="alert"] button').trigger('click')
+
+        const marked = control(wrapper, 'Regularisation (C)')
+        expect(wrapper.find('[role="alert"] button').text()).toBe('Go to Regularisation (C)')
+        expect(scrollIntoView.mock.instances[0]).toBe(marked.element)
+        expect(document.activeElement).toBe(marked.element)
+        wrapper.unmount()
+      })
+
+      it('offers no such way when no field is named', async () => {
+        const wrapper = await mountRefused()
+
+        expect(wrapper.find('[role="alert"] button').exists()).toBe(false)
+      })
+
       it('marks a setting that is a select as well', async () => {
         const wrapper = await mountRefused(refuseField('solver'))
 
@@ -260,7 +282,7 @@ describe('ModelCreateWizard', () => {
         const wrapper = await mountRefused(refuseField('C'))
 
         expect(wrapper.find('.vmlb-actions').element.previousElementSibling).toBe(wrapper.find('[role="alert"]').element)
-        expect(alertText(wrapper)).toBe(message)
+        expect(alertText(wrapper)).toContain(message)
       })
 
       it('clears the mark on any change', async () => {
