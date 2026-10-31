@@ -11,6 +11,20 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+### Changed
+
+- `ModelCreateWizard` takes options, ranges and defaults from the backend catalogue,
+  and adds only the explanations, so the two cannot drift. `parameterSchemas` remains
+  the fallback for a host without one, and is aligned with legal-ml-core.
+- The wizard applies the catalogue's new `rules`: a penalty narrows the solvers, ward
+  linkage narrows the distances and `liblinear` goes on a Dataset of more than two
+  labels. A choice ruled out moves to one still open, and a note says why.
+- New settings in the wizard: balancing labels, and the elasticnet mix, shown only
+  with that penalty. NMF's L1 ratio is gone. Clearing a number uses its default.
+- A cluster count is capped at the Dataset's rows, given `at_most_rows` from the
+  backend. New exports: `parameterRules` and the `ParameterRule` type.
+- UK spelling in parameter help, such as "penalises" and "Initialisation".
+
 ## [0.5.0] - 2026-10-30
 
 ### Changed
