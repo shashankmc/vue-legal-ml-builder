@@ -11,6 +11,8 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-31
+
 ### Changed
 
 - `ModelCreateWizard` takes options, ranges and defaults from the backend catalogue,
@@ -153,7 +155,8 @@ tagged `vX.Y.Z`.
   monitoring), extracted from the `reducing_digital_divide` SvelteKit frontend
   and driven through a host-supplied `MLAdapter`.
 
-[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.3.0...v0.3.1
