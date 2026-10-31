@@ -7,7 +7,7 @@ export const AVAILABLE_MODELS_DEMO: ModelCatalog = {
       description: 'Linear and non-linear classification using support vectors',
       parameters: {
         kernel: { type: 'select', options: ['linear', 'rbf', 'poly', 'sigmoid'], default: 'rbf', description: 'Kernel type' },
-        C: { type: 'float', min: 0.1, max: 100, default: 1.0, description: 'Regularization parameter' },
+        C: { type: 'float', min: 0.1, max: 100, default: 1.0, description: 'Regularisation parameter' },
       },
     },
     naive_bayes: {
