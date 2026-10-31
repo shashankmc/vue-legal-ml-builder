@@ -130,7 +130,7 @@ describe('ModelCreateWizard', () => {
   describe('when the backend refuses', () => {
     const scrollIntoView = vi.fn()
     beforeEach(() => {
-      scrollIntoView.mockClear()
+      scrollIntoView.mockReset()
       Element.prototype.scrollIntoView = scrollIntoView // not in this test DOM
     })
 
@@ -204,6 +204,105 @@ describe('ModelCreateWizard', () => {
       await flushPromises()
 
       expect(alertText(wrapper)).toBe('')
+    })
+
+    describe('and names a field', () => {
+      const refuseField = (field: string) => vi.fn().mockRejectedValue(Object.assign(new Error(message), { field }))
+      const advanced = (wrapper: Awaited<ReturnType<typeof mountRefused>>) =>
+        wrapper.find<HTMLDetailsElement>('.vmlb-configure-form details').element
+      // The number input for C, a select for Solver, and a boolean select for Naive Bayes.
+      const control = (wrapper: Awaited<ReturnType<typeof mountRefused>>, label: string) =>
+        wrapper.findAll('.vmlb-param-row').find((row) => row.find('.vmlb-link-btn').text() === label)!.find('input, select')
+
+      it('marks that setting and points it at the alert', async () => {
+        const wrapper = await mountRefused(refuseField('C'))
+
+        const marked = control(wrapper, 'Regularisation (C)')
+        expect(marked.attributes('aria-invalid')).toBe('true')
+        const alert = wrapper.find('[role="alert"]')
+        expect(alert.attributes('id')).toBeTruthy()
+        expect(marked.attributes('aria-describedby')).toBe(alert.attributes('id'))
+      })
+
+      it('marks a setting that is a select as well', async () => {
+        const wrapper = await mountRefused(refuseField('solver'))
+
+        expect(control(wrapper, 'Solver').attributes('aria-invalid')).toBe('true')
+        expect(control(wrapper, 'Regularisation (C)').attributes('aria-invalid')).toBeUndefined()
+      })
+
+      it('opens Advanced settings, where the setting is', async () => {
+        const wrapper = await mountRefused(refuseField('C'))
+
+        expect(advanced(wrapper).open).toBe(true)
+      })
+
+      it('opens Advanced settings before bringing the buttons into view, as it pushes them down', async () => {
+        let openWhenScrolled = false
+        scrollIntoView.mockImplementation(function () {
+          openWhenScrolled = document.querySelector<HTMLDetailsElement>('.vmlb-configure-form details')?.open ?? false
+        })
+        const adapter = createTestAdapter({
+          listDatasets: vi.fn().mockResolvedValue([dataset()]),
+          createModel: refuseField('C'),
+        })
+        const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' }, attachTo: document.body })
+        await flushPromises()
+        await wrapper.find('.vmlb-btn-primary').trigger('click')
+        await flushPromises()
+
+        expect(openWhenScrolled).toBe(true)
+        expect(scrollIntoView).toHaveBeenCalledTimes(1)
+        wrapper.unmount()
+      })
+
+      it('keeps the alert directly above the buttons', async () => {
+        const wrapper = await mountRefused(refuseField('C'))
+
+        expect(wrapper.find('.vmlb-actions').element.previousElementSibling).toBe(wrapper.find('[role="alert"]').element)
+        expect(alertText(wrapper)).toBe(message)
+      })
+
+      it('clears the mark on any change', async () => {
+        const wrapper = await mountRefused(refuseField('solver'))
+
+        await control(wrapper, 'Regularisation (C)').setValue(2)
+
+        const solver = control(wrapper, 'Solver')
+        expect(solver.attributes('aria-invalid')).toBeUndefined()
+        expect(solver.attributes('aria-describedby')).toBeUndefined()
+      })
+
+      it('clears the mark during a retry', async () => {
+        let refuse = (_: Error) => {}
+        const createModel = vi.fn()
+          .mockRejectedValueOnce(Object.assign(new Error(message), { field: 'C' }))
+          .mockReturnValueOnce(new Promise((_, reject) => { refuse = reject }))
+        const wrapper = await mountRefused(createModel)
+
+        await wrapper.find('.vmlb-btn-primary').trigger('click')
+        expect(control(wrapper, 'Regularisation (C)').attributes('aria-invalid')).toBeUndefined()
+
+        refuse(Object.assign(new Error(message), { field: 'C' }))
+        await flushPromises()
+        expect(control(wrapper, 'Regularisation (C)').attributes('aria-invalid')).toBe('true')
+      })
+
+      it('leaves Advanced settings as they were for a setting not on the form', async () => {
+        const wrapper = await mountRefused(refuseField('l1_ratio')) // shown only for elasticnet
+
+        expect(advanced(wrapper).open).toBe(false)
+        expect(wrapper.find('[aria-invalid]').exists()).toBe(false)
+        expect(alertText(wrapper)).toBe(message)
+      })
+    })
+
+    it('marks nothing and leaves Advanced settings shut when no field is named', async () => {
+      const wrapper = await mountRefused()
+
+      expect(wrapper.find('[aria-invalid]').exists()).toBe(false)
+      expect(wrapper.find<HTMLDetailsElement>('.vmlb-configure-form details').element.open).toBe(false)
+      expect(alertText(wrapper)).toBe(message)
     })
 
     it('empties the alert during a retry, so the same refusal is announced again', async () => {

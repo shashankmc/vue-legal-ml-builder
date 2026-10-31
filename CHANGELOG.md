@@ -11,6 +11,14 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `createSelfHostedAdapter` keeps a refusal's `field` on the Error it throws, typed as
+  `RefusalError`. Adapters that send none work as before.
+- When a refusal names a setting, `ModelCreateWizard` marks it with `aria-invalid` and
+  `aria-describedby` pointing at the alert, and opens Advanced settings. The mark clears
+  on any change. The alert stays beside the buttons, and the buttons stay in view.
+
 ## [0.5.3] - 2026-10-31
 
 ### Fixed

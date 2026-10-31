@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onMounted, reactive, ref, watch } from 'vue'
-import type { Dataset, MLAdapter, ModelTypeInfo } from '../types'
+import type { Dataset, MLAdapter, ModelTypeInfo, RefusalError } from '../types'
 import { allModelInfo, defaultModelFor, modelsByTaskType, parameterRules, parameterSchemas, taskTypeLabel } from './modelCatalogData'
 import { allowedOptions, mergeSchema, reconcileChoices } from './parameterOptions'
 import type { ParameterFieldSchema } from './modelCatalogData'
@@ -37,10 +37,12 @@ const parameters = reactive<Record<string, unknown>>({})
 const isLoading = ref(true)
 const isCreating = ref(false)
 const error = ref('')
-// Why Create & train did not go through, shown beside that button. The backend
-// answers with a sentence and names no field, so no setting can be marked.
+// Why Create & train did not go through, shown beside that button, and the
+// setting at fault when the backend names one that is on the form.
 const refusal = ref('')
+const refusedField = ref('')
 const actions = ref<HTMLElement | null>(null)
+const advanced = ref<HTMLDetailsElement | null>(null)
 const expandedModelInfo = ref<string | null>(null)
 // One model is always chosen, so the rest of the grid stays folded until asked for.
 const showAllModels = ref(false)
@@ -95,9 +97,15 @@ watch([parameters, multiclass, allSettings], () => {
 })
 
 // A refusal is about the values refused, so it goes when they do.
-watch([parameters, modelName, modelType, selectedDataset], () => {
+watch([parameters, modelName, modelType, selectedDataset], clearRefusal)
+
+function clearRefusal() {
   refusal.value = ''
-})
+  refusedField.value = ''
+}
+
+const refusalMark = (key: string) =>
+  refusedField.value === key ? { 'aria-invalid': 'true' as const, 'aria-describedby': 'vmlb-refusal' } : {}
 
 onMounted(async () => {
   if (!adapter.value) {
@@ -199,7 +207,7 @@ async function createModel() {
   }
   try {
     isCreating.value = true
-    refusal.value = ''
+    clearRefusal()
     const model = await adapter.value.createModel({
       name: modelName.value,
       dataset_id: selectedDataset.value.id,
@@ -223,7 +231,13 @@ async function createModel() {
     emit('created', model, { trainingQueued })
   } catch (err) {
     refusal.value = err instanceof Error ? err.message : 'Failed to create model'
-    // The alert grows above the buttons, which can push both past the viewport.
+    const field = (err as RefusalError).field
+    if (currentSchema.value.some((p) => p.key === field)) {
+      refusedField.value = field as string
+      if (advanced.value) advanced.value.open = true
+    }
+    // The alert and Advanced settings grow above the buttons, which can push them
+    // past the viewport, so this comes after both.
     await nextTick()
     actions.value?.scrollIntoView({ block: 'nearest' })
   } finally {
@@ -330,7 +344,7 @@ async function createModel() {
               />
             </div>
 
-            <details v-if="currentSchema.length" class="vmlb-advanced">
+            <details v-if="currentSchema.length" ref="advanced" class="vmlb-advanced">
               <summary>Advanced settings</summary>
               <p class="vmlb-muted vmlb-small">Sensible defaults are already applied. Change these only if you want to.</p>
               <div class="vmlb-params">
@@ -342,10 +356,10 @@ async function createModel() {
                     <p class="vmlb-muted vmlb-small">{{ param.shortDesc }}</p>
                   </div>
                   <div class="vmlb-param-input">
-                    <select v-if="param.type === 'select'" v-model="parameters[param.key]">
+                    <select v-if="param.type === 'select'" v-model="parameters[param.key]" v-bind="refusalMark(param.key)">
                       <option v-for="opt in optionsFor(param).options" :key="opt" :value="opt">{{ opt }}</option>
                     </select>
-                    <select v-else-if="param.type === 'boolean'" v-model="parameters[param.key]">
+                    <select v-else-if="param.type === 'boolean'" v-model="parameters[param.key]" v-bind="refusalMark(param.key)">
                       <option :value="true">true</option>
                       <option :value="false">false</option>
                     </select>
@@ -357,6 +371,7 @@ async function createModel() {
                       :min="param.min"
                       :max="param.max"
                       :placeholder="param.default === null ? 'unlimited' : String(param.default)"
+                      v-bind="refusalMark(param.key)"
                     />
                   </div>
                   <p v-if="adjusted[param.key]" class="vmlb-param-note">{{ adjusted[param.key] }}</p>
@@ -398,7 +413,7 @@ async function createModel() {
 
       <!-- Stays in the page when empty: a screen reader announces what arrives in an
            alert it already knows. Above the buttons, so it lands where the user is. -->
-      <div v-if="modelType" role="alert" class="vmlb-refusal">
+      <div v-if="modelType" id="vmlb-refusal" role="alert" class="vmlb-refusal">
         <div v-if="refusal" class="vmlb-alert-error">
           <Icon name="alert" /> {{ refusal }}
         </div>
@@ -487,6 +502,7 @@ async function createModel() {
   border-radius: var(--vmlb-radius-sm);
   background: var(--vmlb-surface); color: var(--vmlb-text); font-family: inherit; font-size: 0.875rem;
 }
+.vmlb-param-input [aria-invalid='true'] { border-color: var(--vmlb-error); box-shadow: 0 0 0 1px var(--vmlb-error); }
 .vmlb-param-note { flex-basis: 100%; margin: 0; font-size: 0.75rem; color: var(--vmlb-text-muted); }
 .vmlb-param-explain { flex-basis: 100%; background: var(--vmlb-surface-sunken); border-radius: var(--vmlb-radius-sm); padding: 0.75rem; font-size: 0.8125rem; color: var(--vmlb-text-muted); line-height: 1.55; }
 .vmlb-option-line { display: flex; gap: 0.5rem; margin: 0.25rem 0; }
