@@ -127,6 +127,104 @@ describe('ModelCreateWizard', () => {
     expect(wrapper.emitted('created')?.[0]).toEqual([createdModel, { trainingQueued: true }])
   })
 
+  describe('when the backend refuses', () => {
+    const message = 'Regularization Strength (C) must be at most 1000.'
+    const mountRefused = async (createModel = vi.fn().mockRejectedValue(new Error(message))) => {
+      const adapter = createTestAdapter({
+        listDatasets: vi.fn().mockResolvedValue([dataset(), dataset({ id: 'ds-2', name: 'Leases' })]),
+        createModel,
+      })
+      const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+      await flushPromises()
+      await wrapper.find('.vmlb-btn-primary').trigger('click')
+      await flushPromises()
+      return wrapper
+    }
+    const alertText = (wrapper: Awaited<ReturnType<typeof mountRefused>>) => wrapper.find('[role="alert"]').text()
+
+    it('says so beside Create & train, not at the top of the form', async () => {
+      const wrapper = await mountRefused()
+
+      expect(wrapper.find('.vmlb-actions').element.previousElementSibling).toBe(wrapper.find('[role="alert"]').element)
+      expect(alertText(wrapper)).toBe(message)
+      expect(wrapper.text().split(message)).toHaveLength(2)
+    })
+
+    it('keeps the alert in the page beforehand, so screen readers announce what arrives in it', async () => {
+      const adapter = createTestAdapter({ listDatasets: vi.fn().mockResolvedValue([dataset()]) })
+      const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+      await flushPromises()
+
+      expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+      expect(wrapper.find('[role="alert"]').text()).toBe('')
+    })
+
+    it('clears when a setting changes', async () => {
+      const wrapper = await mountRefused()
+
+      await wrapper.find('.vmlb-param-input input[type="number"]').setValue(5)
+
+      expect(alertText(wrapper)).toBe('')
+    })
+
+    it('clears when the name changes', async () => {
+      const wrapper = await mountRefused()
+
+      await wrapper.find('#vmlb-model-name').setValue('Another name')
+
+      expect(alertText(wrapper)).toBe('')
+    })
+
+    it('clears when another model is chosen', async () => {
+      const wrapper = await mountRefused()
+
+      await wrapper.find('.vmlb-show-models').trigger('click')
+      await wrapper.findAll('.vmlb-model-card').find((c) => c.text().includes('Support Vector Machine'))!.trigger('click')
+
+      expect(alertText(wrapper)).toBe('')
+    })
+
+    it('clears when another dataset is chosen', async () => {
+      const wrapper = await mountRefused()
+
+      await wrapper.find('select').setValue(wrapper.find('select').findAll('option')[2].element.value)
+      await flushPromises()
+
+      expect(alertText(wrapper)).toBe('')
+    })
+
+    it('empties the alert during a retry, so the same refusal is announced again', async () => {
+      let refuse = (_: Error) => {}
+      const createModel = vi.fn()
+        .mockRejectedValueOnce(new Error(message))
+        .mockReturnValueOnce(new Promise((_, reject) => { refuse = reject }))
+      const wrapper = await mountRefused(createModel)
+
+      await wrapper.find('.vmlb-btn-primary').trigger('click')
+      expect(alertText(wrapper)).toBe('')
+
+      refuse(new Error(message))
+      await flushPromises()
+      expect(alertText(wrapper)).toBe(message)
+    })
+
+    it('does not guess the field from the wording of the message', async () => {
+      const wrapper = await mountRefused()
+
+      expect(wrapper.find('[aria-invalid]').exists()).toBe(false)
+      expect(wrapper.find('.vmlb-configure-form details').attributes('open')).toBeUndefined()
+    })
+
+    it('still shows a failure to load, when there is no action to sit beside', async () => {
+      const adapter = createTestAdapter({ listDatasets: vi.fn().mockRejectedValue(new Error('Could not reach the server')) })
+      const wrapper = mount(ModelCreateWizard, { props: { adapter } })
+      await flushPromises()
+
+      expect(wrapper.find('.vmlb-actions').exists()).toBe(false)
+      expect(wrapper.text()).toContain('Could not reach the server')
+    })
+  })
+
   describe('asks less of a no-code user', () => {
     const labelsIn = (wrapper: ReturnType<typeof mount>) => wrapper.find('.vmlb-configure-lens').text()
     const selectedCards = (wrapper: ReturnType<typeof mount>) =>

@@ -37,6 +37,9 @@ const parameters = reactive<Record<string, unknown>>({})
 const isLoading = ref(true)
 const isCreating = ref(false)
 const error = ref('')
+// Why Create & train did not go through, shown beside that button. The backend
+// answers with a sentence and names no field, so no setting can be marked.
+const refusal = ref('')
 const expandedModelInfo = ref<string | null>(null)
 // One model is always chosen, so the rest of the grid stays folded until asked for.
 const showAllModels = ref(false)
@@ -88,6 +91,11 @@ watch([parameters, multiclass, allSettings], () => {
     return !!param && optionsFor(param).reasons.some((reason) => note.includes(reason))
   }
   adjusted.value = Object.fromEntries(Object.entries({ ...adjusted.value, ...moved }).filter(stillTrue))
+})
+
+// A refusal is about the values refused, so it goes when they do.
+watch([parameters, modelName, modelType, selectedDataset], () => {
+  refusal.value = ''
 })
 
 onMounted(async () => {
@@ -185,12 +193,12 @@ function toggleParam(key: string) {
 async function createModel() {
   if (!adapter.value) return
   if (!selectedDataset.value || !modelName.value.trim() || !modelType.value) {
-    error.value = 'Please fill in all required fields'
+    refusal.value = 'Please fill in all required fields'
     return
   }
   try {
     isCreating.value = true
-    error.value = ''
+    refusal.value = ''
     const model = await adapter.value.createModel({
       name: modelName.value,
       dataset_id: selectedDataset.value.id,
@@ -213,7 +221,7 @@ async function createModel() {
 
     emit('created', model, { trainingQueued })
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to create model'
+    refusal.value = err instanceof Error ? err.message : 'Failed to create model'
   } finally {
     isCreating.value = false
   }
@@ -384,6 +392,13 @@ async function createModel() {
         </div>
       </section>
 
+      <!-- Stays in the page when empty: a screen reader announces what arrives in an
+           alert it already knows. Above the buttons, so it lands where the user is. -->
+      <div v-if="modelType" role="alert" class="vmlb-refusal">
+        <div v-if="refusal" class="vmlb-alert-error">
+          <Icon name="alert" /> {{ refusal }}
+        </div>
+      </div>
       <div v-if="modelType" class="vmlb-actions">
         <button type="button" class="vmlb-btn-secondary" @click="emit('cancel')">Cancel</button>
         <button
@@ -449,6 +464,7 @@ async function createModel() {
 .vmlb-italic { font-style: italic; color: var(--vmlb-text-subtle); }
 .vmlb-field { margin-bottom: 1.25rem; }
 .vmlb-show-models { margin-top: 0.75rem; }
+.vmlb-refusal .vmlb-alert-error { margin: var(--vmlb-space-md) 0 0; }
 .vmlb-chooser { margin-bottom: 1rem; }
 .vmlb-advanced summary { cursor: pointer; font-size: 0.875rem; font-weight: 600; color: var(--vmlb-text); }
 .vmlb-advanced[open] summary { margin-bottom: 0.5rem; }

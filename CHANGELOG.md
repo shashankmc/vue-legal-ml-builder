@@ -11,6 +11,11 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+### Fixed
+
+- `ModelCreateWizard` shows a refusal beside Create & train, as an alert, instead of out
+  of view at the top of the form, and clears it when a value changes.
+
 ## [0.5.1] - 2026-10-31
 
 ### Changed
