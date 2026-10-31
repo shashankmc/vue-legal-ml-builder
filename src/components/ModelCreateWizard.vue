@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, reactive, ref } from 'vue'
-import type { Dataset, MLAdapter } from '../types'
-import { allModelInfo, defaultModelFor, modelsByTaskType, parameterSchemas, taskTypeLabel } from './modelCatalogData'
+import { computed, inject, onMounted, reactive, ref, watch } from 'vue'
+import type { Dataset, MLAdapter, ModelTypeInfo } from '../types'
+import { allModelInfo, defaultModelFor, modelsByTaskType, parameterRules, parameterSchemas, taskTypeLabel } from './modelCatalogData'
+import { allowedOptions, mergeSchema, reconcileChoices } from './parameterOptions'
+import type { ParameterFieldSchema } from './modelCatalogData'
 import ModelLens from './shared/ModelLens.vue'
 import ModelQuestionTree from './ModelQuestionTree.vue'
 import Icon from './shared/Icon.vue'
@@ -43,6 +45,11 @@ const expandedParams = reactive<Record<string, boolean>>({})
 // Falls back to the static catalog when the adapter can't answer (e.g. a
 // non-BAIGLE host), so the wizard still works standalone.
 const backendModels = ref<string[] | null>(null)
+// What the backend says about each model: it decides the options, ranges and
+// dependent options, so the wizard cannot offer what it refuses.
+const backendInfo = ref<Record<string, ModelTypeInfo>>({})
+// Why a setting just moved, for the settings that had to.
+const adjusted = ref<Record<string, string>>({})
 // Label names from the dataset's overview, for datasets uploaded with their
 // labels in a column rather than declared up front.
 const overviewLabels = ref<string[] | null>(null)
@@ -58,9 +65,30 @@ const availableModels = computed<string[]>(() => {
 const visibleModels = computed<string[]>(() =>
   !showAllModels.value && availableModels.value.includes(modelType.value) ? [modelType.value] : availableModels.value,
 )
-const currentSchema = computed(() => parameterSchemas[modelType.value] || [])
+const schemaFor = (type: string) =>
+  mergeSchema(parameterSchemas[type] || [], backendInfo.value[type], selectedDataset.value?.row_count)
+const currentRules = computed(() => backendInfo.value[modelType.value]?.rules ?? parameterRules[modelType.value] ?? [])
+const allSettings = computed(() => schemaFor(modelType.value))
+const currentSchema = computed(() =>
+  allSettings.value.filter((p) => Object.entries(p.showWhen ?? {}).every(([key, value]) => parameters[key] === value)),
+)
 const taskLabel = computed(() => (selectedDataset.value ? taskTypeLabel(selectedDataset.value.task_type) : ''))
 const datasetLabels = computed(() => (selectedDataset.value?.labels?.length ? selectedDataset.value.labels : overviewLabels.value))
+const multiclass = computed(() => (datasetLabels.value?.length ?? 0) > 2)
+
+const optionsFor = (param: ParameterFieldSchema) => allowedOptions(param, currentRules.value, parameters, multiclass.value)
+
+// Choosing a penalty can rule out the solver already chosen, as can the labels
+// arriving after the model is picked.
+watch([parameters, multiclass, allSettings], () => {
+  const moved = reconcileChoices(allSettings.value, currentRules.value, parameters, multiclass.value)
+  // A note lasts as long as the rule that caused it.
+  const stillTrue = ([key, note]: [string, string]) => {
+    const param = allSettings.value.find((p) => p.key === key)
+    return !!param && optionsFor(param).reasons.some((reason) => note.includes(reason))
+  }
+  adjusted.value = Object.fromEntries(Object.entries({ ...adjusted.value, ...moved }).filter(stillTrue))
+})
 
 onMounted(async () => {
   if (!adapter.value) {
@@ -83,12 +111,14 @@ onMounted(async () => {
 
 async function loadBackendModels() {
   backendModels.value = null
+  backendInfo.value = {}
   const dataset = selectedDataset.value
   if (!adapter.value?.getAvailableModelTypes || !dataset) return
   try {
     const catalog = await adapter.value.getAvailableModelTypes(dataset.task_type)
     if (selectedDataset.value !== dataset) return
-    const types = Object.keys(catalog?.[dataset.task_type] ?? {})
+    backendInfo.value = catalog?.[dataset.task_type] ?? {}
+    const types = Object.keys(backendInfo.value)
     backendModels.value = types.length ? types : null
   } catch {
     backendModels.value = null
@@ -136,9 +166,9 @@ function selectModelType(type: string) {
   modelType.value = type
   expandedModelInfo.value = type
   Object.keys(expandedParams).forEach((k) => delete expandedParams[k])
-  const schema = parameterSchemas[type] || []
+  adjusted.value = {}
   Object.keys(parameters).forEach((k) => delete parameters[k])
-  for (const p of schema) parameters[p.key] = p.default
+  for (const p of schemaFor(type)) parameters[p.key] = p.default
   if (!modelNameEdited.value && selectedDataset.value) {
     modelName.value = `${allModelInfo[type]?.label || type} - ${selectedDataset.value.name}`
   }
@@ -165,7 +195,8 @@ async function createModel() {
       name: modelName.value,
       dataset_id: selectedDataset.value.id,
       model_type: modelType.value,
-      parameters: { ...parameters },
+      // A number cleared by hand is left to its default.
+      parameters: Object.fromEntries(Object.entries(parameters).filter(([, value]) => value !== '')),
       ...(props.projectId ? { project_id: props.projectId } : {}),
     })
 
@@ -300,7 +331,7 @@ async function createModel() {
                   </div>
                   <div class="vmlb-param-input">
                     <select v-if="param.type === 'select'" v-model="parameters[param.key]">
-                      <option v-for="opt in param.options" :key="opt" :value="opt">{{ opt }}</option>
+                      <option v-for="opt in optionsFor(param).options" :key="opt" :value="opt">{{ opt }}</option>
                     </select>
                     <select v-else-if="param.type === 'boolean'" v-model="parameters[param.key]">
                       <option :value="true">true</option>
@@ -316,10 +347,18 @@ async function createModel() {
                       :placeholder="param.default === null ? 'unlimited' : String(param.default)"
                     />
                   </div>
+                  <p v-if="adjusted[param.key]" class="vmlb-param-note">{{ adjusted[param.key] }}</p>
+                  <p v-else-if="optionsFor(param).reasons.length" class="vmlb-param-note">
+                    {{ optionsFor(param).reasons.join(' ') }}
+                  </p>
                   <div v-if="expandedParams[param.key]" class="vmlb-param-explain">
                     <p>{{ param.explanation }}</p>
                     <div v-if="param.optionsExplained">
-                      <div v-for="opt in param.optionsExplained" :key="opt.value" class="vmlb-option-line">
+                      <div
+                        v-for="opt in param.optionsExplained.filter((o) => optionsFor(param).options.includes(o.value))"
+                        :key="opt.value"
+                        class="vmlb-option-line"
+                      >
                         <code>{{ opt.value }}</code> <span>{{ opt.desc }}</span>
                       </div>
                     </div>
@@ -428,6 +467,7 @@ async function createModel() {
   border-radius: var(--vmlb-radius-sm);
   background: var(--vmlb-surface); color: var(--vmlb-text); font-family: inherit; font-size: 0.875rem;
 }
+.vmlb-param-note { flex-basis: 100%; margin: 0; font-size: 0.75rem; color: var(--vmlb-text-muted); }
 .vmlb-param-explain { flex-basis: 100%; background: var(--vmlb-surface-sunken); border-radius: var(--vmlb-radius-sm); padding: 0.75rem; font-size: 0.8125rem; color: var(--vmlb-text-muted); line-height: 1.55; }
 .vmlb-option-line { display: flex; gap: 0.5rem; margin: 0.25rem 0; }
 .vmlb-option-line code { background: var(--vmlb-surface); border: 1px solid var(--vmlb-border); padding: 0.0625rem 0.375rem; border-radius: var(--vmlb-radius-sm); font-size: 0.75rem; }

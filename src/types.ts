@@ -193,6 +193,8 @@ export interface ParameterFieldSchema {
   min?: number
   max?: number
   options?: Array<string | number>
+  /** Also capped at the rows of the Dataset, as a cluster count is. */
+  at_most_rows?: boolean
   description?: string
   /** Optional in-workflow copy on why this parameter affects performance —
    * shown by ParameterPerformanceExplorer, not present in the raw backend
@@ -202,10 +204,20 @@ export interface ParameterFieldSchema {
   recommendation?: string
 }
 
+/** Limits `parameter` to `options` while `when` holds, and `reason` says why.
+ * `when` names chosen values, or `multiclass` for over two labels in the Dataset. */
+export interface ParameterRule {
+  when: Record<string, unknown>
+  parameter: string
+  options: string[]
+  reason: string
+}
+
 export interface ModelTypeInfo {
   name: string
   description: string
   parameters: Record<string, ParameterFieldSchema>
+  rules?: ParameterRule[]
 }
 
 export type ModelCatalog = Record<string, Record<string, ModelTypeInfo>>

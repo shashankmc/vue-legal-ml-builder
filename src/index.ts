@@ -106,7 +106,7 @@ export { useParameterComparison } from './composables/useParameterComparison'
 export { useTraining } from './composables/useTraining'
 export { useTrainingCurves } from './composables/useTrainingCurves'
 
-export { allModelInfo, modelsByTaskType, parameterSchemas, quickGuideFor, taskTypeLabel } from './components/modelCatalogData'
+export { allModelInfo, modelsByTaskType, parameterRules, parameterSchemas, quickGuideFor, taskTypeLabel } from './components/modelCatalogData'
 export { classColor, defaultLabels, lensCopy, lensFamily } from './lens/modelLens'
 export type { LensCopy, LensFamily, LensPoint } from './lens/modelLens'
 export { decisionTreeFor } from './lens/modelGuide'
@@ -131,6 +131,7 @@ export type {
   MLBuilderPluginOptions,
   MlModel,
   ModelCatalog,
+  ParameterRule,
   ModelComparison,
   ModelStatus,
   ModelTypeInfo,

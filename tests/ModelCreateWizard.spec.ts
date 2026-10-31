@@ -183,6 +183,106 @@ describe('ModelCreateWizard', () => {
       expect(wrapper.text()).toContain('LDA (Topic Modelling)')
     })
 
+    describe('options that depend on each other', () => {
+      const catalogue = {
+        classification: {
+          logistic_regression: {
+            name: 'Logistic Regression',
+            description: '',
+            parameters: {
+              penalty: { type: 'select', options: ['l2', 'elasticnet'], default: 'l2', description: 'Penalty' },
+              solver: { type: 'select', options: ['lbfgs', 'liblinear', 'saga'], default: 'lbfgs', description: 'Solver' },
+              l1_ratio: { type: 'float', min: 0, max: 1, default: 0.5, description: 'Mix' },
+            },
+            rules: [
+              { when: { penalty: 'elasticnet' }, parameter: 'solver', options: ['saga'], reason: 'The elasticnet penalty needs the saga solver.' },
+              { when: { multiclass: true }, parameter: 'solver', options: ['lbfgs', 'saga'], reason: 'The liblinear solver handles two labels only.' },
+            ],
+          },
+        },
+      }
+      const mountWizard = async (labels: string[], createModel = vi.fn().mockResolvedValue({ id: 'm-1' })) => {
+        const adapter = createTestAdapter({
+          listDatasets: vi.fn().mockResolvedValue([dataset({ labels })]),
+          getAvailableModelTypes: vi.fn().mockResolvedValue(catalogue),
+          createModel,
+        })
+        const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+        await flushPromises()
+        return wrapper
+      }
+      const row = (wrapper: Awaited<ReturnType<typeof mountWizard>>, label: string) =>
+        wrapper.findAll('.vmlb-param-row').find((r) => r.text().includes(label))!
+      const solverOptions = (wrapper: Awaited<ReturnType<typeof mountWizard>>) =>
+        row(wrapper, 'Solver').findAll('option').map((o) => o.text())
+
+      it('offers what the catalogue offers', async () => {
+        const wrapper = await mountWizard(['civil', 'criminal'])
+
+        expect(solverOptions(wrapper)).toEqual(['lbfgs', 'liblinear', 'saga'])
+      })
+
+      it('narrows the solvers to what the penalty allows, moves the choice and says why', async () => {
+        const createModel = vi.fn().mockResolvedValue({ id: 'm-1' })
+        const wrapper = await mountWizard(['civil', 'criminal'], createModel)
+
+        await row(wrapper, 'Penalty').find('select').setValue('elasticnet')
+        await flushPromises()
+
+        expect(solverOptions(wrapper)).toEqual(['saga'])
+        expect(row(wrapper, 'Solver').text()).toContain('Solver changed to saga. The elasticnet penalty needs the saga solver.')
+
+        await wrapper.find('.vmlb-btn-primary').trigger('click')
+        await flushPromises()
+        expect(createModel.mock.calls[0][0].parameters).toMatchObject({ penalty: 'elasticnet', solver: 'saga' })
+      })
+
+      it('drops the note once the penalty that caused it is gone', async () => {
+        const wrapper = await mountWizard(['civil', 'criminal'])
+        await row(wrapper, 'Penalty').find('select').setValue('elasticnet')
+        await flushPromises()
+
+        await row(wrapper, 'Penalty').find('select').setValue('l2')
+        await flushPromises()
+
+        expect(row(wrapper, 'Solver').text()).not.toContain('changed to')
+      })
+
+      it('does not offer liblinear on a Dataset of more than two labels', async () => {
+        const wrapper = await mountWizard(['civil', 'criminal', 'family'])
+
+        expect(solverOptions(wrapper)).toEqual(['lbfgs', 'saga'])
+        expect(row(wrapper, 'Solver').text()).toContain('The liblinear solver handles two labels only.')
+      })
+
+      it('shows the elasticnet mix only with the elasticnet penalty', async () => {
+        const wrapper = await mountWizard(['civil', 'criminal'])
+        expect(row(wrapper, 'Elasticnet Mix')).toBeUndefined()
+
+        await row(wrapper, 'Penalty').find('select').setValue('elasticnet')
+        await flushPromises()
+
+        expect(row(wrapper, 'Elasticnet Mix')).toBeDefined()
+      })
+    })
+
+    it('leaves a cleared number to the default instead of sending nothing', async () => {
+      const createModel = vi.fn().mockResolvedValue({ id: 'm-1' })
+      const adapter = createTestAdapter({
+        listDatasets: vi.fn().mockResolvedValue([dataset()]),
+        createModel,
+        startTraining: vi.fn().mockResolvedValue({ job_id: 'j' }),
+      })
+      const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+      await flushPromises()
+      await wrapper.find('.vmlb-param-input input[type="number"]').setValue('')
+
+      await wrapper.find('.vmlb-btn-primary').trigger('click')
+      await flushPromises()
+
+      expect(createModel.mock.calls[0][0].parameters).not.toHaveProperty('C')
+    })
+
     it('tucks settings away, closed, and still sends their defaults', async () => {
       const createModel = vi.fn().mockResolvedValue({ id: 'm-1' })
       const adapter = createTestAdapter({

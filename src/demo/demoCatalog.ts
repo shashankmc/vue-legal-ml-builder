@@ -7,14 +7,14 @@ export const AVAILABLE_MODELS_DEMO: ModelCatalog = {
       description: 'Linear and non-linear classification using support vectors',
       parameters: {
         kernel: { type: 'select', options: ['linear', 'rbf', 'poly', 'sigmoid'], default: 'rbf', description: 'Kernel type' },
-        C: { type: 'float', min: 0.1, max: 100, default: 1.0, description: 'Regularisation parameter' },
+        C: { type: 'float', min: 0.001, max: 100, default: 1.0, description: 'Regularisation parameter' },
       },
     },
     naive_bayes: {
       name: 'Naive Bayes',
       description: 'Probabilistic classifier based on Bayes theorem',
       parameters: {
-        alpha: { type: 'float', min: 0.1, max: 10, default: 1.0, description: 'Smoothing parameter' },
+        alpha: { type: 'float', min: 0.01, max: 10, default: 1.0, description: 'Smoothing parameter' },
       },
     },
   },
