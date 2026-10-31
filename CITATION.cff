@@ -21,7 +21,7 @@ authors:
 license: MIT
 repository-code: "https://github.com/shashankmc/vue-legal-ml-builder"
 url: "https://github.com/shashankmc/vue-legal-ml-builder"
-version: "0.5.4"
+version: "0.5.5"
 date-released: "2026-10-31"
 keywords:
   - "legal NLP"
