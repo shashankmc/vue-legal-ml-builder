@@ -358,6 +358,23 @@ export interface MLAdapter {
 // Plugin options
 // ---------------------------------------------------------------------------
 
+/** How `TrainingCurves` draws a job's curves. Set app-wide through the plugin's
+ * `monitoring` option or `provide('vmlb:monitoring', …)`; props override it. */
+export interface TrainingCurvesOptions {
+  /** Only these metric names are drawn. Default: every metric. */
+  metrics?: string[]
+  /** `group` (default) draws one chart per group; `none` draws every metric on one chart. */
+  groupBy?: 'group' | 'none'
+  /** `step` (default) or `epoch`. A point without the chosen one falls back to the other. */
+  xAxis?: 'step' | 'epoch'
+  /** Moving-average weight from 0 (default, raw values) to just below 1 (smoothest). */
+  smoothing?: number
+  /** Draw values on a log scale. Default false. */
+  logScale?: boolean
+  /** How often a running job is polled for new points, in milliseconds. Default 3000. */
+  pollIntervalMs?: number
+}
+
 export interface MLBuilderPluginOptions {
   /** A pre-built adapter instance, or preset name + connection info. */
   adapter: MLAdapter | { apiUrl: string; getAuthToken?: () => string | null | undefined }
@@ -370,4 +387,6 @@ export interface MLBuilderPluginOptions {
   /** Hide the builder's annotation views and skip annotation operations, for
    * hosts with their own annotation (Legal Blocks). Default false (shown). */
   hideAnnotation?: boolean
+  /** App-wide defaults for `TrainingCurves`, provided as `vmlb:monitoring`. */
+  monitoring?: TrainingCurvesOptions
 }

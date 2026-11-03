@@ -81,6 +81,42 @@ hyperparameter-vs-performance comparison. Live curves are dense only for the
 LegalBERT/RoBERTa training path — classical sklearn algorithms only produce a
 few coarse phase-marker points (see `legal-ml-core`'s README for why).
 
+## Configuring the training curves
+
+`TrainingCurves` draws a job's curves, and `TrainingMonitor` passes these props
+through to it. Every one is optional; left unset, the curves look as before.
+
+| prop | default | effect |
+| --- | --- | --- |
+| `metrics` | every metric | Only these metric names are drawn, e.g. `['loss', 'eval_accuracy']`. Stages are always shown. |
+| `groupBy` | `'group'` | `'group'` draws one chart per group (Training, Evaluation, System); `'none'` draws every metric on one chart. |
+| `xAxis` | `'step'` | `'step'` or `'epoch'`. A point without the chosen one falls back to the other. |
+| `pollIntervalMs` | `3000` | How often a running job is polled for new points. |
+| `smoothing` | `0` | Moving-average weight, from 0 (raw values) to just below 1 (smoothest). |
+| `logScale` | `false` | Draws values on a log scale. |
+
+Set app-wide defaults once, through the plugin or `provide`. Each prop a
+component is given overrides its own default:
+
+```ts
+app.use(VueLegalMlBuilderPlugin, { adapter, monitoring: { xAxis: 'epoch', smoothing: 0.6 } })
+// or, without the plugin:
+app.provide('vmlb:monitoring', { xAxis: 'epoch', smoothing: 0.6 })
+```
+
+To draw the curves your own way, use the default slot. It replaces the stage
+timeline and charts (not the waiting or error message), and gets `charts` (one
+per group, each with its `series` of `{ metric, x, y }`, after the settings
+above), `stages` (`{ name, label, at }`, in order) and every raw `points`:
+
+```vue
+<TrainingCurves :job-id="jobId" :job-status="status">
+  <template #default="{ charts, stages }">
+    <MyChart v-for="chart in charts" :key="chart.group" :title="chart.title" :series="chart.series" />
+  </template>
+</TrainingCurves>
+```
+
 ## Theming
 
 Styling is driven entirely by `--vmlb-*` CSS custom properties, so the package

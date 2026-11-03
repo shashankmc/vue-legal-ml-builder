@@ -1,33 +1,58 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
-import type { MLAdapter } from '../types'
+import type { MLAdapter, TrainingCurvesOptions, TrainingMetricPoint } from '../types'
 import { useTrainingCurves } from '../composables/useTrainingCurves'
-import { curveCharts, stageEvents } from '../utils/trainingCharts'
+import { curveCharts, stageEvents, type CurveChart, type StageEvent } from '../utils/trainingCharts'
 import PlotlyChart from './shared/PlotlyChart.vue'
 import Icon from './shared/Icon.vue'
 
-const props = defineProps<{ adapter?: MLAdapter; jobId: string; jobStatus?: string }>()
+const props = withDefaults(
+  defineProps<{ adapter?: MLAdapter; jobId: string; jobStatus?: string } & TrainingCurvesOptions>(),
+  // Left unset, not false, so an app-wide default can apply.
+  { logScale: undefined },
+)
 
 const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
 const adapter = computed(() => props.adapter ?? injectedAdapter)
-const { points, start, stop, fetchNew } = useTrainingCurves(adapter.value as MLAdapter)
+// App-wide defaults; each prop the host sets overrides its own one.
+const appDefaults = inject<TrainingCurvesOptions>('vmlb:monitoring', {})
+const option = <K extends keyof TrainingCurvesOptions>(key: K): TrainingCurvesOptions[K] => props[key] ?? appDefaults[key]
+const { points, start, stop, fetchNew } = useTrainingCurves(adapter.value as MLAdapter, option('pollIntervalMs') ?? 3000)
 
 const error = ref('')
 
 const isSettled = computed(() => ['completed', 'failed', 'cancelled'].includes(props.jobStatus ?? ''))
 
 // One chart per group, so loss, learning rate and scores each get an axis that fits.
+const curves = computed(() =>
+  curveCharts(points.value, {
+    metrics: option('metrics'),
+    groupBy: option('groupBy'),
+    xAxis: option('xAxis'),
+    smoothing: option('smoothing'),
+  }),
+)
 const charts = computed(() =>
-  curveCharts(points.value).map((chart) => ({
+  curves.value.map((chart) => ({
     group: chart.group,
     title: chart.title,
     plotData: {
       data: chart.series.map((s) => ({ x: s.x, y: s.y, mode: 'lines+markers', name: s.metric })),
-      layout: { xaxis: { title: chart.xAxisTitle }, yaxis: { title: 'value' }, height: 300 },
+      layout: {
+        xaxis: { title: chart.xAxisTitle },
+        yaxis: { title: 'value', ...(option('logScale') ? { type: 'log' } : {}) },
+        height: 300,
+      },
     },
   })),
 )
 const stages = computed(() => stageEvents(points.value))
+
+defineSlots<{
+  /** Draws the curves in the host's own way, in place of the stage timeline and
+   * charts. Gets the configured charts (grouped series), the stages and every point. */
+  default?(scope: { charts: CurveChart[]; stages: StageEvent[]; points: TrainingMetricPoint[] }): unknown
+}>()
 
 onMounted(async () => {
   if (!adapter.value) {
@@ -55,6 +80,7 @@ onUnmounted(stop)
       <p v-if="points.length === 0" class="vmlb-waiting">
         <Icon name="spark" /> Waiting for the first metric point…
       </p>
+      <slot v-else-if="$slots.default" :charts="curves" :stages="stages" :points="points" />
       <template v-else>
         <ol v-if="stages.length" class="vmlb-stage-timeline" aria-label="Training stages">
           <li v-for="(stage, i) in stages" :key="`${stage.name}-${i}`" :data-stage="stage.name">
