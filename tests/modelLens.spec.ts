@@ -125,6 +125,19 @@ describe('decisionTreeFor', () => {
     }
   })
 
+  it('asks and answers in plain words, with no algorithm terms or things a user cannot know', () => {
+    const jargon = /tf-?idf|dendrogram|gpu|high-dimensional|bayes|\blda\b|\bnmf\b|probabilistic|calibrated|corpus|cluster|algorithm|transformer|density|ensemble|vector|feature|hierarch|baseline|pre-trained/i
+    for (const task of Object.keys(modelsByTaskType)) {
+      const tree = decisionTreeFor(task)
+      if (!tree) continue
+      for (const node of Object.values(tree.nodes)) {
+        for (const text of [node.question, node.help, ...node.options.flatMap((o) => [o.label, o.note])]) {
+          if (text) expect(text, task).not.toMatch(jargon)
+        }
+      }
+    }
+  })
+
   it('returns null for an unknown task', () => {
     expect(decisionTreeFor('regression')).toBeNull()
   })

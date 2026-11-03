@@ -573,7 +573,7 @@ describe('ModelCreateWizard', () => {
       const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
       await flushPromises()
 
-      const tile = wrapper.findAll('.vmlb-guide-option').find((t) => t.text().includes('Accuracy on complex cases'))
+      const tile = wrapper.findAll('.vmlb-guide-option').find((t) => t.text().includes('Getting as many results right as possible'))
       await tile!.trigger('click')
 
       expect(selectedCards(wrapper)).toEqual(['Random Forest'])
