@@ -15,7 +15,8 @@ tagged `vX.Y.Z`.
 
 - `MonitoringSettings` and `ModelParameters` are exported: a run's own monitoring goes
   under `parameters.monitoring` (`log_every_n_steps`, `eval_strategy` with `eval_steps`,
-  `include` / `exclude` name globs, and `learning_curve` / `system_metrics`, accepted but
+  `include` / `exclude` name globs, `flush_every_points` / `flush_every_seconds` for how
+  often metric points are written, and `learning_curve` / `system_metrics`, accepted but
   not used yet). `MlModel.parameters`, `createModel` and `updateModel` use
   `ModelParameters`. A refusal of one of these names `monitoring.<setting>` as its field.
 - `npm test` also type-checks the type-level tests (`tests/*.test-d.ts`), through

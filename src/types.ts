@@ -33,8 +33,10 @@ export type ModelStatus = 'pending' | 'training' | 'completed' | 'failed'
 /** How a training run is monitored, under `parameters.monitoring`. A setting a
  * run leaves out takes the host's default, then legal-ml-core's. Include and
  * exclude are name globs (`eval_*`) for which metric points are stored; stage
- * markers always are. `learning_curve` and `system_metrics` are accepted but
- * not used yet. A bad value is refused with `field: 'monitoring.<setting>'`. */
+ * markers always are. `flush_every_points` and `flush_every_seconds` say how
+ * often the worker writes metric points in a batch. `learning_curve` and
+ * `system_metrics` are accepted but not used yet. A bad value is refused with
+ * `field: 'monitoring.<setting>'`. */
 export interface MonitoringSettings {
   log_every_n_steps: number
   eval_strategy: 'epoch' | 'steps'
@@ -44,6 +46,10 @@ export interface MonitoringSettings {
   exclude: string[]
   learning_curve: boolean
   system_metrics: boolean
+  /** Whole number above 0; legal-ml-core's default is 50. */
+  flush_every_points: number
+  /** Above 0; legal-ml-core's default is 2. */
+  flush_every_seconds: number
 }
 
 /** A Model's settings, by catalogue name, plus its own monitoring. A run's
