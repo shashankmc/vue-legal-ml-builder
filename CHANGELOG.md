@@ -11,6 +11,22 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+### Changed
+
+- `ModelCreateWizard` opens the model step on the guide questions instead of folding them away. "Choose a model myself"
+  swaps them for the full grid, and "Help me choose instead" brings them back. The default model is still chosen, so
+  skipping the questions changes nothing. The `details.vmlb-chooser` disclosure and its "Help me choose a model"
+  summary are gone, and `.vmlb-show-models` now reads "Choose a model myself".
+- The guide's questions and answers are in plain words, and its recommendation gives the reason for the answer
+  instead of the model's technical description. Hosts or tests that match the old wording must update it.
+- `ModelQuestionTree`'s `select` event is typed `select(modelType, parameters?)`. It still emits only the model type.
+
+### Removed
+
+- Named entity recognition and text summarisation offer no models, and `decisionTreeFor` and `quickGuideFor`
+  return `null` for them, because the backend cannot train them yet. The wizard says so instead of offering
+  LegalBERT and RoBERTa.
+
 ## [0.5.5] - 2026-10-31
 
 ### Added
