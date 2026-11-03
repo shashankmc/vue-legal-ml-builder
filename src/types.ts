@@ -306,6 +306,8 @@ export interface MLAdapter {
   getAvailableModelTypes(taskType?: string): Promise<ModelCatalog>
   /** Rejects with an Error, a `RefusalError` when a refusal names a setting. */
   createModel(config: { name: string; dataset_id: Id; model_type: string; parameters: Record<string, unknown>; project_id?: Id }): Promise<MlModel>
+  /** Optional: renames a Model or replaces its settings. Rejects as `createModel` does. */
+  updateModel?(id: Id, changes: { name?: string; parameters?: Record<string, unknown> }): Promise<MlModel>
   deleteModel(id: Id): Promise<void>
 
   // Training

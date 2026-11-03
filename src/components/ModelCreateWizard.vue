@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type { Dataset, MLAdapter, ModelTypeInfo, RefusalError } from '../types'
-import { allModelInfo, defaultModelFor, modelsByTaskType, parameterRules, parameterSchemas, taskTypeLabel } from './modelCatalogData'
-import { allowedOptions, mergeSchema, reconcileChoices } from './parameterOptions'
-import type { ParameterFieldSchema } from './modelCatalogData'
+import { allModelInfo, defaultModelFor, modelsByTaskType, taskTypeLabel } from './modelCatalogData'
+import ModelParameterForm from './ModelParameterForm.vue'
 import ModelLens from './shared/ModelLens.vue'
 import ModelQuestionTree from './ModelQuestionTree.vue'
 import { decisionTreeFor } from '../lens/modelGuide'
@@ -34,7 +33,10 @@ const selectedDataset = ref<Dataset | null>(null)
 const modelName = ref('')
 const modelNameEdited = ref(false)
 const modelType = ref('')
+// The settings the form reports, for the lens and for Create & train.
 const parameters = reactive<Record<string, unknown>>({})
+// What the form starts from. A new object starts it again.
+const initialParameters = ref<Record<string, unknown>>({})
 const isLoading = ref(true)
 const isCreating = ref(false)
 const error = ref('')
@@ -43,12 +45,11 @@ const error = ref('')
 const refusal = ref('')
 const refusedField = ref('')
 const actions = ref<HTMLElement | null>(null)
-const advanced = ref<HTMLDetailsElement | null>(null)
+const settingsForm = ref<InstanceType<typeof ModelParameterForm> | null>(null)
 const expandedModelInfo = ref<string | null>(null)
 // The step opens on the guide questions, with the chosen model below them. The
 // full grid replaces the questions when the user would rather choose for themselves.
 const showAllModels = ref(false)
-const expandedParams = reactive<Record<string, boolean>>({})
 // Model types the backend reports as trainable for the selected dataset's task.
 // Falls back to the static catalog when the adapter can't answer (e.g. a
 // non-BAIGLE host), so the wizard still works standalone.
@@ -56,8 +57,6 @@ const backendModels = ref<string[] | null>(null)
 // What the backend says about each model: it decides the options, ranges and
 // dependent options, so the wizard cannot offer what it refuses.
 const backendInfo = ref<Record<string, ModelTypeInfo>>({})
-// Why a setting just moved, for the settings that had to.
-const adjusted = ref<Record<string, string>>({})
 // Label names from the dataset's overview, for datasets uploaded with their
 // labels in a column rather than declared up front.
 const overviewLabels = ref<string[] | null>(null)
@@ -74,30 +73,14 @@ const visibleModels = computed<string[]>(() =>
   !showAllModels.value && availableModels.value.includes(modelType.value) ? [modelType.value] : availableModels.value,
 )
 const hasGuide = computed(() => !!selectedDataset.value && decisionTreeFor(selectedDataset.value.task_type) !== null)
-const schemaFor = (type: string) =>
-  mergeSchema(parameterSchemas[type] || [], backendInfo.value[type], selectedDataset.value?.row_count)
-const currentRules = computed(() => backendInfo.value[modelType.value]?.rules ?? parameterRules[modelType.value] ?? [])
-const allSettings = computed(() => schemaFor(modelType.value))
-const currentSchema = computed(() =>
-  allSettings.value.filter((p) => Object.entries(p.showWhen ?? {}).every(([key, value]) => parameters[key] === value)),
-)
 const taskLabel = computed(() => (selectedDataset.value ? taskTypeLabel(selectedDataset.value.task_type) : ''))
 const datasetLabels = computed(() => (selectedDataset.value?.labels?.length ? selectedDataset.value.labels : overviewLabels.value))
-const multiclass = computed(() => (datasetLabels.value?.length ?? 0) > 2)
 
-const optionsFor = (param: ParameterFieldSchema) => allowedOptions(param, currentRules.value, parameters, multiclass.value)
-
-// Choosing a penalty can rule out the solver already chosen, as can the labels
-// arriving after the model is picked.
-watch([parameters, multiclass, allSettings], () => {
-  const moved = reconcileChoices(allSettings.value, currentRules.value, parameters, multiclass.value)
-  // A note lasts as long as the rule that caused it.
-  const stillTrue = ([key, note]: [string, string]) => {
-    const param = allSettings.value.find((p) => p.key === key)
-    return !!param && optionsFor(param).reasons.some((reason) => note.includes(reason))
-  }
-  adjusted.value = Object.fromEntries(Object.entries({ ...adjusted.value, ...moved }).filter(stillTrue))
-})
+// Only what changed, so a report of the same settings is not taken for an edit.
+function onSettingsChange(next: Record<string, unknown>) {
+  Object.keys(parameters).filter((k) => !(k in next)).forEach((k) => delete parameters[k])
+  Object.assign(parameters, next)
+}
 
 // A refusal is about the values refused, so it goes when they do.
 watch([parameters, modelName, modelType, selectedDataset], clearRefusal)
@@ -107,11 +90,7 @@ function clearRefusal() {
   refusedField.value = ''
 }
 
-const refusalMark = (key: string) =>
-  refusedField.value === key
-    ? { id: 'vmlb-refused-field', 'aria-invalid': 'true' as const, 'aria-describedby': 'vmlb-refusal' }
-    : {}
-const refusedLabel = computed(() => currentSchema.value.find((p) => p.key === refusedField.value)?.label)
+const refusedLabel = computed(() => settingsForm.value?.labelFor(refusedField.value))
 
 // On a phone the setting can be a long way above the alert, which stays by the buttons.
 function goToRefusedField() {
@@ -186,19 +165,15 @@ function onDatasetChange() {
   modelType.value = ''
   showAllModels.value = false
   expandedModelInfo.value = null
-  Object.keys(expandedParams).forEach((k) => delete expandedParams[k])
   modelNameEdited.value = false
   modelName.value = ''
   prepareDataset()
 }
 
-function selectModelType(type: string) {
+function selectModelType(type: string, preset?: Record<string, unknown>) {
   modelType.value = type
   expandedModelInfo.value = type
-  Object.keys(expandedParams).forEach((k) => delete expandedParams[k])
-  adjusted.value = {}
-  Object.keys(parameters).forEach((k) => delete parameters[k])
-  for (const p of schemaFor(type)) parameters[p.key] = p.default
+  initialParameters.value = { ...preset }
   if (!modelNameEdited.value && selectedDataset.value) {
     modelName.value = `${allModelInfo[type]?.label || type} - ${selectedDataset.value.name}`
   }
@@ -206,10 +181,6 @@ function selectModelType(type: string) {
 
 function toggleModelInfo(type: string) {
   expandedModelInfo.value = expandedModelInfo.value === type ? null : type
-}
-
-function toggleParam(key: string) {
-  expandedParams[key] = !expandedParams[key]
 }
 
 async function createModel() {
@@ -225,8 +196,7 @@ async function createModel() {
       name: modelName.value,
       dataset_id: selectedDataset.value.id,
       model_type: modelType.value,
-      // A number cleared by hand is left to its default.
-      parameters: Object.fromEntries(Object.entries(parameters).filter(([, value]) => value !== '')),
+      parameters: { ...parameters },
       ...(props.projectId ? { project_id: props.projectId } : {}),
     })
 
@@ -244,11 +214,9 @@ async function createModel() {
     emit('created', model, { trainingQueued })
   } catch (err) {
     refusal.value = err instanceof Error ? err.message : 'Failed to create model'
+    // The form marks it, and opens Advanced settings on it, if it is on show.
     const field = (err as RefusalError).field
-    if (currentSchema.value.some((p) => p.key === field)) {
-      refusedField.value = field as string
-      if (advanced.value) advanced.value.open = true
-    }
+    if (settingsForm.value?.labelFor(field)) refusedField.value = field as string
     // The alert and Advanced settings grow above the buttons, which can push them
     // past the viewport, so this comes after both.
     await nextTick()
@@ -367,56 +335,16 @@ async function createModel() {
               />
             </div>
 
-            <details v-if="currentSchema.length" ref="advanced" class="vmlb-advanced">
-              <summary>Advanced settings</summary>
-              <p class="vmlb-muted vmlb-small">Sensible defaults are already applied. Change these only if you want to.</p>
-              <div class="vmlb-params">
-                <div v-for="param in currentSchema" :key="param.key" class="vmlb-param-row">
-                  <div class="vmlb-param-head">
-                    <button type="button" class="vmlb-link-btn" @click="toggleParam(param.key)">
-                      {{ param.label }}
-                    </button>
-                    <p class="vmlb-muted vmlb-small">{{ param.shortDesc }}</p>
-                  </div>
-                  <div class="vmlb-param-input">
-                    <select v-if="param.type === 'select'" v-model="parameters[param.key]" v-bind="refusalMark(param.key)">
-                      <option v-for="opt in optionsFor(param).options" :key="opt" :value="opt">{{ opt }}</option>
-                    </select>
-                    <select v-else-if="param.type === 'boolean'" v-model="parameters[param.key]" v-bind="refusalMark(param.key)">
-                      <option :value="true">true</option>
-                      <option :value="false">false</option>
-                    </select>
-                    <input
-                      v-else
-                      v-model.number="parameters[param.key]"
-                      type="number"
-                      :step="param.step ?? 'any'"
-                      :min="param.min"
-                      :max="param.max"
-                      :placeholder="param.default === null ? 'unlimited' : String(param.default)"
-                      v-bind="refusalMark(param.key)"
-                    />
-                  </div>
-                  <p v-if="adjusted[param.key]" class="vmlb-param-note">{{ adjusted[param.key] }}</p>
-                  <p v-else-if="optionsFor(param).reasons.length" class="vmlb-param-note">
-                    {{ optionsFor(param).reasons.join(' ') }}
-                  </p>
-                  <div v-if="expandedParams[param.key]" class="vmlb-param-explain">
-                    <p>{{ param.explanation }}</p>
-                    <div v-if="param.optionsExplained">
-                      <div
-                        v-for="opt in param.optionsExplained.filter((o) => optionsFor(param).options.includes(o.value))"
-                        :key="opt.value"
-                        class="vmlb-option-line"
-                      >
-                        <code>{{ opt.value }}</code> <span>{{ opt.desc }}</span>
-                      </div>
-                    </div>
-                    <div class="vmlb-recommendation"><Icon name="spark" /> {{ param.recommendation }}</div>
-                  </div>
-                </div>
-              </div>
-            </details>
+            <ModelParameterForm
+              ref="settingsForm"
+              :model-type="modelType"
+              :parameters="initialParameters"
+              :model-info="backendInfo[modelType]"
+              :row-count="selectedDataset?.row_count"
+              :labels="datasetLabels"
+              :refused-field="refusedField"
+              @change="onSettingsChange"
+            />
           </div>
 
           <aside class="vmlb-configure-lens">
@@ -517,31 +445,4 @@ async function createModel() {
 .vmlb-chooser { margin-bottom: 1rem; }
 .vmlb-advanced summary { cursor: pointer; font-size: 0.875rem; font-weight: 600; color: var(--vmlb-text); }
 .vmlb-advanced[open] summary { margin-bottom: 0.5rem; }
-.vmlb-advanced .vmlb-params { margin-top: 0.75rem; }
-.vmlb-params { border: 1px solid var(--vmlb-border); border-radius: var(--vmlb-radius-md); overflow: hidden; }
-.vmlb-param-row {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;
-  padding: 0.75rem 1rem; border-bottom: 1px solid var(--vmlb-border);
-}
-.vmlb-param-row:last-child { border-bottom: none; }
-.vmlb-param-head { flex: 1; min-width: 10rem; }
-.vmlb-param-input input, .vmlb-param-input select {
-  width: auto; min-width: 7rem;
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--vmlb-border-strong);
-  border-radius: var(--vmlb-radius-sm);
-  background: var(--vmlb-surface); color: var(--vmlb-text); font-family: inherit; font-size: 0.875rem;
-}
-.vmlb-param-input [aria-invalid='true'] { border-color: var(--vmlb-error); box-shadow: 0 0 0 1px var(--vmlb-error); }
-.vmlb-param-note { flex-basis: 100%; margin: 0; font-size: 0.75rem; color: var(--vmlb-text-muted); }
-.vmlb-param-explain { flex-basis: 100%; background: var(--vmlb-surface-sunken); border-radius: var(--vmlb-radius-sm); padding: 0.75rem; font-size: 0.8125rem; color: var(--vmlb-text-muted); line-height: 1.55; }
-.vmlb-option-line { display: flex; gap: 0.5rem; margin: 0.25rem 0; }
-.vmlb-option-line code { background: var(--vmlb-surface); border: 1px solid var(--vmlb-border); padding: 0.0625rem 0.375rem; border-radius: var(--vmlb-radius-sm); font-size: 0.75rem; }
-.vmlb-recommendation {
-  display: flex; align-items: flex-start; gap: 0.4rem;
-  margin-top: 0.5rem; padding: 0.5rem 0.75rem;
-  background: var(--vmlb-accent-soft);
-  border-radius: var(--vmlb-radius-sm);
-  font-size: 0.75rem; color: var(--vmlb-accent-strong);
-}
 </style>

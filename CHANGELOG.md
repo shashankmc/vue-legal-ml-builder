@@ -11,6 +11,17 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `ModelParameterForm`, the settings form from `ModelCreateWizard`, can be used on its own,
+  for example to change a trained Model's settings. Give it `modelType`, the starting
+  `parameters` (missing ones take their defaults), and optionally `modelInfo`, `rowCount`,
+  `labels`, `refusedField` and `refusalId`. It reports the settings to send in a `change`
+  event. The wizard looks and behaves as before.
+- `MLAdapter.updateModel(id, { name?, parameters? })`, optional, renames a Model or replaces
+  its settings. `createSelfHostedAdapter` sends it as `PUT /models/<id>`, and a refusal keeps
+  its `field` as with `createModel`.
+
 ### Changed
 
 - `ModelCreateWizard` opens the model step on the guide questions instead of folding them away. "Choose a model myself"
@@ -26,6 +37,11 @@ tagged `vX.Y.Z`.
 - Named entity recognition and text summarisation offer no models, and `decisionTreeFor` and `quickGuideFor`
   return `null` for them, because the backend cannot train them yet. The wizard says so instead of offering
   LegalBERT and RoBERTa.
+
+### Fixed
+
+- A component mounted with `mountComponent` now follows the props passed later through
+  `updateProps`. Before, it kept the props it was mounted with.
 
 ## [0.5.5] - 2026-10-31
 

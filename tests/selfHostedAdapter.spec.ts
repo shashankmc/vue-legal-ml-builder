@@ -6,9 +6,14 @@ function reply(status: number, body: unknown) {
 }
 
 function stubFetch(handler: (url: string, init: RequestInit) => Response) {
-  const calls: { url: string; token: string | undefined }[] = []
+  const calls: { url: string; token: string | undefined; method?: string; body?: unknown }[] = []
   vi.stubGlobal('fetch', async (url: string, init: RequestInit = {}) => {
-    calls.push({ url, token: (init.headers as Record<string, string>).Authorization })
+    calls.push({
+      url,
+      token: (init.headers as Record<string, string>).Authorization,
+      method: init.method,
+      body: typeof init.body === 'string' ? JSON.parse(init.body) : undefined,
+    })
     return handler(url, init)
   })
   return calls
@@ -91,5 +96,39 @@ describe('createSelfHostedAdapter', () => {
 
     expect(refused.message).toBe('Invalid model type')
     expect('field' in refused).toBe(false)
+  })
+  describe('updateModel', () => {
+    const changes = { parameters: { C: 2, solver: 'saga' } }
+
+    it('sends the new settings to the Model and returns the saved Model', async () => {
+      const calls = stubFetch(() => reply(200, { message: 'Model updated', model: { id: 'm1', parameters: changes.parameters } }))
+      const adapter = createSelfHostedAdapter({ apiUrl: '/api' })
+
+      const model = await adapter.updateModel!('m1', changes)
+
+      expect(calls).toEqual([expect.objectContaining({ url: '/api/models/m1', method: 'PUT', body: changes })])
+      expect(model).toEqual({ id: 'm1', parameters: changes.parameters })
+    })
+
+    it('keeps the field a refusal names', async () => {
+      stubFetch(() => reply(400, { error: 'Regularisation (C) must be between 0.001 and 100.', field: 'C' }))
+      const adapter = createSelfHostedAdapter({ apiUrl: '/api' })
+
+      const refused = await adapter.updateModel!('m1', changes).catch((err) => err)
+
+      expect(refused).toBeInstanceOf(Error)
+      expect(refused.message).toBe('Regularisation (C) must be between 0.001 and 100.')
+      expect(refused.field).toBe('C')
+    })
+
+    it('adds no field for a backend that sends none', async () => {
+      stubFetch(() => reply(409, { error: 'This Model is training. Wait for it to finish.' }))
+      const adapter = createSelfHostedAdapter({ apiUrl: '/api' })
+
+      const refused = await adapter.updateModel!('m1', changes).catch((err) => err)
+
+      expect(refused.message).toBe('This Model is training. Wait for it to finish.')
+      expect('field' in refused).toBe(false)
+    })
   })
 })

@@ -9,6 +9,7 @@ import DatasetManager from './components/DatasetManager.vue'
 import ModelCreateWizard from './components/ModelCreateWizard.vue'
 import ModelDetail from './components/ModelDetail.vue'
 import ModelList from './components/ModelList.vue'
+import ModelParameterForm from './components/ModelParameterForm.vue'
 import ModelQuestionTree from './components/ModelQuestionTree.vue'
 import ParameterPerformanceExplorer from './components/ParameterPerformanceExplorer.vue'
 import ConfusionMatrix from './components/shared/ConfusionMatrix.vue'
@@ -48,6 +49,7 @@ export const VueLegalMlBuilderPlugin = {
     app.component('ModelList', ModelList)
     app.component('ModelCreateWizard', ModelCreateWizard)
     app.component('ModelDetail', ModelDetail)
+    app.component('ModelParameterForm', ModelParameterForm)
     app.component('ModelQuestionTree', ModelQuestionTree)
     app.component('TrainingMonitor', TrainingMonitor)
     app.component('TrainingCurves', TrainingCurves)
@@ -78,6 +80,7 @@ export {
   ModelDetail,
   ModelLens,
   ModelList,
+  ModelParameterForm,
   ModelQuestionTree,
   ParameterPerformanceExplorer,
   PlotlyChart,

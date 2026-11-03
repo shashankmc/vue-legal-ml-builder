@@ -135,6 +135,10 @@ export function createSelfHostedAdapter(opts: SelfHostedAdapterOptions): MLAdapt
       const data = await post('/models/', config)
       return data.model
     },
+    async updateModel(id, changes): Promise<MlModel> {
+      const data = await put(`/models/${id}`, changes)
+      return data.model
+    },
     async deleteModel(id: Id): Promise<void> {
       await del(`/models/${id}`)
     },

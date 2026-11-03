@@ -15,6 +15,7 @@ export function createTestAdapter(overrides: Partial<MLAdapter> = {}): MLAdapter
     getModel: vi.fn(),
     getAvailableModelTypes: vi.fn().mockResolvedValue({}),
     createModel: vi.fn(),
+    updateModel: vi.fn(),
     deleteModel: vi.fn(),
 
     startTraining: vi.fn(),
