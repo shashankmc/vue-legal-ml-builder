@@ -103,6 +103,57 @@ describe('curveCharts', () => {
     ])
   })
 
+  it('draws a run with both resource readings and a learning curve, each on its own charts', () => {
+    const charts = curveCharts([
+      point('memory_mb', { group: 'system', value: 2048 }),
+      point('learning_curve_train_accuracy', { group: 'train', training_step: 3, value: 1 }),
+      point('samples_per_second', { group: 'system', value: 16 }),
+      point('learning_curve_eval_accuracy', { group: 'eval', training_step: 3, value: 0.5 }),
+    ])
+
+    expect(charts.map((c) => [c.group, c.title, c.unit, c.series.map((s) => s.metric)])).toEqual([
+      ['system', 'Memory (MB)', 'MB', ['memory_mb']],
+      ['system', 'Speed (samples per second)', 'samples per second', ['samples_per_second']],
+      ['learning_curve', 'Learning curve', undefined, ['learning_curve_train_accuracy', 'learning_curve_eval_accuracy']],
+    ])
+    expect(charts[2].xAxisTitle).toBe('Training examples')
+  })
+
+  it('draws the resource readings one chart per unit, each titled with its unit', () => {
+    const system = (name: string, value: number) => point(name, { group: 'system', training_step: 10, value })
+    const charts = curveCharts([
+      point('loss', { training_step: 10 }),
+      system('memory_mb', 2048),
+      system('gpu_memory_mb', 512),
+      system('gpu_use_percent', 40),
+      system('samples_per_second', 16),
+      system('seconds_remaining', 45),
+    ])
+
+    expect(charts.map((c) => [c.group, c.title, c.unit])).toEqual([
+      ['train', 'Training', undefined],
+      ['system', 'Memory (MB)', 'MB'],
+      ['system', 'GPU use (%)', '%'],
+      ['system', 'Speed (samples per second)', 'samples per second'],
+      ['system', 'Time remaining (seconds)', 'seconds'],
+    ])
+    expect(charts[1].series.map((s) => s.metric)).toEqual(['memory_mb', 'gpu_memory_mb'])
+  })
+
+  it('takes the unit of a resource reading it does not know from its name', () => {
+    const charts = curveCharts([
+      point('cpu_percent', { group: 'system' }),
+      point('disk_mb', { group: 'system' }),
+      point('open_files', { group: 'system' }),
+    ])
+
+    expect(charts.map((c) => [c.title, c.unit])).toEqual([
+      ['System (%)', '%'],
+      ['System (MB)', 'MB'],
+      ['System', undefined],
+    ])
+  })
+
   it('has no charts when a run only has stage markers', () => {
     expect(curveCharts([point('training_started', { group: 'stage' })])).toEqual([])
   })

@@ -93,7 +93,7 @@ through to it. Every one is optional; left unset, the curves look as before.
 | prop | default | effect |
 | --- | --- | --- |
 | `metrics` | every metric | Only these metric names are drawn, e.g. `['loss', 'eval_accuracy']`. Stages are always shown. |
-| `groupBy` | `'group'` | `'group'` draws one chart per group (Training, Evaluation, System); `'none'` draws every metric on one chart. |
+| `groupBy` | `'group'` | `'group'` draws one chart per group (Training, Evaluation, System), and the System readings one chart per unit, e.g. Memory (MB); `'none'` draws every metric on one chart. |
 | `xAxis` | `'step'` | `'step'` or `'epoch'`. A point without the chosen one falls back to the other. |
 | `pollIntervalMs` | `3000` | How often a running job is polled for new points. |
 | `smoothing` | `0` | Moving-average weight, from 0 (raw values) to just below 1 (smoothest). |

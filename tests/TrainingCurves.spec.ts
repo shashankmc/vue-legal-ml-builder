@@ -67,6 +67,19 @@ describe('TrainingCurves', () => {
     expect(plot[0].props('plotData').data.map((t: { x: number[] }) => t.x)).toEqual([[3, 32], [3, 32]])
   })
 
+  it('labels each resource chart\'s value axis with its unit', async () => {
+    const wrapper = await mountWith([
+      point(0, 'memory_mb', { group: 'system', training_step: 10, value: 2048 }),
+      point(1, 'samples_per_second', { group: 'system', training_step: 10, value: 16 }),
+    ])
+
+    const charts = wrapper.findAll('.vmlb-curves-chart[data-group="system"]')
+    expect(charts.map((c) => c.find('h4').text())).toEqual(['Memory (MB)', 'Speed (samples per second)'])
+    const plots = wrapper.findAllComponents(PlotlyChart)
+    expect(plots.map((p) => p.props('plotData').layout.yaxis.title)).toEqual(['MB', 'samples per second'])
+    expect(new Set(plots.map((p) => p.props('plotId'))).size).toBe(2)
+  })
+
   it('shows stage markers as labelled events, not as a line', async () => {
     const wrapper = await mountWith([
       point(0, 'preprocessing_started', { group: 'stage' }),

@@ -33,6 +33,11 @@ tagged `vX.Y.Z`.
 - App-wide defaults for those settings, through the plugin's `monitoring` option or
   `provide('vmlb:monitoring', …)`. A prop overrides its default. `TrainingCurvesOptions` is
   exported.
+- The resource readings a run takes with `monitoring.system_metrics` on are drawn one
+  chart per unit, each titled with it: Memory (MB), GPU use (%), Speed (samples per
+  second) and Time remaining (seconds). Its value axis names the unit. `CurveChart`
+  has the `unit`, and `metricUnitOf(name)` reads it from the end of a point's name.
+  A host matching the single System chart's title must update.
 - A default slot on `TrainingCurves` lets a host draw the curves its own way. It gets the
   configured `charts`, the `stages` and the raw `points`. `curveCharts` takes the same
   settings as a second argument (`CurveChartOptions`), and a chart with grouping off has the
