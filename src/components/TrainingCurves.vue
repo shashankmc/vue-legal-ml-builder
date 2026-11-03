@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
-import type { MLAdapter, TrainingCurvesOptions } from '../types'
+import type { MLAdapter, TrainingCurvesOptions, TrainingMetricPoint } from '../types'
 import { useTrainingCurves } from '../composables/useTrainingCurves'
-import { curveCharts, stageEvents } from '../utils/trainingCharts'
+import { curveCharts, stageEvents, type CurveChart, type StageEvent } from '../utils/trainingCharts'
 import PlotlyChart from './shared/PlotlyChart.vue'
 import Icon from './shared/Icon.vue'
 
@@ -40,13 +40,16 @@ const error = ref('')
 const isSettled = computed(() => ['completed', 'failed', 'cancelled'].includes(props.jobStatus ?? ''))
 
 // One chart per group, so loss, learning rate and scores each get an axis that fits.
-const charts = computed(() =>
+const curves = computed(() =>
   curveCharts(points.value, {
     metrics: option('metrics'),
     groupBy: option('groupBy'),
     xAxis: option('xAxis'),
     smoothing: option('smoothing'),
-  }).map((chart) => ({
+  }),
+)
+const charts = computed(() =>
+  curves.value.map((chart) => ({
     group: chart.group,
     title: chart.title,
     plotData: {
@@ -60,6 +63,12 @@ const charts = computed(() =>
   })),
 )
 const stages = computed(() => stageEvents(points.value))
+
+defineSlots<{
+  /** Draws the curves in the host's own way, in place of the stage timeline and
+   * charts. Gets the configured charts (grouped series), the stages and every point. */
+  default?(scope: { charts: CurveChart[]; stages: StageEvent[]; points: TrainingMetricPoint[] }): unknown
+}>()
 
 onMounted(async () => {
   if (!adapter.value) {
@@ -87,6 +96,7 @@ onUnmounted(stop)
       <p v-if="points.length === 0" class="vmlb-waiting">
         <Icon name="spark" /> Waiting for the first metric point…
       </p>
+      <slot v-else-if="$slots.default" :charts="curves" :stages="stages" :points="points" />
       <template v-else>
         <ol v-if="stages.length" class="vmlb-stage-timeline" aria-label="Training stages">
           <li v-for="(stage, i) in stages" :key="`${stage.name}-${i}`" :data-stage="stage.name">

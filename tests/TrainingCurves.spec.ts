@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 import TrainingCurves from '../src/components/TrainingCurves.vue'
 import { VueLegalMlBuilderPlugin } from '../src/index'
 import { createTestAdapter } from './testAdapter'
+import { h } from 'vue'
 import type { TrainingMetricPoint } from '../src/types'
+import type { CurveChart, StageEvent } from '../src/utils/trainingCharts'
 
 function point(step: number, metric_name: string, overrides: Partial<TrainingMetricPoint> = {}): TrainingMetricPoint {
   return {
@@ -153,6 +155,28 @@ describe('TrainingCurves', () => {
       await flushPromises()
 
       expect(names(wrapper)).toEqual([['eval_accuracy']])
+    })
+
+    it('lets the host draw the grouped series and stages itself, through its slot', async () => {
+      let received: { charts: CurveChart[]; stages: StageEvent[] } | undefined
+      const wrapper = await mountWith(
+        [point(0, 'training_started', { group: 'stage' }), ...fineTuning()],
+        { metrics: ['loss', 'eval_accuracy'] },
+        {
+          slots: {
+            default: (scope: { charts: CurveChart[]; stages: StageEvent[] }) => {
+              received = scope
+              return h('div', { class: 'host-curves' }, scope.charts.map((c) => c.title).join(','))
+            },
+          },
+        },
+      )
+
+      expect(wrapper.find('.host-curves').text()).toBe('Training,Evaluation')
+      expect(received!.charts[0].series).toEqual([{ metric: 'loss', x: [10, 20], y: [0.8, 0.4] }])
+      expect(received!.stages.map((e) => e.label)).toEqual(['Training started'])
+      expect(wrapper.findAllComponents(PlotlyChart)).toHaveLength(0)
+      expect(wrapper.find('.vmlb-stage-timeline').exists()).toBe(false)
     })
 
     it('polls a running job at the interval it is given, 3 seconds by default', async () => {
