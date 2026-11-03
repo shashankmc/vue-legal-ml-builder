@@ -3,6 +3,7 @@ import { adviseFor, decisionTreeFor } from '../src/lens/modelGuide'
 import type { DatasetFacts, GuideOption } from '../src/lens/modelGuide'
 import { modelsByTaskType, parameterRules, parameterSchemas } from '../src/components/modelCatalogData'
 import { reconcileChoices } from '../src/components/parameterOptions'
+import { coreParameterLimits } from './fixtures/coreParameterLimits'
 
 const optionFor = (task: string, label: string): GuideOption =>
   Object.values(decisionTreeFor(task)!.nodes).flatMap((n) => n.options).find((o) => o.label === label)!
@@ -73,6 +74,7 @@ describe('adviseFor', () => {
 describe('every guide recommendation', () => {
   const datasets: Record<string, DatasetFacts> = {
     'no facts': {},
+    'tiny, two even labels': { rowCount: 4, labelCounts: { Granted: 2, Refused: 2 } },
     'small, two even labels': { rowCount: 200, labelCounts: { Granted: 100, Refused: 100 } },
     'large, two uneven labels': { rowCount: 20000, labelCounts: { Granted: 19000, Refused: 1000 } },
     'large, several uneven labels': { rowCount: 20000, labelCounts: { Lease: 15000, Loan: 4000, Tort: 1000 } },
@@ -95,9 +97,13 @@ describe('every guide recommendation', () => {
         if (field!.type === 'select') expect(field!.options, `${where}: ${key}`).toContain(value)
         if (field!.type === 'boolean') expect(typeof value, `${where}: ${key}`).toBe('boolean')
         if (field!.type === 'number') {
+          // Checked against core's own limits, not the package's copy of them.
+          const limit = coreParameterLimits[modelType]?.[key]
           expect(typeof value, `${where}: ${key}`).toBe('number')
-          expect(value as number, `${where}: ${key}`).toBeGreaterThanOrEqual(field!.min ?? -Infinity)
-          expect(value as number, `${where}: ${key}`).toBeLessThanOrEqual(field!.max ?? Infinity)
+          expect(limit, `${where}: ${key} is a number core checks`).toBeDefined()
+          expect(value as number, `${where}: ${key}`).toBeGreaterThanOrEqual(limit!.min)
+          expect(value as number, `${where}: ${key}`).toBeLessThanOrEqual(limit!.max)
+          if (limit!.atMostRows && facts.rowCount !== undefined) expect(value as number, `${where}: ${key}`).toBeLessThanOrEqual(facts.rowCount)
         }
       }
       const chosen = { ...Object.fromEntries(schema.map((p) => [p.key, p.default])), ...parameters }

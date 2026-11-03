@@ -52,6 +52,10 @@ tagged `vX.Y.Z`.
 
 - A component mounted with `mountComponent` now follows the props passed later through
   `updateProps`. Before, it kept the props it was mounted with.
+- Without the backend's catalogue, the settings form and the guide keep to legal-ml-core's limits: Maximum Tree
+  Depth stops at 50, Regularisation (C) at 100, and Number of Clusters at the Dataset's rows, with the other
+  numbers' maxima to match. Before, they could offer values the backend refuses. `ParameterFieldSchema` gains
+  `atMostRows`.
 
 ## [0.5.5] - 2026-10-31
 

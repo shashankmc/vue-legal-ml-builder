@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { allowedOptions, mergeSchema, reconcileChoices } from '../src/components/parameterOptions'
 import { parameterRules, parameterSchemas } from '../src/components/modelCatalogData'
 import type { ModelTypeInfo, ParameterRule } from '../src/types'
+import { coreParameterLimits } from './fixtures/coreParameterLimits'
 
 const rules: ParameterRule[] = [
   { when: { penalty: 'l1' }, parameter: 'solver', options: ['liblinear', 'saga'], reason: 'The l1 penalty needs the liblinear or saga solver.' },
@@ -54,6 +55,24 @@ describe('mergeSchema', () => {
 
     expect(mergeSchema(parameterSchemas.kmeans, clusters, 6)[0]).toMatchObject({ max: 6, default: 6 })
     expect(mergeSchema(parameterSchemas.kmeans, clusters, 100)[0]).toMatchObject({ max: 20, default: 8 })
+  })
+
+  it('caps a count at the rows of the Dataset without a backend answer too', () => {
+    const clusters = mergeSchema(parameterSchemas.kmeans, undefined, 6).find((f) => f.key === 'n_clusters')
+    expect(clusters).toMatchObject({ max: 6, default: 6 })
+  })
+})
+
+describe('the package settings', () => {
+  it("keep to legal-ml-core's limits, so the form and guide offer only what it accepts", () => {
+    for (const [modelType, limits] of Object.entries(coreParameterLimits)) {
+      for (const [key, limit] of Object.entries(limits)) {
+        const field = parameterSchemas[modelType]?.find((p) => p.key === key)
+        if (!field) continue
+        expect({ min: field.min, max: field.max, atMostRows: field.atMostRows }, `${modelType} ${key}`)
+          .toEqual({ min: limit.min, max: limit.max, atMostRows: limit.atMostRows })
+      }
+    }
   })
 })
 

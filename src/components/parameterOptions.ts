@@ -2,32 +2,38 @@ import type { ModelTypeInfo, ParameterRule } from '../types'
 import type { ParameterFieldSchema } from './modelCatalogData'
 
 /** The package's settings with the backend's facts over them: it decides what is
- * offered, its range and its default, and this package adds the explanations. */
+ * offered, its range and its default, and this package adds the explanations.
+ * With the Dataset's row count, a setting that cannot exceed the rows is capped. */
 export function mergeSchema(
   schema: ParameterFieldSchema[],
   backend: ModelTypeInfo | undefined,
   rowCount?: number,
 ): ParameterFieldSchema[] {
-  if (!backend?.parameters) return schema
-  return Object.entries(backend.parameters).map(([key, field]) => {
-    const known = schema.find((p) => p.key === key)
-    const label = field.description ?? key
-    const type = field.type === 'select' || field.type === 'boolean' ? field.type : 'number'
-    const capped = field.at_most_rows && rowCount !== undefined
-    return {
-      label,
-      shortDesc: label,
-      explanation: label,
-      recommendation: '',
-      ...known,
-      key,
-      type,
-      default: capped ? Math.min(field.default as number, rowCount) : field.default,
-      min: field.min,
-      max: capped ? Math.min(field.max as number, rowCount) : field.max,
-      options: field.options?.map(String),
-    }
-  })
+  const merged = backend?.parameters
+    ? Object.entries(backend.parameters).map(([key, field]): ParameterFieldSchema => {
+        const known = schema.find((p) => p.key === key)
+        const label = field.description ?? key
+        const type = field.type === 'select' || field.type === 'boolean' ? field.type : 'number'
+        return {
+          label,
+          shortDesc: label,
+          explanation: label,
+          recommendation: '',
+          ...known,
+          key,
+          type,
+          default: field.default,
+          min: field.min,
+          max: field.max,
+          options: field.options?.map(String),
+          atMostRows: field.at_most_rows,
+        }
+      })
+    : schema
+  if (rowCount === undefined || !merged.some((p) => p.atMostRows)) return merged
+  return merged.map((p) => (p.atMostRows
+    ? { ...p, default: Math.min(p.default as number, rowCount), max: Math.min(p.max ?? rowCount, rowCount) }
+    : p))
 }
 
 function holds(rule: ParameterRule, chosen: Record<string, unknown>, multiclass: boolean): boolean {
