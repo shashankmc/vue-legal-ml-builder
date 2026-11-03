@@ -121,5 +121,27 @@ describe('TrainingCurves', () => {
       const log = (await mountWith(fineTuning(), { logScale: true })).findComponent(PlotlyChart).props('plotData')
       expect(log.layout.yaxis.type).toBe('log')
     })
+
+    it('polls a running job at the interval it is given, 3 seconds by default', async () => {
+      vi.useFakeTimers()
+      try {
+        const callsAfter = async (ms: number, props: Record<string, unknown> = {}) => {
+          const getTrainingMetrics = vi.fn().mockResolvedValue([])
+          const wrapper = mount(TrainingCurves, {
+            props: { adapter: createTestAdapter({ getTrainingMetrics }), jobId: 'job-1', jobStatus: 'running', ...props },
+            global: { stubs: { PlotlyChart } },
+          })
+          await vi.advanceTimersByTimeAsync(ms)
+          wrapper.unmount()
+          return getTrainingMetrics.mock.calls.length
+        }
+
+        // The first fetch on mount, then one per interval.
+        expect(await callsAfter(3000)).toBe(2)
+        expect(await callsAfter(3000, { pollIntervalMs: 1000 })).toBe(4)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 })

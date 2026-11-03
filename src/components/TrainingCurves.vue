@@ -20,11 +20,13 @@ const props = defineProps<{
   smoothing?: number
   /** Draw values on a log scale. Default false. */
   logScale?: boolean
+  /** How often a running job is polled for new points. Default 3000. */
+  pollIntervalMs?: number
 }>()
 
 const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
 const adapter = computed(() => props.adapter ?? injectedAdapter)
-const { points, start, stop, fetchNew } = useTrainingCurves(adapter.value as MLAdapter)
+const { points, start, stop, fetchNew } = useTrainingCurves(adapter.value as MLAdapter, props.pollIntervalMs ?? 3000)
 
 const error = ref('')
 
