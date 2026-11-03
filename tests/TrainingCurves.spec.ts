@@ -113,5 +113,13 @@ describe('TrainingCurves', () => {
       // Each value is half the last smoothed value plus half the new one.
       expect(smoothed.data[0].y.map((v: number) => Number(v.toFixed(6)))).toEqual([0.8, 0.6, 0.6])
     })
+
+    it('draws values on a log scale when asked', async () => {
+      const linear = (await mountWith(fineTuning())).findComponent(PlotlyChart).props('plotData')
+      expect(linear.layout.yaxis.type).toBeUndefined()
+
+      const log = (await mountWith(fineTuning(), { logScale: true })).findComponent(PlotlyChart).props('plotData')
+      expect(log.layout.yaxis.type).toBe('log')
+    })
   })
 })

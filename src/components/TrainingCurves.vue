@@ -18,6 +18,8 @@ const props = defineProps<{
   xAxis?: 'step' | 'epoch'
   /** Moving-average weight from 0 (default, raw values) to just below 1. */
   smoothing?: number
+  /** Draw values on a log scale. Default false. */
+  logScale?: boolean
 }>()
 
 const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
@@ -35,7 +37,11 @@ const charts = computed(() =>
     title: chart.title,
     plotData: {
       data: chart.series.map((s) => ({ x: s.x, y: s.y, mode: 'lines+markers', name: s.metric })),
-      layout: { xaxis: { title: chart.xAxisTitle }, yaxis: { title: 'value' }, height: 300 },
+      layout: {
+        xaxis: { title: chart.xAxisTitle },
+        yaxis: { title: 'value', ...(props.logScale ? { type: 'log' } : {}) },
+        height: 300,
+      },
     },
   })),
 )
