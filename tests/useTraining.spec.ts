@@ -58,4 +58,64 @@ describe('useTraining', () => {
     await expect(start('m1')).rejects.toThrow('boom')
     expect(error.value).toBe('boom')
   })
+
+  describe('stop', () => {
+    function running(overrides = {}) {
+      const statuses: TrainingJob[] = [job({ status: 'running' })]
+      const adapter = createTestAdapter({
+        startTraining: vi.fn().mockResolvedValue({ job_id: 'job-1' }),
+        getTrainingStatus: vi.fn().mockImplementation(async () => ({ job: statuses[statuses.length - 1], model: model() })),
+        ...overrides,
+      })
+      return { adapter, statuses }
+    }
+
+    it('stops the run and reports it stopped once the server says cancelled', async () => {
+      const { adapter, statuses } = running({
+        stopTraining: vi.fn().mockImplementation(async () => { statuses.push(job({ status: 'cancelled' })) }),
+      })
+      const training = useTraining(adapter, 100000)
+      await training.start('m1')
+
+      await expect(training.stop()).resolves.toBe('stopped')
+
+      expect(adapter.stopTraining).toHaveBeenCalledWith('job-1')
+      expect(training.job.value?.status).toBe('cancelled')
+      expect(training.isStopping.value).toBe(false)
+      expect(training.error.value).toBeNull()
+    })
+
+    it('reports a run that ended before the stop arrived, without an error', async () => {
+      const { adapter, statuses } = running({
+        stopTraining: vi.fn().mockImplementation(async () => {
+          statuses.push(job({ status: 'completed', progress: 100 }))
+          throw new Error('Training job is not active')
+        }),
+      })
+      const training = useTraining(adapter, 100000)
+      await training.start('m1')
+
+      await expect(training.stop()).resolves.toBe('finished')
+
+      expect(training.job.value?.status).toBe('completed')
+      expect(training.error.value).toBeNull()
+    })
+
+    it('keeps watching a run the server would not stop, and says why', async () => {
+      vi.useFakeTimers()
+      const { adapter } = running({ stopTraining: vi.fn().mockRejectedValue(new Error('Training job not found')) })
+      const training = useTraining(adapter, 10)
+      await training.start('m1')
+
+      await expect(training.stop()).resolves.toBe('error')
+
+      expect(training.error.value).toBe('Training job not found')
+      expect(training.job.value?.status).toBe('running')
+      const calls = (adapter.getTrainingStatus as any).mock.calls.length
+      await vi.advanceTimersByTimeAsync(10)
+      expect((adapter.getTrainingStatus as any).mock.calls.length).toBeGreaterThan(calls)
+      training.stopPolling()
+      vi.useRealTimers()
+    })
+  })
 })

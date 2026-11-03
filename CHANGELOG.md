@@ -13,6 +13,13 @@ tagged `vX.Y.Z`.
 
 ### Added
 
+- `TrainingMonitor` has a Stop training button while a run is in progress. It asks inline
+  before stopping, so hosts need no dialog of their own. A stopped run then reads Training
+  stopped, with Train again, instead of Training failed, and the component emits `stopped`.
+  When the run ends before the stop arrives, it says so.
+- `useTraining().stop()` resolves to `'stopped'`, `'finished'` (the run ended first) or
+  `'error'` (still running; `error` says why and polling continues), and `isStopping` is
+  true while it is in flight.
 - `ModelParameterForm`, the settings form from `ModelCreateWizard`, can be used on its own,
   for example to change a trained Model's settings. Give it `modelType`, the starting
   `parameters` (missing ones take their defaults), and optionally `modelInfo`, `rowCount`,

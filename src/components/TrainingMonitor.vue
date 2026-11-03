@@ -8,11 +8,15 @@ import TrainingCurves from './TrainingCurves.vue'
 import Icon from './shared/Icon.vue'
 
 const props = defineProps<{ adapter?: MLAdapter; modelId: string; jobId?: string }>()
-const emit = defineEmits<{ complete: [] }>()
+const emit = defineEmits<{ complete: []; stopped: [] }>()
 
 const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
 const adapter = computed(() => props.adapter ?? injectedAdapter)
-const { job, model, isStarting, error, start, loadStatus, stopPolling } = useTraining(adapter.value as MLAdapter)
+const { job, model, isStarting, isStopping, error, start, loadStatus, stop, stopPolling } = useTraining(adapter.value as MLAdapter)
+// Stop asks first, inline, so the component needs no dialog from its host.
+const confirmingStop = ref(false)
+// A run that ended before the stop arrived, so the host is not told it stopped.
+const endedFirst = ref(false)
 
 const MILESTONES = [
   { label: 'Queued', pct: 0 },
@@ -34,9 +38,19 @@ onUnmounted(stopPolling)
 
 const progress = computed(() => job.value?.progress ?? 0)
 const isTraining = computed(() => job.value ? ['pending', 'running'].includes(job.value.status) : false)
+// The server marks a stopped run's Model as failed; the job says it was stopped.
+const wasStopped = computed(() => job.value?.status === 'cancelled')
 
 async function onStart() {
+  endedFirst.value = false
   await start(props.modelId)
+}
+
+async function onConfirmStop() {
+  confirmingStop.value = false
+  const outcome = await stop()
+  if (outcome === 'stopped') emit('stopped')
+  if (outcome === 'finished') endedFirst.value = true
 }
 
 function milestoneState(pct: number, index: number) {
@@ -51,10 +65,29 @@ function milestoneState(pct: number, index: number) {
     <div v-if="error" class="vmlb-alert-error">
       <Icon name="alert" /> {{ error }}
     </div>
+    <p v-if="endedFirst" class="vmlb-muted" role="status">This run had already ended before it could be stopped.</p>
 
     <!-- In progress -->
     <div v-if="isTraining" class="vmlb-card vmlb-railed">
-      <h3 class="vmlb-card-title">Training in progress</h3>
+      <div class="vmlb-train-head">
+        <h3 class="vmlb-card-title">Training in progress</h3>
+        <button
+          v-if="!confirmingStop"
+          type="button"
+          class="vmlb-btn-secondary"
+          :disabled="isStopping"
+          @click="confirmingStop = true"
+        >
+          <Icon name="close" /> {{ isStopping ? 'Stopping…' : 'Stop training' }}
+        </button>
+      </div>
+      <div v-if="confirmingStop" class="vmlb-stop-confirm" role="group" aria-label="Stop this run?">
+        <p><strong>Stop this run?</strong> It ends now and gives no results. You can train again at any time.</p>
+        <div class="vmlb-stop-actions">
+          <button type="button" class="vmlb-btn-primary vmlb-btn-danger" @click="onConfirmStop">Stop training</button>
+          <button type="button" class="vmlb-btn-secondary" @click="confirmingStop = false">Keep training</button>
+        </div>
+      </div>
       <div class="vmlb-milestones">
         <div v-for="(m, i) in MILESTONES" :key="m.label" class="vmlb-milestone">
           <div
@@ -110,6 +143,15 @@ function milestoneState(pct: number, index: number) {
       />
     </div>
 
+    <!-- Stopped by the user -->
+    <div v-else-if="wasStopped" class="vmlb-card vmlb-railed">
+      <h3 class="vmlb-card-title">Training stopped</h3>
+      <p class="vmlb-muted">You stopped this run before it finished. Train again when you are ready.</p>
+      <button class="vmlb-btn-primary vmlb-train-start" :disabled="isStarting" @click="onStart">
+        <Icon name="play" /> {{ isStarting ? 'Starting…' : 'Train again' }}
+      </button>
+    </div>
+
     <!-- Failed -->
     <div v-else-if="model?.status === 'failed'" class="vmlb-card vmlb-railed vmlb-railed-error">
       <h3 class="vmlb-card-title">Training failed</h3>
@@ -123,6 +165,12 @@ function milestoneState(pct: number, index: number) {
 .vmlb-train { max-width: 62rem; margin: 0 auto; }
 .vmlb-railed { border-left: 3px solid var(--vmlb-accent); }
 .vmlb-railed-error { border-left-color: var(--vmlb-error); }
+.vmlb-train-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.vmlb-stop-confirm { margin-top: 0.75rem; padding: 0.75rem 1rem; border-radius: var(--vmlb-radius-md); background: var(--vmlb-error-soft); }
+.vmlb-stop-confirm p { margin: 0 0 0.5rem; }
+.vmlb-stop-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.vmlb-btn-danger { background: var(--vmlb-error); border-color: var(--vmlb-error); }
+.vmlb-btn-danger:hover:not(:disabled) { background: var(--vmlb-error); filter: brightness(0.92); }
 .vmlb-milestones { display: flex; gap: 0.5rem; margin: 1.25rem 0; }
 .vmlb-milestone { display: flex; flex-direction: column; align-items: center; gap: 0.375rem; flex: 1; }
 .vmlb-milestone-dot {
