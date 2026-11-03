@@ -18,6 +18,7 @@ tagged `vX.Y.Z`.
   number of training examples. Its `learning_curve_*` points are left out of the
   Training and Evaluation charts, and stay apart when `groupBy` is `'none'`. A slot's
   `charts` has it with `group: 'learning_curve'`, and `isLearningCurvePoint` is exported.
+  `ModelTypeInfo.supports_learning_curve` says whether a model type can record one.
 
 - `MonitoringSettings` and `ModelParameters` are exported: a run's own monitoring goes
   under `parameters.monitoring` (`log_every_n_steps`, `eval_strategy` with `eval_steps`,
@@ -30,13 +31,14 @@ tagged `vX.Y.Z`.
   draw), `groupBy` (`'group'`, or `'none'` for one chart), `xAxis` (`'step'` or `'epoch'`),
   `pollIntervalMs`, `smoothing` (a moving-average weight from 0) and `logScale`, and
   `TrainingMonitor` passes them through. Unset, the curves look and poll as before.
-- App-wide defaults for those settings, through the plugin's `monitoring` option or
-  `provide('vmlb:monitoring', …)`. A prop overrides its default. `TrainingCurvesOptions` is
+- App-wide defaults for those settings, through the plugin's `trainingCurves` option or
+  `provide('vmlb:trainingCurves', …)`. A prop overrides its default. `TrainingCurvesOptions` is
   exported.
 - The resource readings a run takes with `monitoring.system_metrics` on are drawn one
-  chart per unit, each titled with it: Memory (MB), GPU use (%), Speed (samples per
-  second) and Time remaining (seconds). Its value axis names the unit. `CurveChart`
-  has the `unit`, and `metricUnitOf(name)` reads it from the end of a point's name.
+  chart per unit, each titled with it: Memory (MB), GPU use (%), Speed (samples/s)
+  and Time remaining (s). Its value axis names the unit. `CurveChart` has the
+  `unit`. It is the point's `unit` from legal-ml-core; a point without one gets it
+  from the end of its name through `metricUnitOf(name)`.
   A host matching the single System chart's title must update.
 - A default slot on `TrainingCurves` lets a host draw the curves its own way. It gets the
   configured `charts`, the `stages` and the raw `points`. `curveCharts` takes the same
@@ -45,6 +47,11 @@ tagged `vX.Y.Z`.
 - `TrainingMetricPoint` has `group` (`TrainingMetricGroup`: `train`, `eval`, `system` or
   `stage`) and, for fine-tuning, `training_step`, the trainer's own step. `step` stays the
   polling cursor. A point without a group gets one from its name, as legal-ml-core does.
+  It also has `x_kind` (`TrainingXKind`: `step`, `iteration` or `training_examples`), what
+  its `training_step` counts, and `unit`, a system point's unit. A chart's x-axis title
+  follows `x_kind`, so logistic regression's loss by iteration is drawn against
+  Iteration, not Training step. A point without `x_kind` gets it from its name through
+  `xKindOf`, which is exported.
   `TRAINING_METRIC_GROUPS`, `metricGroupOf`, `curveCharts` and `stageEvents` are exported
   for hosts that draw their own curves.
 - `TrainingMonitor` has a Stop training button while a run is in progress. It asks inline

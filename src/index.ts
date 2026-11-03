@@ -40,7 +40,7 @@ export const VueLegalMlBuilderPlugin = {
     app.provide('vmlb:adapter', adapter)
     app.provide('vmlb:pollInterval', opts.pollInterval ?? 3000)
     app.provide('vmlb:hideAnnotation', opts.hideAnnotation ?? false)
-    app.provide('vmlb:monitoring', opts.monitoring ?? {})
+    app.provide('vmlb:trainingCurves', opts.trainingCurves ?? {})
     if (opts.theme && typeof document !== 'undefined') {
       applyTheme(opts.themeTarget ?? document.documentElement, opts.theme)
     }
@@ -109,7 +109,7 @@ export { useModels } from './composables/useModels'
 export { useParameterComparison } from './composables/useParameterComparison'
 export { useTraining } from './composables/useTraining'
 export { useTrainingCurves } from './composables/useTrainingCurves'
-export { TRAINING_METRIC_GROUPS, curveCharts, isLearningCurvePoint, metricGroupOf, metricUnitOf, stageEvents } from './utils/trainingCharts'
+export { TRAINING_METRIC_GROUPS, curveCharts, isLearningCurvePoint, metricGroupOf, metricUnitOf, stageEvents, xKindOf } from './utils/trainingCharts'
 export type { CurveChart, CurveChartOptions, CurveSeries, CurveXAxis, StageEvent } from './utils/trainingCharts'
 
 export { allModelInfo, modelsByTaskType, parameterRules, parameterSchemas, quickGuideFor, taskTypeLabel } from './components/modelCatalogData'
@@ -153,4 +153,5 @@ export type {
   TrainingJobStatus,
   TrainingMetricGroup,
   TrainingMetricPoint,
+  TrainingXKind,
 } from './types'

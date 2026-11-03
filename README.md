@@ -83,7 +83,9 @@ few coarse phase-marker points (see `legal-ml-core`'s README for why), unless
 the run turns on `parameters.monitoring.learning_curve`. Its `learning_curve_*`
 points are drawn on a chart of their own, "Learning curve", against the number
 of training examples (their `training_step`), whatever `groupBy` and `xAxis` say.
-`isLearningCurvePoint(point)` tells them apart in a custom slot.
+`isLearningCurvePoint(point)` tells them apart in a custom slot. Each point's
+`x_kind` says what its `training_step` counts, and titles the x-axis: Training
+step, Iteration (logistic regression's loss by iteration) or Training examples.
 
 ## Configuring the training curves
 
@@ -103,9 +105,9 @@ Set app-wide defaults once, through the plugin or `provide`. Each prop a
 component is given overrides its own default:
 
 ```ts
-app.use(VueLegalMlBuilderPlugin, { adapter, monitoring: { xAxis: 'epoch', smoothing: 0.6 } })
+app.use(VueLegalMlBuilderPlugin, { adapter, trainingCurves: { xAxis: 'epoch', smoothing: 0.6 } })
 // or, without the plugin:
-app.provide('vmlb:monitoring', { xAxis: 'epoch', smoothing: 0.6 })
+app.provide('vmlb:trainingCurves', { xAxis: 'epoch', smoothing: 0.6 })
 ```
 
 To draw the curves your own way, use the default slot. It replaces the stage

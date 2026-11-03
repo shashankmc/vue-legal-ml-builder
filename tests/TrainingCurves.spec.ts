@@ -74,9 +74,9 @@ describe('TrainingCurves', () => {
     ])
 
     const charts = wrapper.findAll('.vmlb-curves-chart[data-group="system"]')
-    expect(charts.map((c) => c.find('h4').text())).toEqual(['Memory (MB)', 'Speed (samples per second)'])
+    expect(charts.map((c) => c.find('h4').text())).toEqual(['Memory (MB)', 'Speed (samples/s)'])
     const plots = wrapper.findAllComponents(PlotlyChart)
-    expect(plots.map((p) => p.props('plotData').layout.yaxis.title)).toEqual(['MB', 'samples per second'])
+    expect(plots.map((p) => p.props('plotData').layout.yaxis.title)).toEqual(['MB', 'samples/s'])
     expect(new Set(plots.map((p) => p.props('plotId'))).size).toBe(2)
   })
 
@@ -155,7 +155,7 @@ describe('TrainingCurves', () => {
     })
 
     it('takes its defaults from the app, and its props override them', async () => {
-      const provide = { 'vmlb:monitoring': { metrics: ['loss'], groupBy: 'none', xAxis: 'epoch', logScale: true, smoothing: 0.5 } }
+      const provide = { 'vmlb:trainingCurves': { metrics: ['loss'], groupBy: 'none', xAxis: 'epoch', logScale: true, smoothing: 0.5 } }
 
       const fromApp = (await mountWith(fineTuning(), {}, { provide })).findComponent(PlotlyChart).props('plotData')
       expect(fromApp.data.map((t: { name: string }) => t.name)).toEqual(['loss'])
@@ -179,7 +179,7 @@ describe('TrainingCurves', () => {
       const adapter = createTestAdapter({ getTrainingMetrics: vi.fn().mockResolvedValue(fineTuning()) })
       const wrapper = mount(TrainingCurves, {
         props: { jobId: 'job-1', jobStatus: 'completed' },
-        global: { stubs: { PlotlyChart }, plugins: [[VueLegalMlBuilderPlugin, { adapter, monitoring: { metrics: ['eval_accuracy'] } }]] },
+        global: { stubs: { PlotlyChart }, plugins: [[VueLegalMlBuilderPlugin, { adapter, trainingCurves: { metrics: ['eval_accuracy'] } }]] },
       })
       await flushPromises()
 
@@ -225,8 +225,8 @@ describe('TrainingCurves', () => {
         // The first fetch on mount, then one per interval.
         expect(await callsAfter(3000)).toBe(2)
         expect(await callsAfter(3000, { pollIntervalMs: 1000 })).toBe(4)
-        expect(await callsAfter(3000, {}, { 'vmlb:monitoring': { pollIntervalMs: 1000 } })).toBe(4)
-        expect(await callsAfter(3000, { pollIntervalMs: 3000 }, { 'vmlb:monitoring': { pollIntervalMs: 1000 } })).toBe(2)
+        expect(await callsAfter(3000, {}, { 'vmlb:trainingCurves': { pollIntervalMs: 1000 } })).toBe(4)
+        expect(await callsAfter(3000, { pollIntervalMs: 3000 }, { 'vmlb:trainingCurves': { pollIntervalMs: 1000 } })).toBe(2)
       } finally {
         vi.useRealTimers()
       }

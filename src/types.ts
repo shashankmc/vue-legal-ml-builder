@@ -1,4 +1,5 @@
 import type { MlBuilderTheme } from './theme'
+import type { CurveChartOptions } from './utils/trainingCharts'
 
 // ---------------------------------------------------------------------------
 // Core entities — mirror legal-ml-core's `to_dict()` shapes.
@@ -98,6 +99,11 @@ export interface TrainingJob {
  * throughput) or `stage` (the run's milestones, drawn as events). */
 export type TrainingMetricGroup = 'train' | 'eval' | 'system' | 'stage'
 
+/** What a metric point's `training_step` counts: the trainer's steps, a
+ * classical run's iterations (loss by iteration), or training examples (a
+ * learning curve). */
+export type TrainingXKind = 'step' | 'iteration' | 'training_examples'
+
 export interface TrainingMetricPoint {
   id: Id
   training_job_id: Id
@@ -112,6 +118,12 @@ export interface TrainingMetricPoint {
   /** Left out by hosts on an older legal-ml-core; `metricGroupOf` then
    * derives it from the name. */
   group?: TrainingMetricGroup
+  /** Left out by hosts on an older legal-ml-core; `xKindOf` then derives it
+   * from the name. */
+  x_kind?: TrainingXKind
+  /** A system point's unit (`MB`, `%`, `samples/s`, `s`), null for other
+   * points. Left out by older hosts; `metricUnitOf` then reads it from the name. */
+  unit?: string | null
   value: number
   created_at: string
 }
@@ -261,6 +273,9 @@ export interface ModelTypeInfo {
   description: string
   parameters: Record<string, ParameterFieldSchema>
   rules?: ParameterRule[]
+  /** Whether a run can record a learning curve (`monitoring.learning_curve`).
+   * Left out by hosts on an older legal-ml-core. */
+  supports_learning_curve?: boolean
 }
 
 export type ModelCatalog = Record<string, Record<string, ModelTypeInfo>>
@@ -391,16 +406,8 @@ export interface MLAdapter {
 // ---------------------------------------------------------------------------
 
 /** How `TrainingCurves` draws a job's curves. Set app-wide through the plugin's
- * `monitoring` option or `provide('vmlb:monitoring', …)`; props override it. */
-export interface TrainingCurvesOptions {
-  /** Only these metric names are drawn. Default: every metric. */
-  metrics?: string[]
-  /** `group` (default) draws one chart per group; `none` draws every metric on one chart. */
-  groupBy?: 'group' | 'none'
-  /** `step` (default) or `epoch`. A point without the chosen one falls back to the other. */
-  xAxis?: 'step' | 'epoch'
-  /** Moving-average weight from 0 (default, raw values) to just below 1 (smoothest). */
-  smoothing?: number
+ * `trainingCurves` option or `provide('vmlb:trainingCurves', …)`; props override it. */
+export interface TrainingCurvesOptions extends CurveChartOptions {
   /** Draw values on a log scale. Default false. */
   logScale?: boolean
   /** How often a running job is polled for new points, in milliseconds. Default 3000. */
@@ -419,6 +426,6 @@ export interface MLBuilderPluginOptions {
   /** Hide the builder's annotation views and skip annotation operations, for
    * hosts with their own annotation (Legal Blocks). Default false (shown). */
   hideAnnotation?: boolean
-  /** App-wide defaults for `TrainingCurves`, provided as `vmlb:monitoring`. */
-  monitoring?: TrainingCurvesOptions
+  /** App-wide defaults for `TrainingCurves`, provided as `vmlb:trainingCurves`. */
+  trainingCurves?: TrainingCurvesOptions
 }
