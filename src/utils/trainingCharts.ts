@@ -1,4 +1,4 @@
-import type { TrainingMetricGroup, TrainingMetricPoint } from '../types'
+import type { TrainingMetricGroup, TrainingMetricPoint, TrainingXKind } from '../types'
 
 /** Every metric group, in the order their charts are drawn. */
 export const TRAINING_METRIC_GROUPS: readonly TrainingMetricGroup[] = ['train', 'eval', 'system', 'stage']
@@ -62,8 +62,15 @@ export interface CurveSeries {
  * the training-set size as their `training_step`, so they get a chart of their own. */
 const LEARNING_CURVE_PREFIX = 'learning_curve_'
 
+/** What the point's `training_step` counts. A point without `x_kind` (from a
+ * host on an older legal-ml-core) gets it from its name, as legal-ml-core does. */
+export function xKindOf(point: TrainingMetricPoint): TrainingXKind {
+  if (point.x_kind) return point.x_kind
+  return point.metric_name.startsWith(LEARNING_CURVE_PREFIX) ? 'training_examples' : 'step'
+}
+
 export function isLearningCurvePoint(point: TrainingMetricPoint): boolean {
-  return point.metric_name.startsWith(LEARNING_CURVE_PREFIX)
+  return xKindOf(point) === 'training_examples'
 }
 
 export interface CurveChart {
@@ -90,9 +97,16 @@ function xOf(point: TrainingMetricPoint, xAxis: CurveXAxis): number {
   return point.training_step ?? point.epoch ?? point.step
 }
 
+const X_AXIS_TITLES: Record<TrainingXKind, string> = {
+  step: 'Training step',
+  iteration: 'Iteration',
+  training_examples: 'Training examples',
+}
+
 function xAxisTitle(points: TrainingMetricPoint[], xAxis: CurveXAxis): string {
   if (xAxis === 'epoch' && points.some((p) => p.epoch != null)) return 'Epoch'
-  if (points.some((p) => p.training_step != null)) return 'Training step'
+  const counted = points.filter((p) => p.training_step != null)
+  if (counted.length) return X_AXIS_TITLES[xKindOf(counted[0])]
   if (points.some((p) => p.epoch != null)) return 'Epoch'
   return 'Point'
 }
@@ -143,7 +157,7 @@ export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOp
   const shown = options.metrics ? new Set(options.metrics) : null
   const shownCurves = points.filter((p) => metricGroupOf(p) !== 'stage' && (!shown || shown.has(p.metric_name)))
   const curves = shownCurves.filter((p) => !isLearningCurvePoint(p))
-  const buckets: Array<Pick<CurveChart, 'group' | 'title' | 'unit'> & { xAxisTitle?: string; points: TrainingMetricPoint[] }> = [
+  const buckets: Array<Pick<CurveChart, 'group' | 'title' | 'unit'> & { points: TrainingMetricPoint[] }> = [
     ...(options.groupBy === 'none'
       ? [{ group: 'all' as const, title: 'Metrics', points: curves }]
       : CURVE_GROUPS.flatMap((group) => {
@@ -153,12 +167,11 @@ export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOp
     {
       group: 'learning_curve',
       title: 'Learning curve',
-      xAxisTitle: 'Training examples',
       points: shownCurves.filter(isLearningCurvePoint),
     },
   ]
   const charts: CurveChart[] = []
-  for (const { group, title, unit, xAxisTitle: fixedXAxisTitle, points: inGroup } of buckets) {
+  for (const { group, title, unit, points: inGroup } of buckets) {
     if (!inGroup.length) continue
     const byMetric = new Map<string, TrainingMetricPoint[]>()
     for (const p of inGroup) {
@@ -169,7 +182,7 @@ export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOp
       group,
       title,
       ...(unit ? { unit } : {}),
-      xAxisTitle: fixedXAxisTitle ?? xAxisTitle(inGroup, xAxis),
+      xAxisTitle: xAxisTitle(inGroup, xAxis),
       series: [...byMetric].map(([metric, series]) => ({
         metric,
         x: series.map((p) => xOf(p, xAxis)),

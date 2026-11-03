@@ -59,6 +59,20 @@ describe('curveCharts', () => {
     expect(chart.series[0].y).toEqual([0.7, 0.6])
   })
 
+  it('titles the axis Iteration for points the run counts in iterations', () => {
+    const charts = curveCharts([
+      point('loss', { training_step: 1, x_kind: 'iteration' }),
+      point('loss', { training_step: 4, x_kind: 'iteration' }),
+      point('eval_loss', { group: 'eval', training_step: 1, x_kind: 'iteration' }),
+    ])
+
+    expect(charts.map((c) => [c.group, c.xAxisTitle])).toEqual([
+      ['train', 'Iteration'],
+      ['eval', 'Iteration'],
+    ])
+    expect(charts[0].series[0].x).toEqual([1, 4])
+  })
+
   it('falls back to the epoch when a point has no training step', () => {
     const [chart] = curveCharts([
       point('loss', { epoch: 0.5 }),

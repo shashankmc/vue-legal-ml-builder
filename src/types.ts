@@ -99,6 +99,11 @@ export interface TrainingJob {
  * throughput) or `stage` (the run's milestones, drawn as events). */
 export type TrainingMetricGroup = 'train' | 'eval' | 'system' | 'stage'
 
+/** What a metric point's `training_step` counts: the trainer's steps, a
+ * classical run's iterations (loss by iteration), or training examples (a
+ * learning curve). */
+export type TrainingXKind = 'step' | 'iteration' | 'training_examples'
+
 export interface TrainingMetricPoint {
   id: Id
   training_job_id: Id
@@ -113,6 +118,12 @@ export interface TrainingMetricPoint {
   /** Left out by hosts on an older legal-ml-core; `metricGroupOf` then
    * derives it from the name. */
   group?: TrainingMetricGroup
+  /** Left out by hosts on an older legal-ml-core; `xKindOf` then derives it
+   * from the name. */
+  x_kind?: TrainingXKind
+  /** A system point's unit (`MB`, `%`, `samples/s`, `s`), null for other
+   * points. Left out by older hosts; `metricUnitOf` then reads it from the name. */
+  unit?: string | null
   value: number
   created_at: string
 }
