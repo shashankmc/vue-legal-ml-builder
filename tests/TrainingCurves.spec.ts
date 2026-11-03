@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import TrainingCurves from '../src/components/TrainingCurves.vue'
+import { VueLegalMlBuilderPlugin } from '../src/index'
 import { createTestAdapter } from './testAdapter'
 import type { TrainingMetricPoint } from '../src/types'
 
@@ -141,6 +142,17 @@ describe('TrainingCurves', () => {
       expect(train.data[0].x).toEqual([10, 20])
       expect(train.data[0].y).toEqual([0.8, 0.4])
       expect(train.layout.yaxis.type).toBeUndefined()
+    })
+
+    it('takes app-wide defaults from the plugin', async () => {
+      const adapter = createTestAdapter({ getTrainingMetrics: vi.fn().mockResolvedValue(fineTuning()) })
+      const wrapper = mount(TrainingCurves, {
+        props: { jobId: 'job-1', jobStatus: 'completed' },
+        global: { stubs: { PlotlyChart }, plugins: [[VueLegalMlBuilderPlugin, { adapter, monitoring: { metrics: ['eval_accuracy'] } }]] },
+      })
+      await flushPromises()
+
+      expect(names(wrapper)).toEqual([['eval_accuracy']])
     })
 
     it('polls a running job at the interval it is given, 3 seconds by default', async () => {
