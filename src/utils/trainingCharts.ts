@@ -76,6 +76,17 @@ export interface CurveChartOptions {
   groupBy?: 'group' | 'none'
   /** `step` (default) or `epoch`. A point without the chosen one falls back to the other. */
   xAxis?: CurveXAxis
+  /** Moving-average weight from 0 (default, raw values) to just below 1 (smoothest). */
+  smoothing?: number
+}
+
+/** An exponential moving average: each value is `weight` of the last smoothed
+ * value plus the rest of the new one. */
+function smooth(values: number[], weight: number): number[] {
+  const w = Math.min(Math.max(weight, 0), 0.99)
+  if (!w) return values
+  let last = values[0]
+  return values.map((v) => (last = w * last + (1 - w) * v))
 }
 
 /** One chart per group that has points, so values on different scales are not
@@ -107,7 +118,7 @@ export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOp
       series: [...byMetric].map(([metric, series]) => ({
         metric,
         x: series.map((p) => xOf(p, xAxis)),
-        y: series.map((p) => p.value),
+        y: smooth(series.map((p) => p.value), options.smoothing ?? 0),
       })),
     })
   }

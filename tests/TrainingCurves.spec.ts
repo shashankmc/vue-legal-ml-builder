@@ -102,5 +102,16 @@ describe('TrainingCurves', () => {
       expect(byEpoch.data[0].x).toEqual([0.5, 1])
       expect(byEpoch.layout.xaxis.title).toBe('Epoch')
     })
+
+    it('smooths each curve by a moving average when asked', async () => {
+      const points = [0.8, 0.4, 0.6].map((value, i) => point(i, 'loss', { training_step: (i + 1) * 10, value }))
+
+      const raw = (await mountWith(points)).findComponent(PlotlyChart).props('plotData')
+      expect(raw.data[0].y).toEqual([0.8, 0.4, 0.6])
+
+      const smoothed = (await mountWith(points, { smoothing: 0.5 })).findComponent(PlotlyChart).props('plotData')
+      // Each value is half the last smoothed value plus half the new one.
+      expect(smoothed.data[0].y.map((v: number) => Number(v.toFixed(6)))).toEqual([0.8, 0.6, 0.6])
+    })
   })
 })
