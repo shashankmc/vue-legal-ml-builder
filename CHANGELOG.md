@@ -20,7 +20,17 @@ tagged `vX.Y.Z`.
   `ModelParameters`. A refusal of one of these names `monitoring.<setting>` as its field.
 - `npm test` also type-checks the type-level tests (`tests/*.test-d.ts`), through
   `npm run test:types`.
-
+- The training curves can be configured. `TrainingCurves` takes `metrics` (which metrics to
+  draw), `groupBy` (`'group'`, or `'none'` for one chart), `xAxis` (`'step'` or `'epoch'`),
+  `pollIntervalMs`, `smoothing` (a moving-average weight from 0) and `logScale`, and
+  `TrainingMonitor` passes them through. Unset, the curves look and poll as before.
+- App-wide defaults for those settings, through the plugin's `monitoring` option or
+  `provide('vmlb:monitoring', …)`. A prop overrides its default. `TrainingCurvesOptions` is
+  exported.
+- A default slot on `TrainingCurves` lets a host draw the curves its own way. It gets the
+  configured `charts`, the `stages` and the raw `points`. `curveCharts` takes the same
+  settings as a second argument (`CurveChartOptions`), and a chart with grouping off has the
+  group `all`.
 - `TrainingMetricPoint` has `group` (`TrainingMetricGroup`: `train`, `eval`, `system` or
   `stage`) and, for fine-tuning, `training_step`, the trainer's own step. `step` stays the
   polling cursor. A point without a group gets one from its name, as legal-ml-core does.

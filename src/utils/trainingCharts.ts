@@ -3,7 +3,11 @@ import type { TrainingMetricGroup, TrainingMetricPoint } from '../types'
 /** Every metric group, in the order their charts are drawn. */
 export const TRAINING_METRIC_GROUPS: readonly TrainingMetricGroup[] = ['train', 'eval', 'system', 'stage']
 
-const CHART_TITLES: Record<Exclude<TrainingMetricGroup, 'stage'>, string> = {
+type CurveGroup = Exclude<TrainingMetricGroup, 'stage'>
+
+const CURVE_GROUPS = TRAINING_METRIC_GROUPS.filter((g): g is CurveGroup => g !== 'stage')
+
+const CHART_TITLES: Record<CurveGroup, string> = {
   train: 'Training',
   eval: 'Evaluation',
   system: 'System',
@@ -35,7 +39,8 @@ export interface CurveSeries {
 }
 
 export interface CurveChart {
-  group: Exclude<TrainingMetricGroup, 'stage'>
+  /** The group charted, or `all` when grouping is off. */
+  group: CurveGroup | 'all'
   title: string
   xAxisTitle: string
   series: CurveSeries[]
@@ -48,25 +53,58 @@ export interface StageEvent {
   at: string
 }
 
-/** Fine-tuning points sit at the trainer's step, falling back to the epoch,
- * then to the write counter. */
-function xOf(point: TrainingMetricPoint): number {
+/** By step, fine-tuning points sit at the trainer's step, falling back to the
+ * epoch, then to the write counter. By epoch, the epoch comes first. */
+function xOf(point: TrainingMetricPoint, xAxis: CurveXAxis): number {
+  if (xAxis === 'epoch') return point.epoch ?? point.training_step ?? point.step
   return point.training_step ?? point.epoch ?? point.step
 }
 
-function xAxisTitle(points: TrainingMetricPoint[]): string {
+function xAxisTitle(points: TrainingMetricPoint[], xAxis: CurveXAxis): string {
+  if (xAxis === 'epoch' && points.some((p) => p.epoch != null)) return 'Epoch'
   if (points.some((p) => p.training_step != null)) return 'Training step'
   if (points.some((p) => p.epoch != null)) return 'Epoch'
   return 'Point'
 }
 
+export type CurveXAxis = 'step' | 'epoch'
+
+export interface CurveChartOptions {
+  /** Only these metric names are drawn. Default: every metric. */
+  metrics?: string[]
+  /** `group` (default) draws one chart per group; `none` draws every metric on one chart. */
+  groupBy?: 'group' | 'none'
+  /** `step` (default) or `epoch`. A point without the chosen one falls back to the other. */
+  xAxis?: CurveXAxis
+  /** Moving-average weight from 0 (default, raw values) to just below 1 (smoothest). */
+  smoothing?: number
+}
+
+/** An exponential moving average: each value is `weight` of the last smoothed
+ * value plus the rest of the new one. */
+function smooth(values: number[], weight: number): number[] {
+  const w = Math.min(Math.max(weight, 0), 0.99)
+  if (!w) return values
+  let last = values[0]
+  return values.map((v) => (last = w * last + (1 - w) * v))
+}
+
 /** One chart per group that has points, so values on different scales are not
  * drawn against one axis. Stage markers are left to `stageEvents`. */
-export function curveCharts(points: TrainingMetricPoint[]): CurveChart[] {
+export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOptions = {}): CurveChart[] {
+  const xAxis = options.xAxis ?? 'step'
+  const shown = options.metrics ? new Set(options.metrics) : null
+  const curves = points.filter((p) => metricGroupOf(p) !== 'stage' && (!shown || shown.has(p.metric_name)))
+  const buckets: Array<Pick<CurveChart, 'group' | 'title'> & { points: TrainingMetricPoint[] }> =
+    options.groupBy === 'none'
+      ? [{ group: 'all', title: 'Metrics', points: curves }]
+      : CURVE_GROUPS.map((group) => ({
+          group,
+          title: CHART_TITLES[group],
+          points: curves.filter((p) => metricGroupOf(p) === group),
+        }))
   const charts: CurveChart[] = []
-  for (const group of TRAINING_METRIC_GROUPS) {
-    if (group === 'stage') continue
-    const inGroup = points.filter((p) => metricGroupOf(p) === group)
+  for (const { group, title, points: inGroup } of buckets) {
     if (!inGroup.length) continue
     const byMetric = new Map<string, TrainingMetricPoint[]>()
     for (const p of inGroup) {
@@ -75,12 +113,12 @@ export function curveCharts(points: TrainingMetricPoint[]): CurveChart[] {
     }
     charts.push({
       group,
-      title: CHART_TITLES[group],
-      xAxisTitle: xAxisTitle(inGroup),
+      title,
+      xAxisTitle: xAxisTitle(inGroup, xAxis),
       series: [...byMetric].map(([metric, series]) => ({
         metric,
-        x: series.map(xOf),
-        y: series.map((p) => p.value),
+        x: series.map((p) => xOf(p, xAxis)),
+        y: smooth(series.map((p) => p.value), options.smoothing ?? 0),
       })),
     })
   }
