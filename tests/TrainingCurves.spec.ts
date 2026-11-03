@@ -13,11 +13,16 @@ function point(step: number, metric_name: string, overrides: Partial<TrainingMet
 
 const PlotlyChart = { name: 'PlotlyChart', props: ['plotData', 'plotId'], template: '<div class="plot-stub" />' }
 
-async function mountWith(points: TrainingMetricPoint[]) {
+async function mountWith(
+  points: TrainingMetricPoint[],
+  props: Record<string, unknown> = {},
+  options: { provide?: Record<string, unknown>; slots?: Record<string, unknown> } = {},
+) {
   const adapter = createTestAdapter({ getTrainingMetrics: vi.fn().mockResolvedValue(points) })
   const wrapper = mount(TrainingCurves, {
-    props: { adapter, jobId: 'job-1', jobStatus: 'completed' },
-    global: { stubs: { PlotlyChart } },
+    props: { adapter, jobId: 'job-1', jobStatus: 'completed', ...props },
+    global: { stubs: { PlotlyChart }, provide: options.provide },
+    slots: options.slots as never,
   })
   await flushPromises()
   return wrapper
@@ -63,5 +68,22 @@ describe('TrainingCurves', () => {
     const wrapper = await mountWith([point(0, 'training_started', { group: 'stage' })])
 
     expect(wrapper.find('.vmlb-hint').exists()).toBe(true)
+  })
+
+  describe('configuration', () => {
+    const fineTuning = () => [
+      point(1, 'loss', { training_step: 10, epoch: 0.5, value: 0.8 }),
+      point(2, 'learning_rate', { training_step: 10, epoch: 0.5, value: 2e-5 }),
+      point(3, 'loss', { training_step: 20, epoch: 1, value: 0.4 }),
+      point(4, 'eval_accuracy', { group: 'eval', training_step: 20, epoch: 1, value: 0.8 }),
+    ]
+    const names = (wrapper: Awaited<ReturnType<typeof mountWith>>) =>
+      wrapper.findAllComponents(PlotlyChart).map((p) => p.props('plotData').data.map((t: { name: string }) => t.name))
+
+    it('shows only the metrics it is given', async () => {
+      const wrapper = await mountWith(fineTuning(), { metrics: ['loss', 'eval_accuracy'] })
+
+      expect(names(wrapper)).toEqual([['loss'], ['eval_accuracy']])
+    })
   })
 })

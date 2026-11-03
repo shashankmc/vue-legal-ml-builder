@@ -60,13 +60,19 @@ function xAxisTitle(points: TrainingMetricPoint[]): string {
   return 'Point'
 }
 
+export interface CurveChartOptions {
+  /** Only these metric names are drawn. Default: every metric. */
+  metrics?: string[]
+}
+
 /** One chart per group that has points, so values on different scales are not
  * drawn against one axis. Stage markers are left to `stageEvents`. */
-export function curveCharts(points: TrainingMetricPoint[]): CurveChart[] {
+export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOptions = {}): CurveChart[] {
+  const shown = options.metrics ? new Set(options.metrics) : null
   const charts: CurveChart[] = []
   for (const group of TRAINING_METRIC_GROUPS) {
     if (group === 'stage') continue
-    const inGroup = points.filter((p) => metricGroupOf(p) === group)
+    const inGroup = points.filter((p) => metricGroupOf(p) === group && (!shown || shown.has(p.metric_name)))
     if (!inGroup.length) continue
     const byMetric = new Map<string, TrainingMetricPoint[]>()
     for (const p of inGroup) {

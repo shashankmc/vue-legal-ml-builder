@@ -6,7 +6,13 @@ import { curveCharts, stageEvents } from '../utils/trainingCharts'
 import PlotlyChart from './shared/PlotlyChart.vue'
 import Icon from './shared/Icon.vue'
 
-const props = defineProps<{ adapter?: MLAdapter; jobId: string; jobStatus?: string }>()
+const props = defineProps<{
+  adapter?: MLAdapter
+  jobId: string
+  jobStatus?: string
+  /** Only these metric names are drawn. Default: every metric. */
+  metrics?: string[]
+}>()
 
 const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
 const adapter = computed(() => props.adapter ?? injectedAdapter)
@@ -18,7 +24,7 @@ const isSettled = computed(() => ['completed', 'failed', 'cancelled'].includes(p
 
 // One chart per group, so loss, learning rate and scores each get an axis that fits.
 const charts = computed(() =>
-  curveCharts(points.value).map((chart) => ({
+  curveCharts(points.value, { metrics: props.metrics }).map((chart) => ({
     group: chart.group,
     title: chart.title,
     plotData: {
