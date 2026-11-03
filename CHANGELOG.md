@@ -18,6 +18,7 @@ tagged `vX.Y.Z`.
   number of training examples. Its `learning_curve_*` points are left out of the
   Training and Evaluation charts, and stay apart when `groupBy` is `'none'`. A slot's
   `charts` has it with `group: 'learning_curve'`, and `isLearningCurvePoint` is exported.
+  `ModelTypeInfo.supports_learning_curve` says whether a model type can record one.
 
 - `MonitoringSettings` and `ModelParameters` are exported: a run's own monitoring goes
   under `parameters.monitoring` (`log_every_n_steps`, `eval_strategy` with `eval_steps`,

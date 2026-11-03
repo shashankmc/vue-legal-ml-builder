@@ -273,6 +273,9 @@ export interface ModelTypeInfo {
   description: string
   parameters: Record<string, ParameterFieldSchema>
   rules?: ParameterRule[]
+  /** Whether a run can record a learning curve (`monitoring.learning_curve`).
+   * Left out by hosts on an older legal-ml-core. */
+  supports_learning_curve?: boolean
 }
 
 export type ModelCatalog = Record<string, Record<string, ModelTypeInfo>>
