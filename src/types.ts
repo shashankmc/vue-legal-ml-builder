@@ -30,6 +30,26 @@ export interface Dataset {
 
 export type ModelStatus = 'pending' | 'training' | 'completed' | 'failed'
 
+/** How a training run is monitored, under `parameters.monitoring`. A setting a
+ * run leaves out takes the host's default, then legal-ml-core's. Include and
+ * exclude are name globs (`eval_*`) for which metric points are stored; stage
+ * markers always are. `learning_curve` and `system_metrics` are accepted but
+ * not used yet. A bad value is refused with `field: 'monitoring.<setting>'`. */
+export interface MonitoringSettings {
+  log_every_n_steps: number
+  eval_strategy: 'epoch' | 'steps'
+  /** Read only when `eval_strategy` is `steps`. */
+  eval_steps: number
+  include: string[]
+  exclude: string[]
+  learning_curve: boolean
+  system_metrics: boolean
+}
+
+/** A Model's settings, by catalogue name, plus its own monitoring. A run's
+ * recorded settings carry every monitoring setting, defaults filled in. */
+export type ModelParameters = Record<string, unknown> & { monitoring?: Partial<MonitoringSettings> }
+
 export interface MlModel {
   id: Id
   user_id: Id
@@ -37,7 +57,7 @@ export interface MlModel {
   project_id?: Id | null
   name: string
   model_type: string
-  parameters: Record<string, unknown>
+  parameters: ModelParameters
   status: ModelStatus
   file_path?: string | null
   /** accuracy/precision/recall/f1_score are numbers; confusion_matrix,
@@ -316,9 +336,9 @@ export interface MLAdapter {
   getModel(id: Id): Promise<MlModel>
   getAvailableModelTypes(taskType?: string): Promise<ModelCatalog>
   /** Rejects with an Error, a `RefusalError` when a refusal names a setting. */
-  createModel(config: { name: string; dataset_id: Id; model_type: string; parameters: Record<string, unknown>; project_id?: Id }): Promise<MlModel>
+  createModel(config: { name: string; dataset_id: Id; model_type: string; parameters: ModelParameters; project_id?: Id }): Promise<MlModel>
   /** Optional: renames a Model or replaces its settings. Rejects as `createModel` does. */
-  updateModel?(id: Id, changes: { name?: string; parameters?: Record<string, unknown> }): Promise<MlModel>
+  updateModel?(id: Id, changes: { name?: string; parameters?: ModelParameters }): Promise<MlModel>
   deleteModel(id: Id): Promise<void>
 
   // Training

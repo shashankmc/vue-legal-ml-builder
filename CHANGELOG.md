@@ -13,6 +13,14 @@ tagged `vX.Y.Z`.
 
 ### Added
 
+- `MonitoringSettings` and `ModelParameters` are exported: a run's own monitoring goes
+  under `parameters.monitoring` (`log_every_n_steps`, `eval_strategy` with `eval_steps`,
+  `include` / `exclude` name globs, and `learning_curve` / `system_metrics`, accepted but
+  not used yet). `MlModel.parameters`, `createModel` and `updateModel` use
+  `ModelParameters`. A refusal of one of these names `monitoring.<setting>` as its field.
+- `npm test` also type-checks the type-level tests (`tests/*.test-d.ts`), through
+  `npm run test:types`.
+
 - `TrainingMetricPoint` has `group` (`TrainingMetricGroup`: `train`, `eval`, `system` or
   `stage`) and, for fine-tuning, `training_step`, the trainer's own step. `step` stays the
   polling cursor. A point without a group gets one from its name, as legal-ml-core does.
