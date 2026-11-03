@@ -2,16 +2,19 @@
 import { computed, ref, watch } from 'vue'
 import { allModelInfo } from './modelCatalogData'
 import { decisionTreeFor } from '../lens/modelGuide'
+import type { GuideOption } from '../lens/modelGuide'
 
 const props = defineProps<{ taskType: string; currentModelType?: string; autoApply?: boolean }>()
 // `select` applies the recommendation's model + default parameters. Emitted
 // automatically once a leaf is reached (when `autoApply`) and by the explicit
-// "Use …" button otherwise.
-const emit = defineEmits<{ select: [modelType: string] }>()
+// "Use …" button otherwise. `parameters` is reserved for per-answer settings.
+const emit = defineEmits<{ select: [modelType: string, parameters?: Record<string, unknown>] }>()
 
 const currentNodeId = ref<string>('')
 const history = ref<Array<{ question: string; answer: string; nodeId: string }>>([])
 const recommendation = ref<string>('')
+// Why the answer leads to the Model, in the guide's own words.
+const reason = ref<string>('')
 
 const tree = computed(() => decisionTreeFor(props.taskType))
 const currentNode = computed(() => (tree.value ? tree.value.nodes[currentNodeId.value] ?? null : null))
@@ -21,15 +24,17 @@ function reset() {
   currentNodeId.value = tree.value?.root ?? ''
   history.value = []
   recommendation.value = ''
+  reason.value = ''
 }
 
 watch(() => props.taskType, reset, { immediate: true })
 
-function choose(option: { label: string; next?: string; recommend?: string }) {
+function choose(option: GuideOption) {
   if (!currentNode.value) return
   history.value = [...history.value, { question: currentNode.value.question, answer: option.label, nodeId: currentNodeId.value }]
   if (option.recommend) {
     recommendation.value = option.recommend
+    reason.value = option.note ? `Recommended because ${option.note.charAt(0).toLowerCase()}${option.note.slice(1)}` : ''
     if (props.autoApply) emit('select', option.recommend)
     return
   }
@@ -40,7 +45,7 @@ function choose(option: { label: string; next?: string; recommend?: string }) {
 <template>
   <div v-if="tree" class="vmlb-guide-tree">
     <div class="vmlb-guide-top">
-      <p class="vmlb-guide-title">Which model fits your case?</p>
+      <p class="vmlb-guide-title">Help me choose a model</p>
       <button v-if="history.length || recommendation" type="button" class="vmlb-guide-restart" @click="reset">Start over</button>
     </div>
 
@@ -54,7 +59,7 @@ function choose(option: { label: string; next?: string; recommend?: string }) {
     <div v-if="recommendedInfo" class="vmlb-guide-result">
       <p class="vmlb-guide-rec-label">Recommended model</p>
       <p class="vmlb-guide-rec-name">{{ recommendedInfo.label }}</p>
-      <p class="vmlb-guide-rec-desc">{{ recommendedInfo.shortDesc }}</p>
+      <p v-if="reason" class="vmlb-guide-rec-desc">{{ reason }}</p>
       <p v-if="currentModelType === recommendation" class="vmlb-guide-rec-current">
         {{ autoApply ? 'Applied — adjust below if needed' : 'Currently selected' }}
       </p>

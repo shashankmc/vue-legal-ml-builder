@@ -30,14 +30,15 @@ describe('ModelLens', () => {
 })
 
 describe('ModelQuestionTree', () => {
+  const answer = async (wrapper: ReturnType<typeof mount>, text: string) =>
+    wrapper.findAll('button.vmlb-guide-option').find((b) => b.text().includes(text))!.trigger('click')
+
   it('walks a branch and emits the recommended model', async () => {
     const wrapper = mount(ModelQuestionTree, { props: { taskType: 'classification' } })
-    expect(wrapper.text()).toContain('What matters most')
+    expect(wrapper.text()).toContain('What matters most to you?')
 
-    const explain = wrapper.findAll('button').find((b) => b.text().includes('I must explain each decision'))
-    await explain!.trigger('click')
-    const rules = wrapper.findAll('button').find((b) => b.text().includes('if/then rules'))
-    await rules!.trigger('click')
+    await answer(wrapper, 'Being able to explain each result')
+    await answer(wrapper, 'As rules a colleague can follow')
 
     expect(wrapper.text()).toContain('Decision Tree')
     const use = wrapper.find('button.vmlb-guide-use')
@@ -47,10 +48,18 @@ describe('ModelQuestionTree', () => {
 
   it('shows a direct recommendation and marks the current selection', async () => {
     const wrapper = mount(ModelQuestionTree, { props: { taskType: 'topic_modeling', currentModelType: 'lda' } })
-    const probabilistic = wrapper.findAll('button').find((b) => b.text().includes('probabilistic topic mix'))
-    await probabilistic!.trigger('click')
+    await answer(wrapper, 'a document can cover several topics')
     expect(wrapper.text()).toContain('LDA (Topic Modelling)')
     expect(wrapper.text()).toContain('Currently selected')
     expect(wrapper.find('button.vmlb-guide-use').exists()).toBe(false)
+  })
+
+  it('explains the recommendation by the answer given, not by how the Model works', async () => {
+    const wrapper = mount(ModelQuestionTree, { props: { taskType: 'classification' } })
+    await answer(wrapper, 'Quick results on a lot of documents')
+
+    const reason = wrapper.find('.vmlb-guide-rec-desc').text()
+    expect(reason).toBe('Recommended because it learns from thousands of documents in seconds.')
+    expect(wrapper.text()).not.toContain('Bayes theorem')
   })
 })

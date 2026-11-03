@@ -16,25 +16,28 @@ export interface DecisionTree {
   nodes: Record<string, GuideNode>
 }
 
+// Each question asks what the user wants to achieve, in words a no-code legal
+// user knows. Each note says why the answer leads to its Model, and is shown
+// again as the reason on the recommendation.
 const CLASSIFICATION: DecisionTree = {
   root: 'priority',
   nodes: {
     priority: {
-      question: 'What matters most for this task?',
-      help: 'Pick the value you would trade accuracy for.',
+      question: 'What matters most to you?',
+      help: 'There is no wrong answer. You can change the model before you train it.',
       options: [
-        { label: 'I must explain each decision', next: 'explain' },
-        { label: 'Accuracy on complex cases', recommend: 'random_forest', note: 'Many weak rules averaged into a strong one.' },
-        { label: 'Speed on a large corpus', recommend: 'naive_bayes', note: 'Fast to train and predict, surprisingly strong on text.' },
-        { label: 'Precise boundaries in high-dimensional text', recommend: 'svm', note: 'Strong with TF-IDF features.' },
-        { label: 'The best accuracy, GPU available', recommend: 'legalbert', note: 'Context-aware, but slower and heavier.' },
+        { label: 'Being able to explain each result', next: 'explain' },
+        { label: 'Getting as many results right as possible', recommend: 'random_forest', note: 'It combines many simple rules, which tends to get more results right.' },
+        { label: 'Quick results on a lot of documents', recommend: 'naive_bayes', note: 'It learns from thousands of documents in seconds.' },
+        { label: 'Telling apart documents that use similar words', recommend: 'svm', note: 'It draws a sharp line between labels that look alike.' },
+        { label: 'The best results, even if training takes much longer', recommend: 'legalbert', note: 'It reads each word in its context and has already read a lot of legal text, but training can take hours.' },
       ],
     },
     explain: {
-      question: 'How should that explanation read?',
+      question: 'How would you like each result explained?',
       options: [
-        { label: 'As if/then rules a colleague can follow', recommend: 'decision_tree', note: 'Each prediction traces a visible path.' },
-        { label: 'As a confidence score per class', recommend: 'logistic_regression', note: 'Returns calibrated probabilities.' },
+        { label: 'As rules a colleague can follow', recommend: 'decision_tree', note: 'Each result follows a path of yes-or-no questions that you can read.' },
+        { label: 'As how strongly the text points to each label', recommend: 'logistic_regression', note: 'Each result shows which words pushed it towards each label.' },
       ],
     },
   },
@@ -44,50 +47,37 @@ const CLUSTERING: DecisionTree = {
   root: 'known',
   nodes: {
     known: {
-      question: 'Do you know how many groups exist?',
+      question: 'Do you already know roughly how many groups to expect?',
       options: [
-        { label: 'Yes, roughly', next: 'shape' },
-        { label: 'No, let the data decide', next: 'outliers' },
+        { label: 'Yes, roughly', next: 'nested' },
+        { label: 'No, let the documents decide', next: 'outliers' },
       ],
     },
-    shape: {
-      question: 'Do you need nested structure to explore?',
+    nested: {
+      question: 'Would you like to see smaller groups inside bigger ones?',
       options: [
-        { label: 'Yes, a hierarchy of topics', recommend: 'hierarchical', note: 'Build a dendrogram and cut it where you like.' },
-        { label: 'No, flat groups are fine', recommend: 'kmeans', note: 'Simple, fast, and easy to read.' },
+        { label: 'Yes, groups within groups', recommend: 'hierarchical', note: 'It builds a family tree of groups, so you choose how broad or fine they are.' },
+        { label: 'No, separate groups are enough', recommend: 'kmeans', note: 'It is quick, and its groups are easy to read.' },
       ],
     },
     outliers: {
-      question: 'Should odd documents be flagged rather than grouped?',
+      question: 'Should unusual documents be set aside rather than put in a group?',
       options: [
-        { label: 'Yes, surface the outliers', recommend: 'dbscan', note: 'Finds clusters of any shape and marks noise.' },
-        { label: 'No, group everything', recommend: 'hierarchical', note: 'Every document joins the tree.' },
+        { label: 'Yes, set them aside', recommend: 'dbscan', note: 'It finds groups of any size and lists the documents that fit none.' },
+        { label: 'No, put every document in a group', recommend: 'hierarchical', note: 'Every document joins a group, and you choose how broad the groups are.' },
       ],
     },
   },
 }
 
 const TOPIC: DecisionTree = {
-  root: 'sharpen',
+  root: 'mix',
   nodes: {
-    sharpen: {
-      question: 'Do you want sharper, more distinct topics?',
+    mix: {
+      question: 'Is each document mostly about one topic?',
       options: [
-        { label: 'Yes, clean boundaries', recommend: 'nmf', note: 'Parts-based topics, often crisper than LDA.' },
-        { label: 'No, a probabilistic topic mix', recommend: 'lda', note: 'Interprets each document as a blend of topics.' },
-      ],
-    },
-  },
-}
-
-const TRANSFORMER: DecisionTree = {
-  root: 'domain',
-  nodes: {
-    domain: {
-      question: 'Is the text legal-domain specific?',
-      options: [
-        { label: 'Yes, strongly legal', recommend: 'legalbert', note: 'Pre-trained on legal corpora.' },
-        { label: 'No, general text', recommend: 'roberta', note: 'Strong general-purpose baseline.' },
+        { label: 'Yes, keep the topics distinct', recommend: 'nmf', note: 'Each topic gets its own clear set of words, so topics overlap less.' },
+        { label: 'No, a document can cover several topics', recommend: 'lda', note: 'It shows each document as a mix of topics, such as mostly lease with some employment.' },
       ],
     },
   },
@@ -97,6 +87,5 @@ export function decisionTreeFor(taskType: string): DecisionTree | null {
   if (['classification', 'document_classification', 'judgment_prediction'].includes(taskType)) return CLASSIFICATION
   if (taskType === 'clustering') return CLUSTERING
   if (taskType === 'topic_modeling') return TOPIC
-  if (['ner', 'named_entity_recognition', 'summarization'].includes(taskType)) return TRANSFORMER
   return null
 }

@@ -6,6 +6,7 @@ import { allowedOptions, mergeSchema, reconcileChoices } from './parameterOption
 import type { ParameterFieldSchema } from './modelCatalogData'
 import ModelLens from './shared/ModelLens.vue'
 import ModelQuestionTree from './ModelQuestionTree.vue'
+import { decisionTreeFor } from '../lens/modelGuide'
 import Icon from './shared/Icon.vue'
 
 const props = withDefaults(defineProps<{
@@ -44,7 +45,8 @@ const refusedField = ref('')
 const actions = ref<HTMLElement | null>(null)
 const advanced = ref<HTMLDetailsElement | null>(null)
 const expandedModelInfo = ref<string | null>(null)
-// One model is always chosen, so the rest of the grid stays folded until asked for.
+// The step opens on the guide questions, with the chosen model below them. The
+// full grid replaces the questions when the user would rather choose for themselves.
 const showAllModels = ref(false)
 const expandedParams = reactive<Record<string, boolean>>({})
 // Model types the backend reports as trainable for the selected dataset's task.
@@ -71,6 +73,7 @@ const availableModels = computed<string[]>(() => {
 const visibleModels = computed<string[]>(() =>
   !showAllModels.value && availableModels.value.includes(modelType.value) ? [modelType.value] : availableModels.value,
 )
+const hasGuide = computed(() => !!selectedDataset.value && decisionTreeFor(selectedDataset.value.task_type) !== null)
 const schemaFor = (type: string) =>
   mergeSchema(parameterSchemas[type] || [], backendInfo.value[type], selectedDataset.value?.row_count)
 const currentRules = computed(() => backendInfo.value[modelType.value]?.rules ?? parameterRules[modelType.value] ?? [])
@@ -283,17 +286,19 @@ async function createModel() {
       <!-- Step 2: model type -->
       <section v-if="selectedDataset" class="vmlb-card">
         <h2 class="vmlb-step-title"><span class="vmlb-step-num">{{ firstStep + 1 }}</span> Select model type</h2>
-        <p class="vmlb-muted vmlb-indent">Available models for <strong>{{ taskLabel }}</strong> tasks.</p>
+        <p v-if="!availableModels.length" class="vmlb-muted vmlb-indent vmlb-no-models">
+          A model cannot be trained for {{ taskLabel }} yet. Choose a dataset with another task type.
+        </p>
+        <p v-else class="vmlb-muted vmlb-indent">Available models for <strong>{{ taskLabel }}</strong> tasks.</p>
 
-        <details class="vmlb-advanced vmlb-chooser">
-          <summary>Help me choose a model</summary>
+        <div v-if="!showAllModels && hasGuide" class="vmlb-chooser">
           <ModelQuestionTree
             :task-type="selectedDataset.task_type"
             :current-model-type="modelType"
             auto-apply
             @select="selectModelType"
           />
-        </details>
+        </div>
 
         <div class="vmlb-model-grid">
           <div
@@ -333,7 +338,15 @@ async function createModel() {
           class="vmlb-link-btn vmlb-show-models"
           @click="showAllModels = true"
         >
-          Show all {{ availableModels.length }} models
+          Choose a model myself
+        </button>
+        <button
+          v-else-if="showAllModels && hasGuide"
+          type="button"
+          class="vmlb-link-btn vmlb-show-guide"
+          @click="showAllModels = false"
+        >
+          Help me choose instead
         </button>
       </section>
 
@@ -498,7 +511,7 @@ async function createModel() {
 .vmlb-model-info li :deep(.vmlb-icon) { color: var(--vmlb-success); margin-top: 0.15rem; }
 .vmlb-italic { font-style: italic; color: var(--vmlb-text-subtle); }
 .vmlb-field { margin-bottom: 1.25rem; }
-.vmlb-show-models { margin-top: 0.75rem; }
+.vmlb-show-models, .vmlb-show-guide { margin-top: 0.75rem; }
 .vmlb-refusal .vmlb-alert-error { margin: var(--vmlb-space-md) 0 0; }
 .vmlb-refusal-link { display: block; min-height: 44px; color: inherit; text-decoration: underline; }
 .vmlb-chooser { margin-bottom: 1rem; }
