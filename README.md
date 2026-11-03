@@ -79,7 +79,11 @@ plus shared primitives `ConfusionMatrix`/`PlotlyChart`/`ModelLens`/
 pieces (mlop.ai-inspired): live per-training-job metric curves and cross-run
 hyperparameter-vs-performance comparison. Live curves are dense only for the
 LegalBERT/RoBERTa training path — classical sklearn algorithms only produce a
-few coarse phase-marker points (see `legal-ml-core`'s README for why).
+few coarse phase-marker points (see `legal-ml-core`'s README for why), unless
+the run turns on `parameters.monitoring.learning_curve`. Its `learning_curve_*`
+points are drawn on a chart of their own, "Learning curve", against the number
+of training examples (their `training_step`), whatever `groupBy` and `xAxis` say.
+`isLearningCurvePoint(point)` tells them apart in a custom slot.
 
 ## Configuring the training curves
 

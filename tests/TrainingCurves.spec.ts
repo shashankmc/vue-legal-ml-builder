@@ -51,6 +51,22 @@ describe('TrainingCurves', () => {
     expect(plots[1].props('plotData').data.map((t: { name: string }) => t.name)).toEqual(['eval_accuracy'])
   })
 
+  it('draws a learning curve against the number of training examples', async () => {
+    const wrapper = await mountWith([
+      point(1, 'learning_curve_train_accuracy', { training_step: 3, value: 1 }),
+      point(2, 'learning_curve_eval_accuracy', { group: 'eval', training_step: 3, value: 0.5 }),
+      point(3, 'learning_curve_train_accuracy', { training_step: 32, value: 0.9 }),
+      point(4, 'learning_curve_eval_accuracy', { group: 'eval', training_step: 32, value: 0.8 }),
+    ])
+
+    const chart = wrapper.find('.vmlb-curves-chart[data-group="learning_curve"]')
+    expect(chart.find('h4').text()).toBe('Learning curve')
+    const plot = wrapper.findAllComponents(PlotlyChart)
+    expect(plot).toHaveLength(1)
+    expect(plot[0].props('plotData').layout.xaxis.title).toBe('Training examples')
+    expect(plot[0].props('plotData').data.map((t: { x: number[] }) => t.x)).toEqual([[3, 32], [3, 32]])
+  })
+
   it('shows stage markers as labelled events, not as a line', async () => {
     const wrapper = await mountWith([
       point(0, 'preprocessing_started', { group: 'stage' }),

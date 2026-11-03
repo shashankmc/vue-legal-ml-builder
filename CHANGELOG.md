@@ -13,11 +13,16 @@ tagged `vX.Y.Z`.
 
 ### Added
 
+- `TrainingCurves` draws a classical run's learning curve (legal-ml-core
+  `monitoring.learning_curve`) on a chart of its own, "Learning curve", against the
+  number of training examples. Its `learning_curve_*` points are left out of the
+  Training and Evaluation charts, and stay apart when `groupBy` is `'none'`. A slot's
+  `charts` has it with `group: 'learning_curve'`, and `isLearningCurvePoint` is exported.
+
 - `MonitoringSettings` and `ModelParameters` are exported: a run's own monitoring goes
   under `parameters.monitoring` (`log_every_n_steps`, `eval_strategy` with `eval_steps`,
   `include` / `exclude` name globs, `flush_every_points` / `flush_every_seconds` for how
-  often metric points are written, and `learning_curve` / `system_metrics`, accepted but
-  not used yet). `MlModel.parameters`, `createModel` and `updateModel` use
+  often metric points are written, and `learning_curve` / `system_metrics`). `MlModel.parameters`, `createModel` and `updateModel` use
   `ModelParameters`. A refusal of one of these names `monitoring.<setting>` as its field.
 - `npm test` also type-checks the type-level tests (`tests/*.test-d.ts`), through
   `npm run test:types`.
