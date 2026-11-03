@@ -160,6 +160,14 @@ export function createMockAdapter(): MLAdapter {
       models.unshift(model)
       return delay(model)
     },
+    async updateModel(id, changes) {
+      const m = models.find((x) => x.id === id)
+      if (!m) throw new Error('Model not found')
+      if (changes.name !== undefined) m.name = changes.name.trim()
+      if (changes.parameters) m.parameters = changes.parameters
+      m.updated_at = new Date().toISOString()
+      return delay(m)
+    },
     async deleteModel(id) {
       const idx = models.findIndex((m) => m.id === id)
       if (idx >= 0) models.splice(idx, 1)
