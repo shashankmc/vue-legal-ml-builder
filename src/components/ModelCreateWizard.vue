@@ -262,7 +262,7 @@ async function createModel() {
       <section v-if="selectedDataset" class="vmlb-card">
         <h2 class="vmlb-step-title"><span class="vmlb-step-num">{{ firstStep + 1 }}</span> Select model type</h2>
         <p v-if="!availableModels.length" class="vmlb-muted vmlb-indent vmlb-no-models">
-          A model cannot be trained for {{ taskLabel }} yet. Choose a dataset with another task type.
+          A Model cannot be trained for {{ taskLabel }} yet. Choose a Dataset with another task type.
         </p>
         <p v-else class="vmlb-muted vmlb-indent">Available models for <strong>{{ taskLabel }}</strong> tasks.</p>
 

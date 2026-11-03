@@ -106,7 +106,7 @@ describe('ModelCreateWizard', () => {
     const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
     await flushPromises()
 
-    expect(wrapper.find('.vmlb-no-models').text()).toContain('cannot be trained for named entity recognition yet')
+    expect(wrapper.find('.vmlb-no-models').text()).toBe('A Model cannot be trained for named entity recognition yet. Choose a Dataset with another task type.')
     expect(wrapper.find('.vmlb-model-card').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Configure model')
   })

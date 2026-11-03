@@ -46,7 +46,7 @@ tagged `vX.Y.Z`.
 
 - Named entity recognition and text summarisation offer no models, and `decisionTreeFor` and `quickGuideFor`
   return `null` for them, because the backend cannot train them yet. The wizard says so instead of offering
-  LegalBERT and RoBERTa.
+  LegalBERT and RoBERTa. It reads "A Model cannot be trained for … yet. Choose a Dataset with another task type."
 
 ### Fixed
 
