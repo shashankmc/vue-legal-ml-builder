@@ -1,4 +1,5 @@
 import type { ModelTypeInfo, ParameterRule } from '../types'
+import { parameterRules, parameterSchemas } from './modelCatalogData'
 import type { ParameterFieldSchema } from './modelCatalogData'
 
 /** The package's settings with the backend's facts over them: it decides what is
@@ -34,6 +35,28 @@ export function mergeSchema(
   return merged.map((p) => (p.atMostRows
     ? { ...p, default: Math.min(p.default as number, rowCount), max: Math.min(p.max ?? rowCount, rowCount) }
     : p))
+}
+
+/** What a Model type's settings are checked against: its settings, the rules
+ * between them, and whether the Dataset has more than two labels. */
+export interface SettingsSetup {
+  schema: ParameterFieldSchema[]
+  rules: ParameterRule[]
+  multiclass: boolean
+}
+
+/** The settings form and the guide both start here, so they offer and move
+ * settings the same way the backend checks them. */
+export function settingsSetup(
+  modelType: string,
+  dataset: { modelInfo?: ModelTypeInfo; rowCount?: number; labels?: readonly string[] | null } = {},
+): SettingsSetup {
+  return {
+    schema: mergeSchema(parameterSchemas[modelType] ?? [], dataset.modelInfo, dataset.rowCount),
+    rules: dataset.modelInfo?.rules ?? parameterRules[modelType] ?? [],
+    // As the backend counts them: different labels, more than two.
+    multiclass: new Set(dataset.labels ?? []).size > 2,
+  }
 }
 
 function holds(rule: ParameterRule, chosen: Record<string, unknown>, multiclass: boolean): boolean {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allowedOptions, mergeSchema, reconcileChoices } from '../src/components/parameterOptions'
+import { allowedOptions, mergeSchema, reconcileChoices, settingsSetup } from '../src/components/parameterOptions'
 import { parameterRules, parameterSchemas } from '../src/components/modelCatalogData'
 import type { ModelTypeInfo, ParameterRule } from '../src/types'
 import { coreParameterLimits } from './fixtures/coreParameterLimits'
@@ -60,6 +60,28 @@ describe('mergeSchema', () => {
   it('caps a count at the rows of the Dataset without a backend answer too', () => {
     const clusters = mergeSchema(parameterSchemas.kmeans, undefined, 6).find((f) => f.key === 'n_clusters')
     expect(clusters).toMatchObject({ max: 6, default: 6 })
+  })
+})
+
+describe('settingsSetup', () => {
+  it("takes the settings and rules from the backend's answer when there is one", () => {
+    const modelInfo: ModelTypeInfo = { name: 'Logistic Regression', description: '', parameters: { C: { type: 'float', min: 0.5, max: 9, default: 2 } }, rules }
+    const setup = settingsSetup('logistic_regression', { modelInfo })
+    expect(setup.schema.map((p) => p.key)).toEqual(['C'])
+    expect(setup.rules).toBe(rules)
+  })
+
+  it('falls back to the package settings and rules', () => {
+    const setup = settingsSetup('logistic_regression')
+    expect(setup.schema).toBe(parameterSchemas.logistic_regression)
+    expect(setup.rules).toBe(parameterRules.logistic_regression)
+  })
+
+  it('counts a Dataset as having many labels from three different labels', () => {
+    expect(settingsSetup('svm', { labels: ['Granted', 'Refused'] }).multiclass).toBe(false)
+    expect(settingsSetup('svm', { labels: ['Granted', 'Refused', 'Granted'] }).multiclass).toBe(false)
+    expect(settingsSetup('svm', { labels: ['Granted', 'Refused', 'Withdrawn'] }).multiclass).toBe(true)
+    expect(settingsSetup('svm', { labels: null }).multiclass).toBe(false)
   })
 })
 

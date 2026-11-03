@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { ModelTypeInfo } from '../types'
-import { parameterRules, parameterSchemas } from './modelCatalogData'
-import { allowedOptions, mergeSchema, reconcileChoices } from './parameterOptions'
+import { allowedOptions, reconcileChoices, settingsSetup } from './parameterOptions'
 import type { ParameterFieldSchema } from './modelCatalogData'
 import Icon from './shared/Icon.vue'
 
@@ -35,12 +34,13 @@ const expandedParams = reactive<Record<string, boolean>>({})
 // Why a setting just moved, for the settings that had to.
 const adjusted = ref<Record<string, string>>({})
 
-const allSettings = computed(() => mergeSchema(parameterSchemas[props.modelType] || [], props.modelInfo, props.rowCount))
-const currentRules = computed(() => props.modelInfo?.rules ?? parameterRules[props.modelType] ?? [])
+const setup = computed(() => settingsSetup(props.modelType, props))
+const allSettings = computed(() => setup.value.schema)
+const currentRules = computed(() => setup.value.rules)
 const currentSchema = computed(() =>
   allSettings.value.filter((p) => Object.entries(p.showWhen ?? {}).every(([key, value]) => parameters[key] === value)),
 )
-const multiclass = computed(() => (props.labels?.length ?? 0) > 2)
+const multiclass = computed(() => setup.value.multiclass)
 
 const optionsFor = (param: ParameterFieldSchema) => allowedOptions(param, currentRules.value, parameters, multiclass.value)
 
