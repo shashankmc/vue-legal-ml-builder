@@ -33,14 +33,16 @@ const curves = computed(() =>
   }),
 )
 const charts = computed(() =>
-  curves.value.map((chart) => ({
+  curves.value.map((chart, i) => ({
+    // The system group can have a chart per unit.
+    id: chart.unit ? `${chart.group}-${i}` : chart.group,
     group: chart.group,
     title: chart.title,
     plotData: {
       data: chart.series.map((s) => ({ x: s.x, y: s.y, mode: 'lines+markers', name: s.metric })),
       layout: {
         xaxis: { title: chart.xAxisTitle },
-        yaxis: { title: 'value', ...(option('logScale') ? { type: 'log' } : {}) },
+        yaxis: { title: chart.unit ?? 'value', ...(option('logScale') ? { type: 'log' } : {}) },
         height: 300,
       },
     },
@@ -88,9 +90,9 @@ onUnmounted(stop)
             <span class="vmlb-stage-label">{{ stage.label }}</span>
           </li>
         </ol>
-        <section v-for="chart in charts" :key="chart.group" class="vmlb-curves-chart" :data-group="chart.group">
+        <section v-for="chart in charts" :key="chart.id" class="vmlb-curves-chart" :data-group="chart.group">
           <h4>{{ chart.title }}</h4>
-          <PlotlyChart :plot-data="chart.plotData" :plot-id="`vmlb-training-curves-${chart.group}`" />
+          <PlotlyChart :plot-data="chart.plotData" :plot-id="`vmlb-training-curves-${chart.id}`" />
         </section>
         <p v-if="!charts.length" class="vmlb-hint">
           This model type records its stages, not a step-by-step curve. Step-by-step curves are

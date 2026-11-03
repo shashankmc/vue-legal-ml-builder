@@ -109,7 +109,7 @@ export { useModels } from './composables/useModels'
 export { useParameterComparison } from './composables/useParameterComparison'
 export { useTraining } from './composables/useTraining'
 export { useTrainingCurves } from './composables/useTrainingCurves'
-export { TRAINING_METRIC_GROUPS, curveCharts, metricGroupOf, stageEvents } from './utils/trainingCharts'
+export { TRAINING_METRIC_GROUPS, curveCharts, metricGroupOf, metricUnitOf, stageEvents } from './utils/trainingCharts'
 export type { CurveChart, CurveChartOptions, CurveSeries, CurveXAxis, StageEvent } from './utils/trainingCharts'
 
 export { allModelInfo, modelsByTaskType, parameterRules, parameterSchemas, quickGuideFor, taskTypeLabel } from './components/modelCatalogData'

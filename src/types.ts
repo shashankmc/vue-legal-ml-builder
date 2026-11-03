@@ -34,8 +34,8 @@ export type ModelStatus = 'pending' | 'training' | 'completed' | 'failed'
  * run leaves out takes the host's default, then legal-ml-core's. Include and
  * exclude are name globs (`eval_*`) for which metric points are stored; stage
  * markers always are. `flush_every_points` and `flush_every_seconds` say how
- * often the worker writes metric points in a batch. `learning_curve` and
- * `system_metrics` are accepted but not used yet. A bad value is refused with
+ * often the worker writes metric points in a batch. `learning_curve` is
+ * accepted but not used yet. A bad value is refused with
  * `field: 'monitoring.<setting>'`. */
 export interface MonitoringSettings {
   log_every_n_steps: number
@@ -45,6 +45,8 @@ export interface MonitoringSettings {
   include: string[]
   exclude: string[]
   learning_curve: boolean
+  /** Record memory, GPU use when there is a GPU, speed and time left as
+   * `system` points. Off by default. */
   system_metrics: boolean
   /** Whole number above 0; legal-ml-core's default is 50. */
   flush_every_points: number

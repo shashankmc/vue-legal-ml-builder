@@ -32,6 +32,26 @@ export function metricGroupOf(point: TrainingMetricPoint): TrainingMetricGroup {
   return 'train'
 }
 
+/** A resource reading's unit, from the end of its name: `_mb`, `_percent`,
+ * `<what>_per_second`, or `seconds_` / `_seconds`. */
+export function metricUnitOf(metricName: string): string | undefined {
+  if (metricName.endsWith('_mb')) return 'MB'
+  if (metricName.endsWith('_percent')) return '%'
+  const rate = metricName.match(/^(.+)_per_second$/)
+  if (rate) return `${rate[1].replace(/_/g, ' ')} per second`
+  if (metricName.startsWith('seconds_') || metricName.endsWith('_seconds')) return 'seconds'
+  return undefined
+}
+
+// What the readings legal-ml-core takes are called on their chart.
+const READING_TITLES: Record<string, string> = {
+  memory_mb: 'Memory',
+  gpu_memory_mb: 'Memory',
+  gpu_use_percent: 'GPU use',
+  samples_per_second: 'Speed',
+  seconds_remaining: 'Time remaining',
+}
+
 export interface CurveSeries {
   metric: string
   x: number[]
@@ -42,6 +62,8 @@ export interface CurveChart {
   /** The group charted, or `all` when grouping is off. */
   group: CurveGroup | 'all'
   title: string
+  /** The unit of every value on a resource chart, which draws one unit only. */
+  unit?: string
   xAxisTitle: string
   series: CurveSeries[]
 }
@@ -89,22 +111,37 @@ function smooth(values: number[], weight: number): number[] {
   return values.map((v) => (last = w * last + (1 - w) * v))
 }
 
+/** The system group's points, one bucket per unit: memory in MB is not drawn
+ * against an axis of seconds. */
+function byUnit(points: TrainingMetricPoint[]): Array<Pick<CurveChart, 'group' | 'title' | 'unit'> & { points: TrainingMetricPoint[] }> {
+  const units = new Map<string | undefined, TrainingMetricPoint[]>()
+  for (const p of points) {
+    const unit = metricUnitOf(p.metric_name)
+    if (!units.has(unit)) units.set(unit, [])
+    units.get(unit)!.push(p)
+  }
+  return [...units].map(([unit, inUnit]) => {
+    const name = inUnit.map((p) => READING_TITLES[p.metric_name]).find(Boolean) ?? 'System'
+    return { group: 'system', title: unit ? `${name} (${unit})` : name, unit, points: inUnit }
+  })
+}
+
 /** One chart per group that has points, so values on different scales are not
- * drawn against one axis. Stage markers are left to `stageEvents`. */
+ * drawn against one axis; resource readings get one chart per unit. Stage
+ * markers are left to `stageEvents`. */
 export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOptions = {}): CurveChart[] {
   const xAxis = options.xAxis ?? 'step'
   const shown = options.metrics ? new Set(options.metrics) : null
   const curves = points.filter((p) => metricGroupOf(p) !== 'stage' && (!shown || shown.has(p.metric_name)))
-  const buckets: Array<Pick<CurveChart, 'group' | 'title'> & { points: TrainingMetricPoint[] }> =
+  const buckets: Array<Pick<CurveChart, 'group' | 'title' | 'unit'> & { points: TrainingMetricPoint[] }> =
     options.groupBy === 'none'
       ? [{ group: 'all', title: 'Metrics', points: curves }]
-      : CURVE_GROUPS.map((group) => ({
-          group,
-          title: CHART_TITLES[group],
-          points: curves.filter((p) => metricGroupOf(p) === group),
-        }))
+      : CURVE_GROUPS.flatMap((group) => {
+          const inGroup = curves.filter((p) => metricGroupOf(p) === group)
+          return group === 'system' ? byUnit(inGroup) : [{ group, title: CHART_TITLES[group], points: inGroup }]
+        })
   const charts: CurveChart[] = []
-  for (const { group, title, points: inGroup } of buckets) {
+  for (const { group, title, unit, points: inGroup } of buckets) {
     if (!inGroup.length) continue
     const byMetric = new Map<string, TrainingMetricPoint[]>()
     for (const p of inGroup) {
@@ -114,6 +151,7 @@ export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOp
     charts.push({
       group,
       title,
+      ...(unit ? { unit } : {}),
       xAxisTitle: xAxisTitle(inGroup, xAxis),
       series: [...byMetric].map(([metric, series]) => ({
         metric,
