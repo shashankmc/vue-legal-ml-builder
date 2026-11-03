@@ -80,23 +80,9 @@ const TOPIC: DecisionTree = {
   },
 }
 
-const TRANSFORMER: DecisionTree = {
-  root: 'domain',
-  nodes: {
-    domain: {
-      question: 'Is the text legal-domain specific?',
-      options: [
-        { label: 'Yes, strongly legal', recommend: 'legalbert', note: 'Pre-trained on legal corpora.' },
-        { label: 'No, general text', recommend: 'roberta', note: 'Strong general-purpose baseline.' },
-      ],
-    },
-  },
-}
-
 export function decisionTreeFor(taskType: string): DecisionTree | null {
   if (['classification', 'document_classification', 'judgment_prediction'].includes(taskType)) return CLASSIFICATION
   if (taskType === 'clustering') return CLUSTERING
   if (taskType === 'topic_modeling') return TOPIC
-  if (['ner', 'named_entity_recognition', 'summarization'].includes(taskType)) return TRANSFORMER
   return null
 }

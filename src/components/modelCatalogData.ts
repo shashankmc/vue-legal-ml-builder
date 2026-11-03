@@ -9,9 +9,10 @@ export const modelsByTaskType: Record<string, string[]> = {
   judgment_prediction: ['decision_tree', 'logistic_regression', 'naive_bayes', 'random_forest', 'svm', 'legalbert', 'roberta'],
   clustering: ['kmeans', 'hierarchical', 'dbscan'],
   topic_modeling: ['lda', 'nmf'],
-  ner: ['legalbert', 'roberta'],
-  named_entity_recognition: ['legalbert', 'roberta'],
-  summarization: ['legalbert', 'roberta'],
+  // The backend cannot train these task types yet, so they offer no Model.
+  ner: [],
+  named_entity_recognition: [],
+  summarization: [],
 }
 
 /** The model a no-code user starts from: Logistic Regression where it applies,
@@ -35,10 +36,6 @@ export const quickGuides: Record<string, Array<{ q: string; a: string }>> = {
   topic_modeling: [
     { q: 'Standard topic discovery?', a: 'LDA' },
     { q: 'Sharper topic boundaries?', a: 'NMF' },
-  ],
-  transformers: [
-    { q: 'Legal domain NER or classification?', a: 'LegalBERT (recommended)' },
-    { q: 'General-purpose transformer?', a: 'RoBERTa' },
   ],
 }
 
@@ -279,6 +276,5 @@ export function quickGuideFor(taskType: string): Array<{ q: string; a: string }>
   if (['classification', 'document_classification', 'judgment_prediction'].includes(taskType)) return quickGuides.classification
   if (taskType === 'clustering') return quickGuides.clustering
   if (taskType === 'topic_modeling') return quickGuides.topic_modeling
-  if (['ner', 'named_entity_recognition', 'summarization'].includes(taskType)) return quickGuides.transformers
   return null
 }

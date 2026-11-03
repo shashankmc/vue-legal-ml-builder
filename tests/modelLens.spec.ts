@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { classColor, defaultLabels, lensCopy, lensFamily, scatterPoints } from '../src/lens/modelLens'
 import { decisionTreeFor } from '../src/lens/modelGuide'
+import type { DecisionTree } from '../src/lens/modelGuide'
+import { modelsByTaskType } from '../src/components/modelCatalogData'
 
 describe('lensFamily', () => {
   it('maps every catalog model type to a family', () => {
@@ -96,11 +98,30 @@ describe('classColor', () => {
 })
 
 describe('decisionTreeFor', () => {
-  it('routes each task type to a tree whose root exists', () => {
-    for (const task of ['classification', 'clustering', 'topic_modeling', 'ner']) {
+  const leavesOf = (tree: DecisionTree): string[] =>
+    Object.values(tree.nodes).flatMap((node) => node.options.flatMap((o) => (o.recommend ? [o.recommend] : [])))
+
+  it('gives every task type that offers Models a guide whose root exists', () => {
+    for (const [task, models] of Object.entries(modelsByTaskType)) {
+      if (!models.length) continue
       const tree = decisionTreeFor(task)
-      expect(tree).not.toBeNull()
-      expect(tree!.nodes[tree!.root]).toBeDefined()
+      expect(tree, task).not.toBeNull()
+      expect(tree!.nodes[tree!.root], task).toBeDefined()
+    }
+  })
+
+  it('only recommends Models that the task type offers', () => {
+    for (const task of Object.keys(modelsByTaskType)) {
+      const tree = decisionTreeFor(task)
+      if (!tree) continue
+      for (const leaf of leavesOf(tree)) expect(modelsByTaskType[task], `${task} -> ${leaf}`).toContain(leaf)
+    }
+  })
+
+  it('offers no Model, and no guide, for a task type the backend cannot train yet', () => {
+    for (const task of ['ner', 'named_entity_recognition', 'summarization']) {
+      expect(modelsByTaskType[task] ?? []).toEqual([])
+      expect(decisionTreeFor(task)).toBeNull()
     }
   })
 
@@ -108,14 +129,17 @@ describe('decisionTreeFor', () => {
     expect(decisionTreeFor('regression')).toBeNull()
   })
 
-  it('every branch terminates in a recommendation', () => {
-    const tree = decisionTreeFor('classification')!
-    const walk = (id: string, seen: Set<string>): boolean => {
-      if (seen.has(id)) return false
-      const node = tree.nodes[id]
-      if (!node) return false
-      return node.options.every((o) => (o.recommend ? true : o.next ? walk(o.next, new Set([...seen, id])) : false))
+  it('ends every branch of every guide in a recommendation', () => {
+    for (const task of Object.keys(modelsByTaskType)) {
+      const tree = decisionTreeFor(task)
+      if (!tree) continue
+      const walk = (id: string, seen: Set<string>): boolean => {
+        if (seen.has(id)) return false
+        const node = tree.nodes[id]
+        if (!node) return false
+        return node.options.every((o) => (o.recommend ? true : o.next ? walk(o.next, new Set([...seen, id])) : false))
+      }
+      expect(walk(tree.root, new Set()), task).toBe(true)
     }
-    expect(walk(tree.root, new Set())).toBe(true)
   })
 })
