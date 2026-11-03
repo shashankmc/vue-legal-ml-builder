@@ -12,15 +12,11 @@ const props = withDefaults(
   // Left unset, not false, so TrainingCurves can apply an app-wide default.
   { logScale: undefined },
 )
-// The curve settings, passed through to TrainingCurves.
-const curveOptions = computed<TrainingCurvesOptions>(() => ({
-  metrics: props.metrics,
-  groupBy: props.groupBy,
-  xAxis: props.xAxis,
-  pollIntervalMs: props.pollIntervalMs,
-  smoothing: props.smoothing,
-  logScale: props.logScale,
-}))
+// Every other prop is a curve setting, passed through to TrainingCurves.
+const curveOptions = computed<TrainingCurvesOptions>(() => {
+  const { adapter: _adapter, modelId: _modelId, jobId: _jobId, ...options } = props
+  return options
+})
 const emit = defineEmits<{ complete: []; stopped: [] }>()
 
 const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)

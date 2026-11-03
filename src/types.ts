@@ -1,4 +1,5 @@
 import type { MlBuilderTheme } from './theme'
+import type { CurveChartOptions } from './utils/trainingCharts'
 
 // ---------------------------------------------------------------------------
 // Core entities — mirror legal-ml-core's `to_dict()` shapes.
@@ -392,15 +393,7 @@ export interface MLAdapter {
 
 /** How `TrainingCurves` draws a job's curves. Set app-wide through the plugin's
  * `trainingCurves` option or `provide('vmlb:trainingCurves', …)`; props override it. */
-export interface TrainingCurvesOptions {
-  /** Only these metric names are drawn. Default: every metric. */
-  metrics?: string[]
-  /** `group` (default) draws one chart per group; `none` draws every metric on one chart. */
-  groupBy?: 'group' | 'none'
-  /** `step` (default) or `epoch`. A point without the chosen one falls back to the other. */
-  xAxis?: 'step' | 'epoch'
-  /** Moving-average weight from 0 (default, raw values) to just below 1 (smoothest). */
-  smoothing?: number
+export interface TrainingCurvesOptions extends CurveChartOptions {
   /** Draw values on a log scale. Default false. */
   logScale?: boolean
   /** How often a running job is polled for new points, in milliseconds. Default 3000. */
