@@ -77,14 +77,38 @@ describe('ModelCreateWizard', () => {
     expect(wrapper.findAll('.vmlb-model-card').length).toBe(count)
   })
 
-  it('tucks the chooser questions away, closed', async () => {
+  it('opens the model step on the guide questions, with a way to choose a model myself', async () => {
     const adapter = createTestAdapter({ listDatasets: vi.fn().mockResolvedValue([dataset()]) })
     const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
     await flushPromises()
 
-    const chooser = wrapper.find('details.vmlb-chooser')
-    expect(chooser.attributes('open')).toBeUndefined()
-    expect(chooser.find('summary').text()).toBe('Help me choose a model')
+    expect(wrapper.find('details.vmlb-chooser').exists()).toBe(false)
+    expect(wrapper.find('.vmlb-guide-tree').text()).toContain('What matters most to you?')
+    expect(wrapper.find('.vmlb-show-models').text()).toBe('Choose a model myself')
+  })
+
+  it('swaps the questions for the full grid, and back', async () => {
+    const adapter = createTestAdapter({ listDatasets: vi.fn().mockResolvedValue([dataset()]) })
+    const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+    await flushPromises()
+
+    await wrapper.find('.vmlb-show-models').trigger('click')
+    expect(wrapper.find('.vmlb-guide-tree').exists()).toBe(false)
+    expect(wrapper.findAll('.vmlb-model-card').length).toBe(7)
+
+    await wrapper.find('.vmlb-show-guide').trigger('click')
+    expect(wrapper.find('.vmlb-guide-tree').exists()).toBe(true)
+    expect(wrapper.findAll('.vmlb-model-card').map((c) => c.find('h3').text())).toEqual(['Logistic Regression'])
+  })
+
+  it('says plainly when the task type has no Model to train yet', async () => {
+    const adapter = createTestAdapter({ listDatasets: vi.fn().mockResolvedValue([dataset({ task_type: 'ner' })]) })
+    const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+    await flushPromises()
+
+    expect(wrapper.find('.vmlb-no-models').text()).toContain('cannot be trained for named entity recognition yet')
+    expect(wrapper.find('.vmlb-model-card').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Configure model')
   })
 
   it('populates default parameters when a model type is selected', async () => {

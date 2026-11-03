@@ -45,7 +45,7 @@ function choose(option: GuideOption) {
 <template>
   <div v-if="tree" class="vmlb-guide-tree">
     <div class="vmlb-guide-top">
-      <p class="vmlb-guide-title">Help me choose a Model</p>
+      <p class="vmlb-guide-title">Help me choose a model</p>
       <button v-if="history.length || recommendation" type="button" class="vmlb-guide-restart" @click="reset">Start over</button>
     </div>
 
@@ -57,7 +57,7 @@ function choose(option: GuideOption) {
     </ol>
 
     <div v-if="recommendedInfo" class="vmlb-guide-result">
-      <p class="vmlb-guide-rec-label">Recommended Model</p>
+      <p class="vmlb-guide-rec-label">Recommended model</p>
       <p class="vmlb-guide-rec-name">{{ recommendedInfo.label }}</p>
       <p v-if="reason" class="vmlb-guide-rec-desc">{{ reason }}</p>
       <p v-if="currentModelType === recommendation" class="vmlb-guide-rec-current">

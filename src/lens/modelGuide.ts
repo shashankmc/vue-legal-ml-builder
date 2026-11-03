@@ -24,7 +24,7 @@ const CLASSIFICATION: DecisionTree = {
   nodes: {
     priority: {
       question: 'What matters most to you?',
-      help: 'There is no wrong answer. You can change the Model before you train it.',
+      help: 'There is no wrong answer. You can change the model before you train it.',
       options: [
         { label: 'Being able to explain each result', next: 'explain' },
         { label: 'Getting as many results right as possible', recommend: 'random_forest', note: 'It combines many simple rules, which tends to get more results right.' },
