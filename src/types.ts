@@ -34,8 +34,9 @@ export type ModelStatus = 'pending' | 'training' | 'completed' | 'failed'
  * run leaves out takes the host's default, then legal-ml-core's. Include and
  * exclude are name globs (`eval_*`) for which metric points are stored; stage
  * markers always are. `flush_every_points` and `flush_every_seconds` say how
- * often the worker writes metric points in a batch. `learning_curve` and
- * `system_metrics` are accepted but not used yet. A bad value is refused with
+ * often the worker writes metric points in a batch. `learning_curve` adds a
+ * learning curve to a classical Text Classification run, which makes it slower.
+ * `system_metrics` is accepted but not used yet. A bad value is refused with
  * `field: 'monitoring.<setting>'`. */
 export interface MonitoringSettings {
   log_every_n_steps: number
@@ -100,7 +101,9 @@ export interface TrainingMetricPoint {
   /** Write counter and polling cursor, not the trainer's step. */
   step: number
   epoch: number | null
-  /** The trainer's own step, for fine-tuning; null otherwise. */
+  /** The trainer's own step, for fine-tuning; the iteration, for a classical
+   * run's loss by iteration; the training-set size, for `learning_curve_*`
+   * points; null otherwise. */
   training_step?: number | null
   metric_name: string
   /** Left out by hosts on an older legal-ml-core; `metricGroupOf` then
