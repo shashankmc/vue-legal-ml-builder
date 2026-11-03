@@ -122,14 +122,35 @@ describe('TrainingCurves', () => {
       expect(log.layout.yaxis.type).toBe('log')
     })
 
+    it('takes its defaults from the app, and its props override them', async () => {
+      const provide = { 'vmlb:monitoring': { metrics: ['loss'], groupBy: 'none', xAxis: 'epoch', logScale: true, smoothing: 0.5 } }
+
+      const fromApp = (await mountWith(fineTuning(), {}, { provide })).findComponent(PlotlyChart).props('plotData')
+      expect(fromApp.data.map((t: { name: string }) => t.name)).toEqual(['loss'])
+      expect(fromApp.data[0].x).toEqual([0.5, 1])
+      expect(fromApp.data[0].y.map((v: number) => Number(v.toFixed(6)))).toEqual([0.8, 0.6])
+      expect(fromApp.layout.yaxis.type).toBe('log')
+
+      const overridden = await mountWith(
+        fineTuning(),
+        { metrics: ['loss', 'eval_accuracy'], groupBy: 'group', xAxis: 'step', logScale: false, smoothing: 0 },
+        { provide },
+      )
+      expect(names(overridden)).toEqual([['loss'], ['eval_accuracy']])
+      const train = overridden.findComponent(PlotlyChart).props('plotData')
+      expect(train.data[0].x).toEqual([10, 20])
+      expect(train.data[0].y).toEqual([0.8, 0.4])
+      expect(train.layout.yaxis.type).toBeUndefined()
+    })
+
     it('polls a running job at the interval it is given, 3 seconds by default', async () => {
       vi.useFakeTimers()
       try {
-        const callsAfter = async (ms: number, props: Record<string, unknown> = {}) => {
+        const callsAfter = async (ms: number, props: Record<string, unknown> = {}, provide = {}) => {
           const getTrainingMetrics = vi.fn().mockResolvedValue([])
           const wrapper = mount(TrainingCurves, {
             props: { adapter: createTestAdapter({ getTrainingMetrics }), jobId: 'job-1', jobStatus: 'running', ...props },
-            global: { stubs: { PlotlyChart } },
+            global: { stubs: { PlotlyChart }, provide },
           })
           await vi.advanceTimersByTimeAsync(ms)
           wrapper.unmount()
@@ -139,6 +160,8 @@ describe('TrainingCurves', () => {
         // The first fetch on mount, then one per interval.
         expect(await callsAfter(3000)).toBe(2)
         expect(await callsAfter(3000, { pollIntervalMs: 1000 })).toBe(4)
+        expect(await callsAfter(3000, {}, { 'vmlb:monitoring': { pollIntervalMs: 1000 } })).toBe(4)
+        expect(await callsAfter(3000, { pollIntervalMs: 3000 }, { 'vmlb:monitoring': { pollIntervalMs: 1000 } })).toBe(2)
       } finally {
         vi.useRealTimers()
       }

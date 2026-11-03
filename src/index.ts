@@ -40,6 +40,7 @@ export const VueLegalMlBuilderPlugin = {
     app.provide('vmlb:adapter', adapter)
     app.provide('vmlb:pollInterval', opts.pollInterval ?? 3000)
     app.provide('vmlb:hideAnnotation', opts.hideAnnotation ?? false)
+    app.provide('vmlb:monitoring', opts.monitoring ?? {})
     if (opts.theme && typeof document !== 'undefined') {
       applyTheme(opts.themeTarget ?? document.documentElement, opts.theme)
     }
@@ -109,7 +110,7 @@ export { useParameterComparison } from './composables/useParameterComparison'
 export { useTraining } from './composables/useTraining'
 export { useTrainingCurves } from './composables/useTrainingCurves'
 export { TRAINING_METRIC_GROUPS, curveCharts, metricGroupOf, stageEvents } from './utils/trainingCharts'
-export type { CurveChart, CurveSeries, StageEvent } from './utils/trainingCharts'
+export type { CurveChart, CurveChartOptions, CurveSeries, CurveXAxis, StageEvent } from './utils/trainingCharts'
 
 export { allModelInfo, modelsByTaskType, parameterRules, parameterSchemas, quickGuideFor, taskTypeLabel } from './components/modelCatalogData'
 export { classColor, defaultLabels, lensCopy, lensFamily } from './lens/modelLens'

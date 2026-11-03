@@ -1,32 +1,39 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
-import type { MLAdapter } from '../types'
+import type { MLAdapter, TrainingCurvesOptions } from '../types'
 import { useTrainingCurves } from '../composables/useTrainingCurves'
 import { curveCharts, stageEvents } from '../utils/trainingCharts'
 import PlotlyChart from './shared/PlotlyChart.vue'
 import Icon from './shared/Icon.vue'
 
-const props = defineProps<{
-  adapter?: MLAdapter
-  jobId: string
-  jobStatus?: string
-  /** Only these metric names are drawn. Default: every metric. */
-  metrics?: string[]
-  /** `group` (default) draws one chart per group; `none` draws every metric on one chart. */
-  groupBy?: 'group' | 'none'
-  /** `step` (default) or `epoch`. */
-  xAxis?: 'step' | 'epoch'
-  /** Moving-average weight from 0 (default, raw values) to just below 1. */
-  smoothing?: number
-  /** Draw values on a log scale. Default false. */
-  logScale?: boolean
-  /** How often a running job is polled for new points. Default 3000. */
-  pollIntervalMs?: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    adapter?: MLAdapter
+    jobId: string
+    jobStatus?: string
+    /** Only these metric names are drawn. Default: every metric. */
+    metrics?: string[]
+    /** `group` (default) draws one chart per group; `none` draws every metric on one chart. */
+    groupBy?: 'group' | 'none'
+    /** `step` (default) or `epoch`. */
+    xAxis?: 'step' | 'epoch'
+    /** Moving-average weight from 0 (default, raw values) to just below 1. */
+    smoothing?: number
+    /** Draw values on a log scale. Default false. */
+    logScale?: boolean
+    /** How often a running job is polled for new points. Default 3000. */
+    pollIntervalMs?: number
+  }>(),
+  // Left unset, not false, so an app-wide default can apply.
+  { logScale: undefined },
+)
 
 const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
 const adapter = computed(() => props.adapter ?? injectedAdapter)
-const { points, start, stop, fetchNew } = useTrainingCurves(adapter.value as MLAdapter, props.pollIntervalMs ?? 3000)
+// App-wide defaults; each prop the host sets overrides its own one.
+const appDefaults = inject<TrainingCurvesOptions>('vmlb:monitoring', {})
+const option = <K extends keyof TrainingCurvesOptions>(key: K): TrainingCurvesOptions[K] => props[key] ?? appDefaults[key]
+const { points, start, stop, fetchNew } = useTrainingCurves(adapter.value as MLAdapter, option('pollIntervalMs') ?? 3000)
 
 const error = ref('')
 
@@ -34,14 +41,19 @@ const isSettled = computed(() => ['completed', 'failed', 'cancelled'].includes(p
 
 // One chart per group, so loss, learning rate and scores each get an axis that fits.
 const charts = computed(() =>
-  curveCharts(points.value, { metrics: props.metrics, groupBy: props.groupBy, xAxis: props.xAxis, smoothing: props.smoothing }).map((chart) => ({
+  curveCharts(points.value, {
+    metrics: option('metrics'),
+    groupBy: option('groupBy'),
+    xAxis: option('xAxis'),
+    smoothing: option('smoothing'),
+  }).map((chart) => ({
     group: chart.group,
     title: chart.title,
     plotData: {
       data: chart.series.map((s) => ({ x: s.x, y: s.y, mode: 'lines+markers', name: s.metric })),
       layout: {
         xaxis: { title: chart.xAxisTitle },
-        yaxis: { title: 'value', ...(props.logScale ? { type: 'log' } : {}) },
+        yaxis: { title: 'value', ...(option('logScale') ? { type: 'log' } : {}) },
         height: 300,
       },
     },
