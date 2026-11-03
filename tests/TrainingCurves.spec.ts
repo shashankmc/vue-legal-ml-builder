@@ -92,5 +92,15 @@ describe('TrainingCurves', () => {
       expect(wrapper.findAll('.vmlb-curves-chart h4').map((h) => h.text())).toEqual(['Metrics'])
       expect(names(wrapper)).toEqual([['loss', 'learning_rate', 'eval_accuracy']])
     })
+
+    it('draws against the training step by default, or the epoch when asked', async () => {
+      const byStep = (await mountWith(fineTuning())).findAllComponents(PlotlyChart)[0].props('plotData')
+      expect(byStep.data[0].x).toEqual([10, 20])
+      expect(byStep.layout.xaxis.title).toBe('Training step')
+
+      const byEpoch = (await mountWith(fineTuning(), { xAxis: 'epoch' })).findAllComponents(PlotlyChart)[0].props('plotData')
+      expect(byEpoch.data[0].x).toEqual([0.5, 1])
+      expect(byEpoch.layout.xaxis.title).toBe('Epoch')
+    })
   })
 })

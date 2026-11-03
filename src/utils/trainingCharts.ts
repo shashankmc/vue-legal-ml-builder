@@ -53,28 +53,35 @@ export interface StageEvent {
   at: string
 }
 
-/** Fine-tuning points sit at the trainer's step, falling back to the epoch,
- * then to the write counter. */
-function xOf(point: TrainingMetricPoint): number {
+/** By step, fine-tuning points sit at the trainer's step, falling back to the
+ * epoch, then to the write counter. By epoch, the epoch comes first. */
+function xOf(point: TrainingMetricPoint, xAxis: CurveXAxis): number {
+  if (xAxis === 'epoch') return point.epoch ?? point.training_step ?? point.step
   return point.training_step ?? point.epoch ?? point.step
 }
 
-function xAxisTitle(points: TrainingMetricPoint[]): string {
+function xAxisTitle(points: TrainingMetricPoint[], xAxis: CurveXAxis): string {
+  if (xAxis === 'epoch' && points.some((p) => p.epoch != null)) return 'Epoch'
   if (points.some((p) => p.training_step != null)) return 'Training step'
   if (points.some((p) => p.epoch != null)) return 'Epoch'
   return 'Point'
 }
+
+export type CurveXAxis = 'step' | 'epoch'
 
 export interface CurveChartOptions {
   /** Only these metric names are drawn. Default: every metric. */
   metrics?: string[]
   /** `group` (default) draws one chart per group; `none` draws every metric on one chart. */
   groupBy?: 'group' | 'none'
+  /** `step` (default) or `epoch`. A point without the chosen one falls back to the other. */
+  xAxis?: CurveXAxis
 }
 
 /** One chart per group that has points, so values on different scales are not
  * drawn against one axis. Stage markers are left to `stageEvents`. */
 export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOptions = {}): CurveChart[] {
+  const xAxis = options.xAxis ?? 'step'
   const shown = options.metrics ? new Set(options.metrics) : null
   const curves = points.filter((p) => metricGroupOf(p) !== 'stage' && (!shown || shown.has(p.metric_name)))
   const buckets: Array<Pick<CurveChart, 'group' | 'title'> & { points: TrainingMetricPoint[] }> =
@@ -96,10 +103,10 @@ export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOp
     charts.push({
       group,
       title,
-      xAxisTitle: xAxisTitle(inGroup),
+      xAxisTitle: xAxisTitle(inGroup, xAxis),
       series: [...byMetric].map(([metric, series]) => ({
         metric,
-        x: series.map(xOf),
+        x: series.map((p) => xOf(p, xAxis)),
         y: series.map((p) => p.value),
       })),
     })
