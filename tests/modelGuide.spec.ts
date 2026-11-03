@@ -43,4 +43,21 @@ describe('adviseFor', () => {
     const advice = adviseFor(optionFor('classification', 'Getting as many results right as possible'), { labelCounts: { Granted: 90, Refused: 10 } }, { catalogue })
     expect(advice.parameters).toEqual({})
   })
+
+  it('steers a small Dataset away from a Model that needs a lot of documents', () => {
+    const best = optionFor('classification', 'The best results, even if training takes much longer')
+    const advice = adviseFor(best, { rowCount: 300 })
+    expect(advice.modelType).toBe('random_forest')
+    expect(advice.why).toBe(
+      'Recommended because this Dataset has only 300 documents, which is too few for LegalBERT to learn from, '
+      + 'and Random Forest gets good results from fewer.',
+    )
+    expect(adviseFor(best, { rowCount: 5000 }).modelType).toBe('legalbert')
+  })
+
+  it('steers only to a Model the Dataset can use', () => {
+    const best = optionFor('classification', 'The best results, even if training takes much longer')
+    expect(adviseFor(best, { rowCount: 300 }, { available: ['logistic_regression', 'legalbert'] }).modelType).toBe('logistic_regression')
+    expect(adviseFor(best, { rowCount: 300 }, { available: ['legalbert'] }).modelType).toBe('legalbert')
+  })
 })

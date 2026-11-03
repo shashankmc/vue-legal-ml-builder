@@ -107,6 +107,8 @@ export interface DatasetFacts {
 /** What the backend offers, when the host can say. */
 export interface GuideContext {
   catalogue?: Record<string, ModelTypeInfo>
+  /** The Models the Dataset can use. The guide steers only to one of these. */
+  available?: string[]
 }
 
 /** What the guide recommends once an answer is reached: the Model, the settings
@@ -116,6 +118,13 @@ export interface GuideAdvice {
   parameters: Record<string, unknown>
   why: string
 }
+
+/** Fewer documents than this are too few for a Model that has read a lot of text
+ * in advance to learn from. */
+export const SMALL_DATASET_ROWS = 1000
+// Models that need a lot of documents, and what to steer to instead, in order.
+const NEEDS_MANY_DOCUMENTS = ['legalbert', 'roberta']
+const FOR_FEWER_DOCUMENTS = ['random_forest', 'logistic_regression', 'svm', 'decision_tree', 'naive_bayes']
 
 /** The most common label at least this many times the rarest counts as imbalanced. */
 export const IMBALANCE_RATIO = 3
@@ -133,14 +142,24 @@ function imbalanced(labelCounts?: Record<string, number> | null): boolean {
  * accepts them: a setting the Model lacks is left out, a number is kept in range,
  * and a choice a rule forbids is moved as the form would move it. */
 export function adviseFor(option: GuideOption, facts: DatasetFacts = {}, context: GuideContext = {}): GuideAdvice {
-  const modelType = option.recommend ?? ''
+  const recommended = option.recommend ?? ''
+  const small = facts.rowCount !== undefined && facts.rowCount < SMALL_DATASET_ROWS
+  const instead = small && NEEDS_MANY_DOCUMENTS.includes(recommended)
+    ? FOR_FEWER_DOCUMENTS.find((type) => context.available?.includes(type) ?? true)
+    : undefined
+  const modelType = instead ?? recommended
   const schema = mergeSchema(parameterSchemas[modelType] ?? [], context.catalogue?.[modelType], facts.rowCount)
   const has = (key: string) => schema.some((p) => p.key === key)
-  const reasons = [option.note ? `Recommended because ${lowerFirst(option.note)}` : '']
+  const label = (type: string) => allModelInfo[type]?.label ?? type
+  const reasons = [
+    instead
+      ? `Recommended because this Dataset has only ${facts.rowCount!.toLocaleString('en-GB')} documents, which is too few for ${label(recommended)} to learn from, and ${label(instead)} gets good results from fewer.`
+      : option.note ? `Recommended because ${lowerFirst(option.note)}` : '',
+  ]
   const preset: Record<string, unknown> = {}
   const clauses: string[] = []
 
-  const settings = option.settings
+  const settings = instead ? undefined : option.settings
   if (settings && Object.keys(settings.parameters).every(has)) {
     Object.assign(preset, settings.parameters)
     clauses.push(settings.why)
