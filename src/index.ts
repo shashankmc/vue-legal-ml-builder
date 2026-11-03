@@ -146,6 +146,7 @@ export type {
   ParameterFieldType,
   PredictionResult,
   RefusalError,
+  TrainingCurvesOptions,
   TrainingJob,
   TrainingJobStatus,
   TrainingMetricGroup,
