@@ -603,5 +603,54 @@ describe('ModelCreateWizard', () => {
       expect(selectedCards(wrapper)).toEqual(['Random Forest'])
       expect(wrapper.find('.vmlb-guide-rec-current').text()).toContain('Applied')
     })
+
+    describe('the guide settles the settings too', () => {
+      const answer = async (wrapper: ReturnType<typeof mount>, text: string) =>
+        wrapper.findAll('.vmlb-guide-option').find((t) => t.text().includes(text))!.trigger('click')
+
+      it('sends the settings the guide chose, weighted for rare labels the overview counts', async () => {
+        const createModel = vi.fn().mockResolvedValue({ id: 'm-1' })
+        const getEdaData = vi.fn().mockResolvedValue({ task_specific_analysis: { label_distribution: { Granted: 90, Refused: 10 } } })
+        const adapter = createTestAdapter({
+          listDatasets: vi.fn().mockResolvedValue([dataset({ labels: ['Granted', 'Refused'] })]),
+          getEdaData,
+          createModel,
+          startTraining: vi.fn().mockResolvedValue({ job_id: 'j' }),
+        })
+        const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+        await flushPromises()
+        expect(getEdaData).toHaveBeenCalledWith('ds-1')
+
+        await answer(wrapper, 'Getting as many results right as possible')
+        await flushPromises()
+        expect(wrapper.find('.vmlb-guide-rec-desc').text()).toContain('rare labels count for more')
+
+        await wrapper.find('.vmlb-actions .vmlb-btn-primary').trigger('click')
+        await flushPromises()
+        expect(createModel.mock.calls[0][0]).toMatchObject({
+          model_type: 'random_forest',
+          parameters: { n_estimators: 200, class_weight: 'balanced', max_depth: null },
+        })
+      })
+
+      it('steers a small Dataset to a Model it can use', async () => {
+        const adapter = createTestAdapter({
+          listDatasets: vi.fn().mockResolvedValue([dataset({ row_count: 300 })]),
+          getAvailableModelTypes: vi.fn().mockResolvedValue({
+            classification: {
+              logistic_regression: { name: 'Logistic Regression', description: '', parameters: { C: { type: 'float', default: 1, min: 0.001, max: 100, description: 'C' } } },
+              legalbert: { name: 'LegalBERT', description: '', parameters: { epochs: { type: 'int', default: 3, min: 1, max: 10, description: 'Epochs' } } },
+            },
+          }),
+        })
+        const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+        await flushPromises()
+
+        await answer(wrapper, 'The best results, even if training takes much longer')
+        await flushPromises()
+        expect(selectedCards(wrapper)).toEqual(['Logistic Regression'])
+        expect(wrapper.find('.vmlb-guide-rec-desc').text()).toContain('only 300 documents')
+      })
+    })
   })
 })

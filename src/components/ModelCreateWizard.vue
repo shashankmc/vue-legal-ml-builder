@@ -60,6 +60,8 @@ const backendInfo = ref<Record<string, ModelTypeInfo>>({})
 // Label names from the dataset's overview, for datasets uploaded with their
 // labels in a column rather than declared up front.
 const overviewLabels = ref<string[] | null>(null)
+// How many documents carry each label, so the guide can weight rare labels up.
+const labelCounts = ref<Record<string, number> | null>(null)
 
 const staticModels = computed<string[]>(() =>
   selectedDataset.value ? (modelsByTaskType[selectedDataset.value.task_type] || []) : [],
@@ -136,14 +138,19 @@ async function loadBackendModels() {
 
 async function loadOverviewLabels() {
   overviewLabels.value = null
+  labelCounts.value = null
   const dataset = selectedDataset.value
-  if (!adapter.value || !dataset || dataset.labels?.length) return
+  if (!adapter.value || !dataset) return
   try {
     const eda = await adapter.value.getEdaData(dataset.id)
     if (selectedDataset.value !== dataset) return
-    const distribution = (eda?.task_specific_analysis?.label_distribution ?? {}) as Record<string, number>
+    const analysis = eda?.task_specific_analysis ?? {}
+    // A judgment Dataset counts its outcomes under their own name.
+    const distribution = (analysis.label_distribution ?? analysis.judgment_distribution ?? {}) as Record<string, number>
     const labels = Object.entries(distribution).sort(([, a], [, b]) => b - a).map(([label]) => label)
-    overviewLabels.value = labels.length ? labels : null
+    labelCounts.value = labels.length ? distribution : null
+    // Labels declared up front are the Dataset's own; the overview only fills in.
+    if (!dataset.labels?.length) overviewLabels.value = labels.length ? labels : null
   } catch {
     overviewLabels.value = null // the generic wording still reads correctly
   }
@@ -263,6 +270,10 @@ async function createModel() {
           <ModelQuestionTree
             :task-type="selectedDataset.task_type"
             :current-model-type="modelType"
+            :row-count="selectedDataset.row_count"
+            :label-counts="labelCounts"
+            :catalogue="backendInfo"
+            :available-models="availableModels"
             auto-apply
             @select="selectModelType"
           />

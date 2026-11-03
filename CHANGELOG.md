@@ -21,6 +21,15 @@ tagged `vX.Y.Z`.
 - `MLAdapter.updateModel(id, { name?, parameters? })`, optional, renames a Model or replaces
   its settings. `createSelfHostedAdapter` sends it as `PUT /models/<id>`, and a refusal keeps
   its `field` as with `createModel`.
+- The guide settles settings as well as the Model, and says why in one or two plain sentences. A `GuideOption` can
+  carry `settings: { parameters, why }`. Its answers on rules a colleague can follow, getting the most results right,
+  and setting unusual documents aside now come with a shorter tree, more trees and comparing documents by their words.
+- The guide fits its advice to the Dataset. When the most common label is at least three times the rarest, it weights
+  rare labels up wherever the Model can. Below 1,000 documents it recommends a Model other than LegalBERT or RoBERTa.
+  `adviseFor(option, facts?, context?)` gives this advice to a host. Its settings go through the same schema and rules
+  as the settings form, using the backend's catalogue when given, so the backend does not refuse them.
+- `ModelQuestionTree` takes optional `rowCount`, `labelCounts`, `catalogue` and `availableModels`, and
+  `ModelCreateWizard` passes them. The wizard now reads the Dataset's overview even when the Dataset declares its labels.
 
 ### Changed
 
@@ -30,7 +39,8 @@ tagged `vX.Y.Z`.
   summary are gone, and `.vmlb-show-models` now reads "Choose a model myself".
 - The guide's questions and answers are in plain words, and its recommendation gives the reason for the answer
   instead of the model's technical description. Hosts or tests that match the old wording must update it.
-- `ModelQuestionTree`'s `select` event is typed `select(modelType, parameters?)`. It still emits only the model type.
+- `ModelQuestionTree`'s `select` event is `select(modelType, parameters)`, and now sends the recommended settings
+  with the Model. With `autoApply` it sends them again if the Dataset's facts arrive later and change the advice.
 
 ### Removed
 
