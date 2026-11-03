@@ -131,7 +131,7 @@ describe('decisionTreeFor', () => {
       const tree = decisionTreeFor(task)
       if (!tree) continue
       for (const node of Object.values(tree.nodes)) {
-        for (const text of [node.question, node.help, ...node.options.flatMap((o) => [o.label, o.note])]) {
+        for (const text of [node.question, node.help, ...node.options.flatMap((o) => [o.label, o.note, o.settings?.why])]) {
           if (text) expect(text, task).not.toMatch(jargon)
         }
       }

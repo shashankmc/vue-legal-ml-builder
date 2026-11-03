@@ -34,7 +34,7 @@ const CLASSIFICATION: DecisionTree = {
       help: 'There is no wrong answer. You can change the model before you train it.',
       options: [
         { label: 'Being able to explain each result', next: 'explain' },
-        { label: 'Getting as many results right as possible', recommend: 'random_forest', note: 'It combines many simple rules, which tends to get more results right.' },
+        { label: 'Getting as many results right as possible', recommend: 'random_forest', note: 'It combines many simple rules, which tends to get more results right.', settings: { parameters: { n_estimators: 200 }, why: 'it combines 200 sets of rules rather than 100, which takes longer but tends to get more right' } },
         { label: 'Quick results on a lot of documents', recommend: 'naive_bayes', note: 'It learns from thousands of documents in seconds.' },
         { label: 'Telling apart documents that use similar words', recommend: 'svm', note: 'It draws a sharp line between labels that look alike.' },
         { label: 'The best results, even if training takes much longer', recommend: 'legalbert', note: 'It reads each word in its context and has already read a lot of legal text, but training can take hours.' },
@@ -70,7 +70,7 @@ const CLUSTERING: DecisionTree = {
     outliers: {
       question: 'Should unusual documents be set aside rather than put in a group?',
       options: [
-        { label: 'Yes, set them aside', recommend: 'dbscan', note: 'It finds groups of any size and lists the documents that fit none.' },
+        { label: 'Yes, set them aside', recommend: 'dbscan', note: 'It finds groups of any size and lists the documents that fit none.', settings: { parameters: { metric: 'cosine' }, why: 'it compares documents by the words they share, so long and short documents can still be grouped together' } },
         { label: 'No, put every document in a group', recommend: 'hierarchical', note: 'Every document joins a group, and you choose how broad the groups are.' },
       ],
     },
