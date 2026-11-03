@@ -38,9 +38,17 @@ export interface CurveSeries {
   y: number[]
 }
 
+/** A learning curve's points (legal-ml-core `monitoring.learning_curve`) carry
+ * the training-set size as their `training_step`, so they get a chart of their own. */
+const LEARNING_CURVE_PREFIX = 'learning_curve_'
+
+export function isLearningCurvePoint(point: TrainingMetricPoint): boolean {
+  return point.metric_name.startsWith(LEARNING_CURVE_PREFIX)
+}
+
 export interface CurveChart {
-  /** The group charted, or `all` when grouping is off. */
-  group: CurveGroup | 'all'
+  /** The group charted, `all` when grouping is off, or `learning_curve`. */
+  group: CurveGroup | 'all' | 'learning_curve'
   title: string
   xAxisTitle: string
   series: CurveSeries[]
@@ -90,21 +98,30 @@ function smooth(values: number[], weight: number): number[] {
 }
 
 /** One chart per group that has points, so values on different scales are not
- * drawn against one axis. Stage markers are left to `stageEvents`. */
+ * drawn against one axis, then the learning curve, whose x is the training-set
+ * size, whatever the grouping. Stage markers are left to `stageEvents`. */
 export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOptions = {}): CurveChart[] {
   const xAxis = options.xAxis ?? 'step'
   const shown = options.metrics ? new Set(options.metrics) : null
-  const curves = points.filter((p) => metricGroupOf(p) !== 'stage' && (!shown || shown.has(p.metric_name)))
-  const buckets: Array<Pick<CurveChart, 'group' | 'title'> & { points: TrainingMetricPoint[] }> =
-    options.groupBy === 'none'
-      ? [{ group: 'all', title: 'Metrics', points: curves }]
+  const shownCurves = points.filter((p) => metricGroupOf(p) !== 'stage' && (!shown || shown.has(p.metric_name)))
+  const curves = shownCurves.filter((p) => !isLearningCurvePoint(p))
+  const buckets: Array<Pick<CurveChart, 'group' | 'title'> & { xAxisTitle?: string; points: TrainingMetricPoint[] }> = [
+    ...(options.groupBy === 'none'
+      ? [{ group: 'all' as const, title: 'Metrics', points: curves }]
       : CURVE_GROUPS.map((group) => ({
           group,
           title: CHART_TITLES[group],
           points: curves.filter((p) => metricGroupOf(p) === group),
-        }))
+        }))),
+    {
+      group: 'learning_curve',
+      title: 'Learning curve',
+      xAxisTitle: 'Training examples',
+      points: shownCurves.filter(isLearningCurvePoint),
+    },
+  ]
   const charts: CurveChart[] = []
-  for (const { group, title, points: inGroup } of buckets) {
+  for (const { group, title, xAxisTitle: fixedXAxisTitle, points: inGroup } of buckets) {
     if (!inGroup.length) continue
     const byMetric = new Map<string, TrainingMetricPoint[]>()
     for (const p of inGroup) {
@@ -114,7 +131,7 @@ export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOp
     charts.push({
       group,
       title,
-      xAxisTitle: xAxisTitle(inGroup, xAxis),
+      xAxisTitle: fixedXAxisTitle ?? xAxisTitle(inGroup, xAxis),
       series: [...byMetric].map(([metric, series]) => ({
         metric,
         x: series.map((p) => xOf(p, xAxis)),

@@ -69,6 +69,40 @@ describe('curveCharts', () => {
     expect(chart.series[0].x).toEqual([0.5, 1])
   })
 
+  it('plots learning-curve points on their own chart, against the training-set size', () => {
+    const charts = curveCharts([
+      point('loss', { group: 'train', training_step: 1 }),
+      point('learning_curve_train_accuracy', { group: 'train', training_step: 3, value: 1 }),
+      point('learning_curve_eval_accuracy', { group: 'eval', training_step: 3, value: 0.5 }),
+      point('learning_curve_train_accuracy', { group: 'train', training_step: 32, value: 0.9 }),
+      point('learning_curve_eval_accuracy', { group: 'eval', training_step: 32, value: 0.8 }),
+      point('eval_loss', { group: 'eval', training_step: 1 }),
+    ])
+
+    expect(charts.map((c) => c.group)).toEqual(['train', 'eval', 'learning_curve'])
+    expect(charts[0].series.map((s) => s.metric)).toEqual(['loss'])
+    expect(charts[1].series.map((s) => s.metric)).toEqual(['eval_loss'])
+    const curve = charts[2]
+    expect(curve.title).toBe('Learning curve')
+    expect(curve.xAxisTitle).toBe('Training examples')
+    expect(curve.series).toEqual([
+      { metric: 'learning_curve_train_accuracy', x: [3, 32], y: [1, 0.9] },
+      { metric: 'learning_curve_eval_accuracy', x: [3, 32], y: [0.5, 0.8] },
+    ])
+  })
+
+  it('keeps the learning curve on its own chart when grouping is off', () => {
+    const charts = curveCharts(
+      [point('loss', { training_step: 1 }), point('learning_curve_eval_accuracy', { group: 'eval', training_step: 8 })],
+      { groupBy: 'none' },
+    )
+
+    expect(charts.map((c) => [c.group, c.series.map((s) => s.metric)])).toEqual([
+      ['all', ['loss']],
+      ['learning_curve', ['learning_curve_eval_accuracy']],
+    ])
+  })
+
   it('has no charts when a run only has stage markers', () => {
     expect(curveCharts([point('training_started', { group: 'stage' })])).toEqual([])
   })
