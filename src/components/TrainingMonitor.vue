@@ -1,13 +1,26 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import type { MLAdapter } from '../types'
+import type { MLAdapter, TrainingCurvesOptions } from '../types'
 import { useTraining } from '../composables/useTraining'
 import { numericMetric } from '../utils/metrics'
 import ConfusionMatrix from './shared/ConfusionMatrix.vue'
 import TrainingCurves from './TrainingCurves.vue'
 import Icon from './shared/Icon.vue'
 
-const props = defineProps<{ adapter?: MLAdapter; modelId: string; jobId?: string }>()
+const props = withDefaults(
+  defineProps<{ adapter?: MLAdapter; modelId: string; jobId?: string } & TrainingCurvesOptions>(),
+  // Left unset, not false, so TrainingCurves can apply an app-wide default.
+  { logScale: undefined },
+)
+// The curve settings, passed through to TrainingCurves.
+const curveOptions = computed<TrainingCurvesOptions>(() => ({
+  metrics: props.metrics,
+  groupBy: props.groupBy,
+  xAxis: props.xAxis,
+  pollIntervalMs: props.pollIntervalMs,
+  smoothing: props.smoothing,
+  logScale: props.logScale,
+}))
 const emit = defineEmits<{ complete: []; stopped: [] }>()
 
 const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
@@ -100,7 +113,7 @@ function milestoneState(pct: number, index: number) {
           <span class="vmlb-muted">{{ m.label }}</span>
         </div>
       </div>
-      <TrainingCurves v-if="job" :adapter="adapter ?? undefined" :job-id="job.id" :job-status="job.status" />
+      <TrainingCurves v-if="job" v-bind="curveOptions" :adapter="adapter ?? undefined" :job-id="job.id" :job-status="job.status" />
     </div>
 
     <!-- Ready to train -->

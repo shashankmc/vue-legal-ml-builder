@@ -7,23 +7,7 @@ import PlotlyChart from './shared/PlotlyChart.vue'
 import Icon from './shared/Icon.vue'
 
 const props = withDefaults(
-  defineProps<{
-    adapter?: MLAdapter
-    jobId: string
-    jobStatus?: string
-    /** Only these metric names are drawn. Default: every metric. */
-    metrics?: string[]
-    /** `group` (default) draws one chart per group; `none` draws every metric on one chart. */
-    groupBy?: 'group' | 'none'
-    /** `step` (default) or `epoch`. */
-    xAxis?: 'step' | 'epoch'
-    /** Moving-average weight from 0 (default, raw values) to just below 1. */
-    smoothing?: number
-    /** Draw values on a log scale. Default false. */
-    logScale?: boolean
-    /** How often a running job is polled for new points. Default 3000. */
-    pollIntervalMs?: number
-  }>(),
+  defineProps<{ adapter?: MLAdapter; jobId: string; jobStatus?: string } & TrainingCurvesOptions>(),
   // Left unset, not false, so an app-wide default can apply.
   { logScale: undefined },
 )
