@@ -255,17 +255,41 @@ export function createMockAdapter(): MLAdapter {
   }
 }
 
-function simulateTraining(jobId: string, modelId: string) {
-  const phases: Array<[string, number]> = [
-    ['preprocessing_started', 0],
-    ['preprocessing_done', 25],
-    ['training_started', 25],
-    ['training_done', 75],
-    ['model_saved', 100],
+type DemoPoint = Pick<TrainingMetricPoint, 'metric_name' | 'group' | 'value' | 'epoch' | 'training_step'>
+
+const stage = (metric_name: string): DemoPoint => ({ metric_name, group: 'stage', value: 1, epoch: null, training_step: null })
+
+/** A short fine-tuning run: stages, a falling loss every 10 steps and an
+ * evaluation after each of the two epochs. Each entry is one tick. */
+function demoRun(): Array<{ points: DemoPoint[]; progress: number }> {
+  const ticks: Array<{ points: DemoPoint[]; progress: number }> = [
+    { points: [stage('preprocessing_started')], progress: 0 },
+    { points: [stage('preprocessing_done'), stage('training_started')], progress: 25 },
   ]
+  const stepsPerEpoch = 40
+  for (let step = 10; step <= stepsPerEpoch * 2; step += 10) {
+    const epoch = step / stepsPerEpoch
+    const points: DemoPoint[] = [
+      { metric_name: 'loss', group: 'train', value: 0.7 * Math.exp(-step / 60) + 0.1, epoch, training_step: step },
+      { metric_name: 'learning_rate', group: 'train', value: 2e-5 * (1 - step / (stepsPerEpoch * 2)), epoch, training_step: step },
+    ]
+    if (step % stepsPerEpoch === 0) {
+      points.push(
+        { metric_name: 'eval_loss', group: 'eval', value: 0.5 - epoch * 0.1, epoch, training_step: step },
+        { metric_name: 'eval_accuracy', group: 'eval', value: 0.8 + epoch * 0.05, epoch, training_step: step },
+      )
+    }
+    ticks.push({ points, progress: 25 + Math.round((50 * step) / (stepsPerEpoch * 2)) })
+  }
+  ticks.push({ points: [stage('training_done')], progress: 75 }, { points: [stage('model_saved')], progress: 100 })
+  return ticks
+}
+
+function simulateTraining(jobId: string, modelId: string) {
+  const ticks = demoRun()
   let i = 0
   const interval = setInterval(() => {
-    if (i >= phases.length) {
+    if (i >= ticks.length) {
       clearInterval(interval)
       const job = jobs[jobId]
       const model = models.find((m) => m.id === modelId)
@@ -276,9 +300,12 @@ function simulateTraining(jobId: string, modelId: string) {
       }
       return
     }
-    const [name, pct] = phases[i]
-    metricPoints[jobId].push({ id: `pt-${jobId}-${i}`, training_job_id: jobId, step: i, epoch: null, metric_name: name, value: 1, created_at: new Date().toISOString() })
-    if (jobs[jobId]) jobs[jobId].progress = pct
+    const series = metricPoints[jobId]
+    for (const p of ticks[i].points) {
+      const step = series.length
+      series.push({ id: `pt-${jobId}-${step}`, training_job_id: jobId, step, created_at: new Date().toISOString(), ...p })
+    }
+    if (jobs[jobId]) jobs[jobId].progress = ticks[i].progress
     i++
   }, 1200)
 }
