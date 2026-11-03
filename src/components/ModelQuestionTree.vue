@@ -1,41 +1,62 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { allModelInfo } from './modelCatalogData'
-import { decisionTreeFor } from '../lens/modelGuide'
+import { adviseFor, decisionTreeFor } from '../lens/modelGuide'
 import type { GuideOption } from '../lens/modelGuide'
+import type { ModelTypeInfo } from '../types'
 
-const props = defineProps<{ taskType: string; currentModelType?: string; autoApply?: boolean }>()
-// `select` applies the recommendation's model + default parameters. Emitted
-// automatically once a leaf is reached (when `autoApply`) and by the explicit
-// "Use …" button otherwise. `parameters` is reserved for per-answer settings.
+const props = defineProps<{
+  taskType: string
+  currentModelType?: string
+  autoApply?: boolean
+  /** What is known about the Dataset, which fits the advice to it. */
+  rowCount?: number
+  labelCounts?: Record<string, number> | null
+  /** What the backend offers for each Model, and the Models the Dataset can use. */
+  catalogue?: Record<string, ModelTypeInfo>
+  availableModels?: string[]
+}>()
+// `select` applies the recommended model and the settings that come with it.
+// Emitted automatically once a leaf is reached (when `autoApply`), and again if
+// the Dataset's facts change the advice, and by the explicit "Use …" button otherwise.
 const emit = defineEmits<{ select: [modelType: string, parameters?: Record<string, unknown>] }>()
 
 const currentNodeId = ref<string>('')
 const history = ref<Array<{ question: string; answer: string; nodeId: string }>>([])
-const recommendation = ref<string>('')
-// Why the answer leads to the Model, in the guide's own words.
-const reason = ref<string>('')
+// The answer that reached a recommendation.
+const answered = ref<GuideOption | null>(null)
 
 const tree = computed(() => decisionTreeFor(props.taskType))
 const currentNode = computed(() => (tree.value ? tree.value.nodes[currentNodeId.value] ?? null : null))
+const advice = computed(() =>
+  answered.value
+    ? adviseFor(answered.value, { rowCount: props.rowCount, labelCounts: props.labelCounts }, { catalogue: props.catalogue, available: props.availableModels })
+    : null,
+)
+const recommendation = computed(() => advice.value?.modelType ?? '')
 const recommendedInfo = computed(() => (recommendation.value ? allModelInfo[recommendation.value] : null))
 
 function reset() {
   currentNodeId.value = tree.value?.root ?? ''
   history.value = []
-  recommendation.value = ''
-  reason.value = ''
+  answered.value = null
 }
 
 watch(() => props.taskType, reset, { immediate: true })
+
+const apply = () => advice.value && emit('select', advice.value.modelType, advice.value.parameters)
+
+// The overview can arrive after the answer, and change what fits the Dataset.
+watch(() => JSON.stringify(advice.value), (now, before) => {
+  if (props.autoApply && advice.value && before !== 'null' && now !== before) apply()
+})
 
 function choose(option: GuideOption) {
   if (!currentNode.value) return
   history.value = [...history.value, { question: currentNode.value.question, answer: option.label, nodeId: currentNodeId.value }]
   if (option.recommend) {
-    recommendation.value = option.recommend
-    reason.value = option.note ? `Recommended because ${option.note.charAt(0).toLowerCase()}${option.note.slice(1)}` : ''
-    if (props.autoApply) emit('select', option.recommend)
+    answered.value = option
+    if (props.autoApply) apply()
     return
   }
   if (option.next) currentNodeId.value = option.next
@@ -59,7 +80,7 @@ function choose(option: GuideOption) {
     <div v-if="recommendedInfo" class="vmlb-guide-result">
       <p class="vmlb-guide-rec-label">Recommended model</p>
       <p class="vmlb-guide-rec-name">{{ recommendedInfo.label }}</p>
-      <p v-if="reason" class="vmlb-guide-rec-desc">{{ reason }}</p>
+      <p v-if="advice?.why" class="vmlb-guide-rec-desc">{{ advice.why }}</p>
       <p v-if="currentModelType === recommendation" class="vmlb-guide-rec-current">
         {{ autoApply ? 'Applied — adjust below if needed' : 'Currently selected' }}
       </p>
@@ -67,7 +88,7 @@ function choose(option: GuideOption) {
         v-else
         type="button"
         class="vmlb-btn-primary vmlb-guide-use"
-        @click="emit('select', recommendation)"
+        @click="apply"
       >
         Use {{ recommendedInfo.label }}
       </button>
