@@ -127,7 +127,7 @@ describe('curveCharts', () => {
 
     expect(charts.map((c) => [c.group, c.title, c.unit, c.series.map((s) => s.metric)])).toEqual([
       ['system', 'Memory (MB)', 'MB', ['memory_mb']],
-      ['system', 'Speed (samples per second)', 'samples per second', ['samples_per_second']],
+      ['system', 'Speed (samples/s)', 'samples/s', ['samples_per_second']],
       ['learning_curve', 'Learning curve', undefined, ['learning_curve_train_accuracy', 'learning_curve_eval_accuracy']],
     ])
     expect(charts[2].xAxisTitle).toBe('Training examples')
@@ -148,10 +148,23 @@ describe('curveCharts', () => {
       ['train', 'Training', undefined],
       ['system', 'Memory (MB)', 'MB'],
       ['system', 'GPU use (%)', '%'],
-      ['system', 'Speed (samples per second)', 'samples per second'],
-      ['system', 'Time remaining (seconds)', 'seconds'],
+      ['system', 'Speed (samples/s)', 'samples/s'],
+      ['system', 'Time remaining (s)', 's'],
     ])
     expect(charts[1].series.map((s) => s.metric)).toEqual(['memory_mb', 'gpu_memory_mb'])
+  })
+
+  it('uses the unit legal-ml-core gives a resource reading', () => {
+    const charts = curveCharts([
+      point('memory_mb', { group: 'system', unit: 'MB' }),
+      point('vram', { group: 'system', unit: 'MB' }),
+      point('samples_per_second', { group: 'system', unit: 'samples/s' }),
+    ])
+
+    expect(charts.map((c) => [c.title, c.unit, c.series.map((s) => s.metric)])).toEqual([
+      ['Memory (MB)', 'MB', ['memory_mb', 'vram']],
+      ['Speed (samples/s)', 'samples/s', ['samples_per_second']],
+    ])
   })
 
   it('takes the unit of a resource reading it does not know from its name', () => {

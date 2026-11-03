@@ -32,15 +32,23 @@ export function metricGroupOf(point: TrainingMetricPoint): TrainingMetricGroup {
   return 'train'
 }
 
-/** A resource reading's unit, from the end of its name: `_mb`, `_percent`,
- * `<what>_per_second`, or `seconds_` / `_seconds`. */
+/** A resource reading's unit, from the end of its name, as legal-ml-core
+ * names it: `_mb` is `MB`, `_percent` is `%`, `<what>_per_second` is
+ * `<what>/s`, and `seconds_` / `_seconds` is `s`. For points from a host on an
+ * older legal-ml-core, which carry no `unit`. */
 export function metricUnitOf(metricName: string): string | undefined {
   if (metricName.endsWith('_mb')) return 'MB'
   if (metricName.endsWith('_percent')) return '%'
   const rate = metricName.match(/^(.+)_per_second$/)
-  if (rate) return `${rate[1].replace(/_/g, ' ')} per second`
-  if (metricName.startsWith('seconds_') || metricName.endsWith('_seconds')) return 'seconds'
+  if (rate) return `${rate[1]}/s`
+  if (metricName.startsWith('seconds_') || metricName.endsWith('_seconds')) return 's'
   return undefined
+}
+
+/** The point's unit: the one legal-ml-core gives it, else read from its name. */
+function unitOf(point: TrainingMetricPoint): string | undefined {
+  if (point.unit !== undefined) return point.unit ?? undefined
+  return metricUnitOf(point.metric_name)
 }
 
 // What the readings legal-ml-core takes are called on their chart.
@@ -138,7 +146,7 @@ function smooth(values: number[], weight: number): number[] {
 function byUnit(points: TrainingMetricPoint[]): Array<Pick<CurveChart, 'group' | 'title' | 'unit'> & { points: TrainingMetricPoint[] }> {
   const units = new Map<string | undefined, TrainingMetricPoint[]>()
   for (const p of points) {
-    const unit = metricUnitOf(p.metric_name)
+    const unit = unitOf(p)
     if (!units.has(unit)) units.set(unit, [])
     units.get(unit)!.push(p)
   }

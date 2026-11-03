@@ -74,9 +74,9 @@ describe('TrainingCurves', () => {
     ])
 
     const charts = wrapper.findAll('.vmlb-curves-chart[data-group="system"]')
-    expect(charts.map((c) => c.find('h4').text())).toEqual(['Memory (MB)', 'Speed (samples per second)'])
+    expect(charts.map((c) => c.find('h4').text())).toEqual(['Memory (MB)', 'Speed (samples/s)'])
     const plots = wrapper.findAllComponents(PlotlyChart)
-    expect(plots.map((p) => p.props('plotData').layout.yaxis.title)).toEqual(['MB', 'samples per second'])
+    expect(plots.map((p) => p.props('plotData').layout.yaxis.title)).toEqual(['MB', 'samples/s'])
     expect(new Set(plots.map((p) => p.props('plotId'))).size).toBe(2)
   })
 
