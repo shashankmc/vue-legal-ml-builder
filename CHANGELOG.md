@@ -13,6 +13,11 @@ tagged `vX.Y.Z`.
 
 ### Added
 
+- `TrainingMetricPoint` has `group` (`TrainingMetricGroup`: `train`, `eval`, `system` or
+  `stage`) and, for fine-tuning, `training_step`, the trainer's own step. `step` stays the
+  polling cursor. A point without a group gets one from its name, as legal-ml-core does.
+  `TRAINING_METRIC_GROUPS`, `metricGroupOf`, `curveCharts` and `stageEvents` are exported
+  for hosts that draw their own curves.
 - `TrainingMonitor` has a Stop training button while a run is in progress. It asks inline
   before stopping, so hosts need no dialog of their own. A stopped run then reads Training
   stopped, with Train again, instead of Training failed, and the component emits `stopped`.
@@ -40,6 +45,11 @@ tagged `vX.Y.Z`.
 
 ### Changed
 
+- `TrainingCurves` draws one chart per group (Training, Evaluation, System), each against
+  the training step, falling back to the epoch. Stage markers are listed as labelled events
+  instead of lines at 1.0. The single `#vmlb-training-curves` chart is now one
+  `.vmlb-curves-chart` per group, with plot ids `vmlb-training-curves-<group>`.
+- The demo adapter's training run has a loss curve and two evaluations as well as its stages.
 - `ModelCreateWizard` opens the model step on the guide questions instead of folding them away. "Choose a model myself"
   swaps them for the full grid, and "Help me choose instead" brings them back. The default model is still chosen, so
   skipping the questions changes nothing. The `details.vmlb-chooser` disclosure and its "Help me choose a model"

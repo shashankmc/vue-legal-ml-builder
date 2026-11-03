@@ -108,6 +108,8 @@ export { useModels } from './composables/useModels'
 export { useParameterComparison } from './composables/useParameterComparison'
 export { useTraining } from './composables/useTraining'
 export { useTrainingCurves } from './composables/useTrainingCurves'
+export { TRAINING_METRIC_GROUPS, curveCharts, metricGroupOf, stageEvents } from './utils/trainingCharts'
+export type { CurveChart, CurveSeries, StageEvent } from './utils/trainingCharts'
 
 export { allModelInfo, modelsByTaskType, parameterRules, parameterSchemas, quickGuideFor, taskTypeLabel } from './components/modelCatalogData'
 export { classColor, defaultLabels, lensCopy, lensFamily } from './lens/modelLens'
@@ -145,5 +147,6 @@ export type {
   RefusalError,
   TrainingJob,
   TrainingJobStatus,
+  TrainingMetricGroup,
   TrainingMetricPoint,
 } from './types'

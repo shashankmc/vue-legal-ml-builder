@@ -1,0 +1,94 @@
+import { describe, expect, it } from 'vitest'
+import { curveCharts, metricGroupOf, stageEvents } from '../src/utils/trainingCharts'
+import type { TrainingMetricPoint } from '../src/types'
+
+let nextStep = 0
+function point(metric_name: string, overrides: Partial<TrainingMetricPoint> = {}): TrainingMetricPoint {
+  const step = nextStep++
+  return {
+    id: `p${step}`,
+    training_job_id: 'job-1',
+    step,
+    epoch: null,
+    training_step: null,
+    metric_name,
+    group: 'train',
+    value: 1,
+    created_at: '2026-11-03T10:00:00',
+    ...overrides,
+  }
+}
+
+describe('metricGroupOf', () => {
+  it('uses the group the point carries', () => {
+    expect(metricGroupOf(point('gpu_memory', { group: 'system' }))).toBe('system')
+  })
+
+  it('gives a point from an older host a group from its name', () => {
+    const legacy = (name: string) => metricGroupOf(point(name, { group: undefined }))
+
+    expect(legacy('eval_accuracy')).toBe('eval')
+    expect(legacy('training_started')).toBe('stage')
+    expect(legacy('model_saved')).toBe('stage')
+    expect(legacy('loss')).toBe('train')
+  })
+})
+
+describe('curveCharts', () => {
+  it('draws one chart per group, in a fixed order, leaving out stage markers', () => {
+    const charts = curveCharts([
+      point('eval_loss', { group: 'eval', training_step: 20 }),
+      point('training_started', { group: 'stage' }),
+      point('loss', { group: 'train', training_step: 10 }),
+      point('learning_rate', { group: 'train', training_step: 10 }),
+    ])
+
+    expect(charts.map((c) => c.group)).toEqual(['train', 'eval'])
+    expect(charts[0].series.map((s) => s.metric)).toEqual(['loss', 'learning_rate'])
+    expect(charts[1].series.map((s) => s.metric)).toEqual(['eval_loss'])
+  })
+
+  it('plots fine-tuning points against the training step', () => {
+    const [chart] = curveCharts([
+      point('loss', { training_step: 10, epoch: 0.5, value: 0.7 }),
+      point('loss', { training_step: 20, epoch: 1, value: 0.6 }),
+    ])
+
+    expect(chart.xAxisTitle).toBe('Training step')
+    expect(chart.series[0].x).toEqual([10, 20])
+    expect(chart.series[0].y).toEqual([0.7, 0.6])
+  })
+
+  it('falls back to the epoch when a point has no training step', () => {
+    const [chart] = curveCharts([
+      point('loss', { epoch: 0.5 }),
+      point('loss', { epoch: 1 }),
+    ])
+
+    expect(chart.xAxisTitle).toBe('Epoch')
+    expect(chart.series[0].x).toEqual([0.5, 1])
+  })
+
+  it('has no charts when a run only has stage markers', () => {
+    expect(curveCharts([point('training_started', { group: 'stage' })])).toEqual([])
+  })
+})
+
+describe('stageEvents', () => {
+  it('lists the stage markers in order, with a plain label', () => {
+    const events = stageEvents([
+      point('preprocessing_started', { group: 'stage', created_at: '2026-11-03T10:00:00' }),
+      point('loss'),
+      point('training_done', { group: undefined, created_at: '2026-11-03T10:05:00' }),
+    ])
+
+    expect(events).toEqual([
+      { name: 'preprocessing_started', label: 'Preparing the data', at: '2026-11-03T10:00:00' },
+      { name: 'training_done', label: 'Training finished', at: '2026-11-03T10:05:00' },
+    ])
+  })
+
+  it('shows an unknown stage by its name', () => {
+    expect(stageEvents([point('warmup_done', { group: 'stage' })])[0].label).toBe('warmup done')
+  })
+})

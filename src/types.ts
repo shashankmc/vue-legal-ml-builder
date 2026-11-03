@@ -63,12 +63,23 @@ export interface TrainingJob {
   created_at: string
 }
 
+/** Which chart a metric point belongs on: `train` (loss, learning rate),
+ * `eval` (scores on the evaluation split), `system` (resources and
+ * throughput) or `stage` (the run's milestones, drawn as events). */
+export type TrainingMetricGroup = 'train' | 'eval' | 'system' | 'stage'
+
 export interface TrainingMetricPoint {
   id: Id
   training_job_id: Id
+  /** Write counter and polling cursor, not the trainer's step. */
   step: number
   epoch: number | null
+  /** The trainer's own step, for fine-tuning; null otherwise. */
+  training_step?: number | null
   metric_name: string
+  /** Left out by hosts on an older legal-ml-core; `metricGroupOf` then
+   * derives it from the name. */
+  group?: TrainingMetricGroup
   value: number
   created_at: string
 }
