@@ -1,4 +1,4 @@
-import { createApp, reactive, type Component } from 'vue'
+import { createApp, h, reactive, type Component } from 'vue'
 
 export interface MountedComponent {
   /** Reassigns into the same reactive props object the app was created with. */
@@ -22,7 +22,9 @@ export function mountComponent(
   initialProps: Record<string, unknown> = {},
 ): MountedComponent {
   const props = reactive({ ...initialProps })
-  const app = createApp(component, props)
+  // Rendered through a function that reads the props: Vue copies a root props
+  // object once, so changes made to it later would never reach the component.
+  const app = createApp({ render: () => h(component, { ...props }) })
   app.mount(el)
 
   return {
