@@ -1,5 +1,5 @@
-import { allModelInfo, parameterRules, parameterSchemas } from '../components/modelCatalogData'
-import { mergeSchema, reconcileChoices } from '../components/parameterOptions'
+import { allModelInfo } from '../components/modelCatalogData'
+import { reconcileChoices, settingsSetup } from '../components/parameterOptions'
 import type { ModelTypeInfo } from '../types'
 
 export interface GuideOption {
@@ -143,42 +143,47 @@ function imbalanced(labelCounts?: Record<string, number> | null): boolean {
  * and a choice a rule forbids is moved as the form would move it. */
 export function adviseFor(option: GuideOption, facts: DatasetFacts = {}, context: GuideContext = {}): GuideAdvice {
   const recommended = option.recommend ?? ''
-  const small = facts.rowCount !== undefined && facts.rowCount < SMALL_DATASET_ROWS
-  const instead = small && NEEDS_MANY_DOCUMENTS.includes(recommended)
+  const tooFewDocuments = facts.rowCount !== undefined && facts.rowCount < SMALL_DATASET_ROWS
+  const forFewerDocuments = tooFewDocuments && NEEDS_MANY_DOCUMENTS.includes(recommended)
     ? FOR_FEWER_DOCUMENTS.find((type) => context.available?.includes(type) ?? true)
     : undefined
-  const modelType = instead ?? recommended
-  const schema = mergeSchema(parameterSchemas[modelType] ?? [], context.catalogue?.[modelType], facts.rowCount)
-  const has = (key: string) => schema.some((p) => p.key === key)
+  const modelType = forFewerDocuments ?? recommended
+  const { schema, rules, multiclass } = settingsSetup(modelType, {
+    modelInfo: context.catalogue?.[modelType],
+    rowCount: facts.rowCount,
+    labels: Object.keys(facts.labelCounts ?? {}),
+  })
+  const offers = (key: string) => schema.some((p) => p.key === key)
   const label = (type: string) => allModelInfo[type]?.label ?? type
   const reasons = [
-    instead
-      ? `Recommended because this Dataset has only ${facts.rowCount!.toLocaleString('en-GB')} documents, which is too few for ${label(recommended)} to learn from, and ${label(instead)} gets good results from fewer.`
+    forFewerDocuments
+      ? `Recommended because this Dataset has only ${facts.rowCount!.toLocaleString('en-GB')} documents, which is too few for ${label(recommended)} to learn from, and ${label(forFewerDocuments)} gets good results from fewer.`
       : option.note ? `Recommended because ${lowerFirst(option.note)}` : '',
   ]
-  const preset: Record<string, unknown> = {}
+  // The settings the advice changes, before they are fitted to the schema and rules.
+  const advised: Record<string, unknown> = {}
   const clauses: string[] = []
 
-  const settings = instead ? undefined : option.settings
-  if (settings && Object.keys(settings.parameters).every(has)) {
-    Object.assign(preset, settings.parameters)
+  const settings = forFewerDocuments ? undefined : option.settings
+  if (settings && Object.keys(settings.parameters).every(offers)) {
+    Object.assign(advised, settings.parameters)
     clauses.push(settings.why)
   }
-  if (imbalanced(facts.labelCounts) && has('class_weight')) {
-    preset.class_weight = 'balanced'
+  if (imbalanced(facts.labelCounts) && offers('class_weight')) {
+    advised.class_weight = 'balanced'
     clauses.push('rare labels count for more, because some labels in this Dataset are much rarer than others')
   }
 
-  const chosen: Record<string, unknown> = Object.fromEntries(schema.map((p) => [p.key, p.default]))
-  for (const [key, value] of Object.entries(preset)) {
+  // Every setting, as the form would hold it, so the rules see the whole choice.
+  const allSettings: Record<string, unknown> = Object.fromEntries(schema.map((p) => [p.key, p.default]))
+  for (const [key, value] of Object.entries(advised)) {
     const field = schema.find((p) => p.key === key)!
-    chosen[key] = typeof value === 'number'
+    allSettings[key] = typeof value === 'number'
       ? Math.min(Math.max(value, field.min ?? value), field.max ?? value)
       : value
   }
-  const rules = context.catalogue?.[modelType]?.rules ?? parameterRules[modelType] ?? []
-  const moved = reconcileChoices(schema, rules, chosen, Object.keys(facts.labelCounts ?? {}).length > 2)
-  const parameters = Object.fromEntries(Object.keys({ ...preset, ...moved }).map((key) => [key, chosen[key]]))
+  const moved = reconcileChoices(schema, rules, allSettings, multiclass)
+  const parameters = Object.fromEntries(Object.keys({ ...advised, ...moved }).map((key) => [key, allSettings[key]]))
 
   if (clauses.length) reasons.push(`${upperFirst(clauses.join(', and '))}.`)
   return { modelType, parameters, why: reasons.filter(Boolean).join(' ') }

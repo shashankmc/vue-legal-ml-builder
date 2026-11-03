@@ -46,12 +46,16 @@ tagged `vX.Y.Z`.
 
 - Named entity recognition and text summarisation offer no models, and `decisionTreeFor` and `quickGuideFor`
   return `null` for them, because the backend cannot train them yet. The wizard says so instead of offering
-  LegalBERT and RoBERTa.
+  LegalBERT and RoBERTa. It reads "A Model cannot be trained for … yet. Choose a Dataset with another task type."
 
 ### Fixed
 
 - A component mounted with `mountComponent` now follows the props passed later through
   `updateProps`. Before, it kept the props it was mounted with.
+- Without the backend's catalogue, the settings form and the guide keep to legal-ml-core's limits: Maximum Tree
+  Depth stops at 50, Regularisation (C) at 100, and Number of Clusters at the Dataset's rows, with the other
+  numbers' maxima to match. Before, they could offer values the backend refuses. `ParameterFieldSchema` gains
+  `atMostRows`.
 
 ## [0.5.5] - 2026-10-31
 
