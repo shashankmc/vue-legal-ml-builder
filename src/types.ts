@@ -391,7 +391,7 @@ export interface MLAdapter {
 // ---------------------------------------------------------------------------
 
 /** How `TrainingCurves` draws a job's curves. Set app-wide through the plugin's
- * `monitoring` option or `provide('vmlb:monitoring', …)`; props override it. */
+ * `trainingCurves` option or `provide('vmlb:trainingCurves', …)`; props override it. */
 export interface TrainingCurvesOptions {
   /** Only these metric names are drawn. Default: every metric. */
   metrics?: string[]
@@ -419,6 +419,6 @@ export interface MLBuilderPluginOptions {
   /** Hide the builder's annotation views and skip annotation operations, for
    * hosts with their own annotation (Legal Blocks). Default false (shown). */
   hideAnnotation?: boolean
-  /** App-wide defaults for `TrainingCurves`, provided as `vmlb:monitoring`. */
-  monitoring?: TrainingCurvesOptions
+  /** App-wide defaults for `TrainingCurves`, provided as `vmlb:trainingCurves`. */
+  trainingCurves?: TrainingCurvesOptions
 }

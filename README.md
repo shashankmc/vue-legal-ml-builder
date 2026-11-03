@@ -103,9 +103,9 @@ Set app-wide defaults once, through the plugin or `provide`. Each prop a
 component is given overrides its own default:
 
 ```ts
-app.use(VueLegalMlBuilderPlugin, { adapter, monitoring: { xAxis: 'epoch', smoothing: 0.6 } })
+app.use(VueLegalMlBuilderPlugin, { adapter, trainingCurves: { xAxis: 'epoch', smoothing: 0.6 } })
 // or, without the plugin:
-app.provide('vmlb:monitoring', { xAxis: 'epoch', smoothing: 0.6 })
+app.provide('vmlb:trainingCurves', { xAxis: 'epoch', smoothing: 0.6 })
 ```
 
 To draw the curves your own way, use the default slot. It replaces the stage

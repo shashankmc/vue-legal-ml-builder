@@ -15,7 +15,7 @@ const props = withDefaults(
 const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
 const adapter = computed(() => props.adapter ?? injectedAdapter)
 // App-wide defaults; each prop the host sets overrides its own one.
-const appDefaults = inject<TrainingCurvesOptions>('vmlb:monitoring', {})
+const appDefaults = inject<TrainingCurvesOptions>('vmlb:trainingCurves', {})
 const option = <K extends keyof TrainingCurvesOptions>(key: K): TrainingCurvesOptions[K] => props[key] ?? appDefaults[key]
 const { points, start, stop, fetchNew } = useTrainingCurves(adapter.value as MLAdapter, option('pollIntervalMs') ?? 3000)
 

@@ -30,8 +30,8 @@ tagged `vX.Y.Z`.
   draw), `groupBy` (`'group'`, or `'none'` for one chart), `xAxis` (`'step'` or `'epoch'`),
   `pollIntervalMs`, `smoothing` (a moving-average weight from 0) and `logScale`, and
   `TrainingMonitor` passes them through. Unset, the curves look and poll as before.
-- App-wide defaults for those settings, through the plugin's `monitoring` option or
-  `provide('vmlb:monitoring', …)`. A prop overrides its default. `TrainingCurvesOptions` is
+- App-wide defaults for those settings, through the plugin's `trainingCurves` option or
+  `provide('vmlb:trainingCurves', …)`. A prop overrides its default. `TrainingCurvesOptions` is
   exported.
 - The resource readings a run takes with `monitoring.system_metrics` on are drawn one
   chart per unit, each titled with it: Memory (MB), GPU use (%), Speed (samples per
