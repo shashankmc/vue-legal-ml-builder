@@ -13,6 +13,13 @@ tagged `vX.Y.Z`.
 
 ### Added
 
+- `MonitoringSettings` and `ModelParameters` are exported: a run's own monitoring goes
+  under `parameters.monitoring` (`log_every_n_steps`, `eval_strategy` with `eval_steps`,
+  `include` / `exclude` name globs, and `learning_curve` / `system_metrics`, accepted but
+  not used yet). `MlModel.parameters`, `createModel` and `updateModel` use
+  `ModelParameters`. A refusal of one of these names `monitoring.<setting>` as its field.
+- `npm test` also type-checks the type-level tests (`tests/*.test-d.ts`), through
+  `npm run test:types`.
 - The training curves can be configured. `TrainingCurves` takes `metrics` (which metrics to
   draw), `groupBy` (`'group'`, or `'none'` for one chart), `xAxis` (`'step'` or `'epoch'`),
   `pollIntervalMs`, `smoothing` (a moving-average weight from 0) and `logScale`, and
