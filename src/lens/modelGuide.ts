@@ -1,8 +1,15 @@
+import { allModelInfo, parameterRules, parameterSchemas } from '../components/modelCatalogData'
+import { mergeSchema, reconcileChoices } from '../components/parameterOptions'
+import type { ModelTypeInfo } from '../types'
+
 export interface GuideOption {
   label: string
   next?: string
   recommend?: string
   note?: string
+  /** Settings that come with the recommendation, and why, as a clause that
+   * completes "Recommended because …, and …". */
+  settings?: { parameters: Record<string, unknown>; why: string }
 }
 
 export interface GuideNode {
@@ -36,7 +43,7 @@ const CLASSIFICATION: DecisionTree = {
     explain: {
       question: 'How would you like each result explained?',
       options: [
-        { label: 'As rules a colleague can follow', recommend: 'decision_tree', note: 'Each result follows a path of yes-or-no questions that you can read.' },
+        { label: 'As rules a colleague can follow', recommend: 'decision_tree', note: 'Each result follows a path of yes-or-no questions that you can read.', settings: { parameters: { max_depth: 5 }, why: 'its tree stops after five questions, so each path stays short enough to follow' } },
         { label: 'As how strongly the text points to each label', recommend: 'logistic_regression', note: 'Each result shows which words pushed it towards each label.' },
       ],
     },
@@ -88,4 +95,72 @@ export function decisionTreeFor(taskType: string): DecisionTree | null {
   if (taskType === 'clustering') return CLUSTERING
   if (taskType === 'topic_modeling') return TOPIC
   return null
+}
+
+/** What the wizard knows about the Dataset, which can change the advice. */
+export interface DatasetFacts {
+  rowCount?: number
+  /** How many documents carry each label, from the Dataset's overview. */
+  labelCounts?: Record<string, number> | null
+}
+
+/** What the backend offers, when the host can say. */
+export interface GuideContext {
+  catalogue?: Record<string, ModelTypeInfo>
+}
+
+/** What the guide recommends once an answer is reached: the Model, the settings
+ * that come with it, and one or two plain sentences on why. */
+export interface GuideAdvice {
+  modelType: string
+  parameters: Record<string, unknown>
+  why: string
+}
+
+/** The most common label at least this many times the rarest counts as imbalanced. */
+export const IMBALANCE_RATIO = 3
+
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1)
+const upperFirst = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
+function imbalanced(labelCounts?: Record<string, number> | null): boolean {
+  const counts = Object.values(labelCounts ?? {}).filter((n) => n > 0)
+  return counts.length > 1 && Math.max(...counts) >= IMBALANCE_RATIO * Math.min(...counts)
+}
+
+/** The Model and settings an answer leads to, fitted to the Dataset. The settings
+ * go through the same schema and rules as the settings form, so the backend
+ * accepts them: a setting the Model lacks is left out, a number is kept in range,
+ * and a choice a rule forbids is moved as the form would move it. */
+export function adviseFor(option: GuideOption, facts: DatasetFacts = {}, context: GuideContext = {}): GuideAdvice {
+  const modelType = option.recommend ?? ''
+  const schema = mergeSchema(parameterSchemas[modelType] ?? [], context.catalogue?.[modelType], facts.rowCount)
+  const has = (key: string) => schema.some((p) => p.key === key)
+  const reasons = [option.note ? `Recommended because ${lowerFirst(option.note)}` : '']
+  const preset: Record<string, unknown> = {}
+  const clauses: string[] = []
+
+  const settings = option.settings
+  if (settings && Object.keys(settings.parameters).every(has)) {
+    Object.assign(preset, settings.parameters)
+    clauses.push(settings.why)
+  }
+  if (imbalanced(facts.labelCounts) && has('class_weight')) {
+    preset.class_weight = 'balanced'
+    clauses.push('rare labels count for more, because some labels in this Dataset are much rarer than others')
+  }
+
+  const chosen: Record<string, unknown> = Object.fromEntries(schema.map((p) => [p.key, p.default]))
+  for (const [key, value] of Object.entries(preset)) {
+    const field = schema.find((p) => p.key === key)!
+    chosen[key] = typeof value === 'number'
+      ? Math.min(Math.max(value, field.min ?? value), field.max ?? value)
+      : value
+  }
+  const rules = context.catalogue?.[modelType]?.rules ?? parameterRules[modelType] ?? []
+  const moved = reconcileChoices(schema, rules, chosen, Object.keys(facts.labelCounts ?? {}).length > 2)
+  const parameters = Object.fromEntries(Object.keys({ ...preset, ...moved }).map((key) => [key, chosen[key]]))
+
+  if (clauses.length) reasons.push(`${upperFirst(clauses.join(', and '))}.`)
+  return { modelType, parameters, why: reasons.filter(Boolean).join(' ') }
 }
