@@ -12,6 +12,8 @@ const props = defineProps<{
   jobStatus?: string
   /** Only these metric names are drawn. Default: every metric. */
   metrics?: string[]
+  /** `group` (default) draws one chart per group; `none` draws every metric on one chart. */
+  groupBy?: 'group' | 'none'
 }>()
 
 const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
@@ -24,7 +26,7 @@ const isSettled = computed(() => ['completed', 'failed', 'cancelled'].includes(p
 
 // One chart per group, so loss, learning rate and scores each get an axis that fits.
 const charts = computed(() =>
-  curveCharts(points.value, { metrics: props.metrics }).map((chart) => ({
+  curveCharts(points.value, { metrics: props.metrics, groupBy: props.groupBy }).map((chart) => ({
     group: chart.group,
     title: chart.title,
     plotData: {

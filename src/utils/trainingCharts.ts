@@ -3,7 +3,11 @@ import type { TrainingMetricGroup, TrainingMetricPoint } from '../types'
 /** Every metric group, in the order their charts are drawn. */
 export const TRAINING_METRIC_GROUPS: readonly TrainingMetricGroup[] = ['train', 'eval', 'system', 'stage']
 
-const CHART_TITLES: Record<Exclude<TrainingMetricGroup, 'stage'>, string> = {
+type CurveGroup = Exclude<TrainingMetricGroup, 'stage'>
+
+const CURVE_GROUPS = TRAINING_METRIC_GROUPS.filter((g): g is CurveGroup => g !== 'stage')
+
+const CHART_TITLES: Record<CurveGroup, string> = {
   train: 'Training',
   eval: 'Evaluation',
   system: 'System',
@@ -35,7 +39,8 @@ export interface CurveSeries {
 }
 
 export interface CurveChart {
-  group: Exclude<TrainingMetricGroup, 'stage'>
+  /** The group charted, or `all` when grouping is off. */
+  group: CurveGroup | 'all'
   title: string
   xAxisTitle: string
   series: CurveSeries[]
@@ -63,16 +68,25 @@ function xAxisTitle(points: TrainingMetricPoint[]): string {
 export interface CurveChartOptions {
   /** Only these metric names are drawn. Default: every metric. */
   metrics?: string[]
+  /** `group` (default) draws one chart per group; `none` draws every metric on one chart. */
+  groupBy?: 'group' | 'none'
 }
 
 /** One chart per group that has points, so values on different scales are not
  * drawn against one axis. Stage markers are left to `stageEvents`. */
 export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOptions = {}): CurveChart[] {
   const shown = options.metrics ? new Set(options.metrics) : null
+  const curves = points.filter((p) => metricGroupOf(p) !== 'stage' && (!shown || shown.has(p.metric_name)))
+  const buckets: Array<Pick<CurveChart, 'group' | 'title'> & { points: TrainingMetricPoint[] }> =
+    options.groupBy === 'none'
+      ? [{ group: 'all', title: 'Metrics', points: curves }]
+      : CURVE_GROUPS.map((group) => ({
+          group,
+          title: CHART_TITLES[group],
+          points: curves.filter((p) => metricGroupOf(p) === group),
+        }))
   const charts: CurveChart[] = []
-  for (const group of TRAINING_METRIC_GROUPS) {
-    if (group === 'stage') continue
-    const inGroup = points.filter((p) => metricGroupOf(p) === group && (!shown || shown.has(p.metric_name)))
+  for (const { group, title, points: inGroup } of buckets) {
     if (!inGroup.length) continue
     const byMetric = new Map<string, TrainingMetricPoint[]>()
     for (const p of inGroup) {
@@ -81,7 +95,7 @@ export function curveCharts(points: TrainingMetricPoint[], options: CurveChartOp
     }
     charts.push({
       group,
-      title: CHART_TITLES[group],
+      title,
       xAxisTitle: xAxisTitle(inGroup),
       series: [...byMetric].map(([metric, series]) => ({
         metric,

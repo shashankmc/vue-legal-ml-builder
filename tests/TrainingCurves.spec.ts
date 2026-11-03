@@ -85,5 +85,12 @@ describe('TrainingCurves', () => {
 
       expect(names(wrapper)).toEqual([['loss'], ['eval_accuracy']])
     })
+
+    it('draws every metric on one chart when grouping is off', async () => {
+      const wrapper = await mountWith(fineTuning(), { groupBy: 'none' })
+
+      expect(wrapper.findAll('.vmlb-curves-chart h4').map((h) => h.text())).toEqual(['Metrics'])
+      expect(names(wrapper)).toEqual([['loss', 'learning_rate', 'eval_accuracy']])
+    })
   })
 })
