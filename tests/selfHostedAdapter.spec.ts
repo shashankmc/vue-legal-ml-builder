@@ -131,4 +131,15 @@ describe('createSelfHostedAdapter', () => {
       expect('field' in refused).toBe(false)
     })
   })
+  it('returns training metric points with their group and the training step', async () => {
+    const point = {
+      id: 'p1', training_job_id: 'job-1', step: 0, epoch: 0.5, training_step: 10,
+      metric_name: 'loss', group: 'train', value: 0.7, created_at: '2026-11-03T10:00:00',
+    }
+    const calls = stubFetch(() => reply(200, { points: [point] }))
+    const adapter = createSelfHostedAdapter({ apiUrl: '/api', getAuthToken: () => 't' })
+
+    await expect(adapter.getTrainingMetrics('job-1', 4)).resolves.toEqual([point])
+    expect(calls[0].url).toBe('/api/training/job-1/metrics?since_step=4')
+  })
 })

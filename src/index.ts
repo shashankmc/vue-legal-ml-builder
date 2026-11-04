@@ -40,6 +40,7 @@ export const VueLegalMlBuilderPlugin = {
     app.provide('vmlb:adapter', adapter)
     app.provide('vmlb:pollInterval', opts.pollInterval ?? 3000)
     app.provide('vmlb:hideAnnotation', opts.hideAnnotation ?? false)
+    app.provide('vmlb:trainingCurves', opts.trainingCurves ?? {})
     if (opts.theme && typeof document !== 'undefined') {
       applyTheme(opts.themeTarget ?? document.documentElement, opts.theme)
     }
@@ -108,6 +109,8 @@ export { useModels } from './composables/useModels'
 export { useParameterComparison } from './composables/useParameterComparison'
 export { useTraining } from './composables/useTraining'
 export { useTrainingCurves } from './composables/useTrainingCurves'
+export { TRAINING_METRIC_GROUPS, curveCharts, isLearningCurvePoint, metricGroupOf, metricUnitOf, stageEvents, xKindOf } from './utils/trainingCharts'
+export type { CurveChart, CurveChartOptions, CurveSeries, CurveXAxis, StageEvent } from './utils/trainingCharts'
 
 export { allModelInfo, modelsByTaskType, parameterRules, parameterSchemas, quickGuideFor, taskTypeLabel } from './components/modelCatalogData'
 export { classColor, defaultLabels, lensCopy, lensFamily } from './lens/modelLens'
@@ -136,14 +139,19 @@ export type {
   ModelCatalog,
   ParameterRule,
   ModelComparison,
+  ModelParameters,
   ModelStatus,
   ModelTypeInfo,
+  MonitoringSettings,
   ParameterComparisonPoint,
   ParameterFieldSchema,
   ParameterFieldType,
   PredictionResult,
   RefusalError,
+  TrainingCurvesOptions,
   TrainingJob,
   TrainingJobStatus,
+  TrainingMetricGroup,
   TrainingMetricPoint,
+  TrainingXKind,
 } from './types'

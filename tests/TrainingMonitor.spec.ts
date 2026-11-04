@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import TrainingMonitor from '../src/components/TrainingMonitor.vue'
+import TrainingCurves from '../src/components/TrainingCurves.vue'
 import { createTestAdapter } from './testAdapter'
 import type { MlModel, TrainingJob } from '../src/types'
 
@@ -72,5 +73,26 @@ describe('TrainingMonitor: stopping a run', () => {
 
     expect(wrapper.text()).toContain('Training stopped')
     expect(wrapper.text()).not.toContain('Training failed')
+  })
+})
+
+describe('TrainingMonitor: configuring the curves', () => {
+  it('passes the curve settings through to TrainingCurves', async () => {
+    const curveProps = { metrics: ['loss'], groupBy: 'none', xAxis: 'epoch', pollIntervalMs: 1000, smoothing: 0.6, logScale: true } as const
+    const wrapper = mount(TrainingMonitor, { props: { adapter: runningAdapter(), modelId: 'm1', jobId: 'job-1', ...curveProps } })
+    await flushPromises()
+
+    expect(wrapper.findComponent(TrainingCurves).props()).toMatchObject(curveProps)
+    wrapper.unmount()
+  })
+
+  it('leaves unset settings unset, so the app-wide defaults apply', async () => {
+    const { wrapper } = await mountRunning()
+
+    const props = wrapper.findComponent(TrainingCurves).props()
+    expect([props.metrics, props.groupBy, props.xAxis, props.pollIntervalMs, props.smoothing, props.logScale]).toEqual(
+      [undefined, undefined, undefined, undefined, undefined, undefined],
+    )
+    wrapper.unmount()
   })
 })

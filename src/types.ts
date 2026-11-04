@@ -1,4 +1,5 @@
 import type { MlBuilderTheme } from './theme'
+import type { CurveChartOptions } from './utils/trainingCharts'
 
 // ---------------------------------------------------------------------------
 // Core entities — mirror legal-ml-core's `to_dict()` shapes.
@@ -30,6 +31,36 @@ export interface Dataset {
 
 export type ModelStatus = 'pending' | 'training' | 'completed' | 'failed'
 
+/** How a training run is monitored, under `parameters.monitoring`. A setting a
+ * run leaves out takes the host's default, then legal-ml-core's. Include and
+ * exclude are name globs (`eval_*`) for which metric points are stored; stage
+ * markers always are. `flush_every_points` and `flush_every_seconds` say how
+ * often the worker writes metric points in a batch. `learning_curve` adds a
+ * learning curve to a classical Text Classification run, which makes it slower.
+ * `system_metrics` records memory, GPU use, speed and time left as `system`
+ * points. A bad value is refused with
+ * `field: 'monitoring.<setting>'`. */
+export interface MonitoringSettings {
+  log_every_n_steps: number
+  eval_strategy: 'epoch' | 'steps'
+  /** Read only when `eval_strategy` is `steps`. */
+  eval_steps: number
+  include: string[]
+  exclude: string[]
+  learning_curve: boolean
+  /** Record memory, GPU use when there is a GPU, speed and time left as
+   * `system` points. Off by default. */
+  system_metrics: boolean
+  /** Whole number above 0; legal-ml-core's default is 50. */
+  flush_every_points: number
+  /** Above 0; legal-ml-core's default is 2. */
+  flush_every_seconds: number
+}
+
+/** A Model's settings, by catalogue name, plus its own monitoring. A run's
+ * recorded settings carry every monitoring setting, defaults filled in. */
+export type ModelParameters = Record<string, unknown> & { monitoring?: Partial<MonitoringSettings> }
+
 export interface MlModel {
   id: Id
   user_id: Id
@@ -37,7 +68,7 @@ export interface MlModel {
   project_id?: Id | null
   name: string
   model_type: string
-  parameters: Record<string, unknown>
+  parameters: ModelParameters
   status: ModelStatus
   file_path?: string | null
   /** accuracy/precision/recall/f1_score are numbers; confusion_matrix,
@@ -63,12 +94,36 @@ export interface TrainingJob {
   created_at: string
 }
 
+/** Which chart a metric point belongs on: `train` (loss, learning rate),
+ * `eval` (scores on the evaluation split), `system` (resources and
+ * throughput) or `stage` (the run's milestones, drawn as events). */
+export type TrainingMetricGroup = 'train' | 'eval' | 'system' | 'stage'
+
+/** What a metric point's `training_step` counts: the trainer's steps, a
+ * classical run's iterations (loss by iteration), or training examples (a
+ * learning curve). */
+export type TrainingXKind = 'step' | 'iteration' | 'training_examples'
+
 export interface TrainingMetricPoint {
   id: Id
   training_job_id: Id
+  /** Write counter and polling cursor, not the trainer's step. */
   step: number
   epoch: number | null
+  /** The trainer's own step, for fine-tuning; the iteration, for a classical
+   * run's loss by iteration; the training-set size, for `learning_curve_*`
+   * points; null otherwise. */
+  training_step?: number | null
   metric_name: string
+  /** Left out by hosts on an older legal-ml-core; `metricGroupOf` then
+   * derives it from the name. */
+  group?: TrainingMetricGroup
+  /** Left out by hosts on an older legal-ml-core; `xKindOf` then derives it
+   * from the name. */
+  x_kind?: TrainingXKind
+  /** A system point's unit (`MB`, `%`, `samples/s`, `s`), null for other
+   * points. Left out by older hosts; `metricUnitOf` then reads it from the name. */
+  unit?: string | null
   value: number
   created_at: string
 }
@@ -218,6 +273,9 @@ export interface ModelTypeInfo {
   description: string
   parameters: Record<string, ParameterFieldSchema>
   rules?: ParameterRule[]
+  /** Whether a run can record a learning curve (`monitoring.learning_curve`).
+   * Left out by hosts on an older legal-ml-core. */
+  supports_learning_curve?: boolean
 }
 
 export type ModelCatalog = Record<string, Record<string, ModelTypeInfo>>
@@ -305,9 +363,9 @@ export interface MLAdapter {
   getModel(id: Id): Promise<MlModel>
   getAvailableModelTypes(taskType?: string): Promise<ModelCatalog>
   /** Rejects with an Error, a `RefusalError` when a refusal names a setting. */
-  createModel(config: { name: string; dataset_id: Id; model_type: string; parameters: Record<string, unknown>; project_id?: Id }): Promise<MlModel>
+  createModel(config: { name: string; dataset_id: Id; model_type: string; parameters: ModelParameters; project_id?: Id }): Promise<MlModel>
   /** Optional: renames a Model or replaces its settings. Rejects as `createModel` does. */
-  updateModel?(id: Id, changes: { name?: string; parameters?: Record<string, unknown> }): Promise<MlModel>
+  updateModel?(id: Id, changes: { name?: string; parameters?: ModelParameters }): Promise<MlModel>
   deleteModel(id: Id): Promise<void>
 
   // Training
@@ -347,6 +405,15 @@ export interface MLAdapter {
 // Plugin options
 // ---------------------------------------------------------------------------
 
+/** How `TrainingCurves` draws a job's curves. Set app-wide through the plugin's
+ * `trainingCurves` option or `provide('vmlb:trainingCurves', …)`; props override it. */
+export interface TrainingCurvesOptions extends CurveChartOptions {
+  /** Draw values on a log scale. Default false. */
+  logScale?: boolean
+  /** How often a running job is polled for new points, in milliseconds. Default 3000. */
+  pollIntervalMs?: number
+}
+
 export interface MLBuilderPluginOptions {
   /** A pre-built adapter instance, or preset name + connection info. */
   adapter: MLAdapter | { apiUrl: string; getAuthToken?: () => string | null | undefined }
@@ -359,4 +426,6 @@ export interface MLBuilderPluginOptions {
   /** Hide the builder's annotation views and skip annotation operations, for
    * hosts with their own annotation (Legal Blocks). Default false (shown). */
   hideAnnotation?: boolean
+  /** App-wide defaults for `TrainingCurves`, provided as `vmlb:trainingCurves`. */
+  trainingCurves?: TrainingCurvesOptions
 }

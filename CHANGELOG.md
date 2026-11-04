@@ -13,6 +13,47 @@ tagged `vX.Y.Z`.
 
 ### Added
 
+- `TrainingCurves` draws a classical run's learning curve (legal-ml-core
+  `monitoring.learning_curve`) on a chart of its own, "Learning curve", against the
+  number of training examples. Its `learning_curve_*` points are left out of the
+  Training and Evaluation charts, and stay apart when `groupBy` is `'none'`. A slot's
+  `charts` has it with `group: 'learning_curve'`, and `isLearningCurvePoint` is exported.
+  `ModelTypeInfo.supports_learning_curve` says whether a model type can record one.
+
+- `MonitoringSettings` and `ModelParameters` are exported: a run's own monitoring goes
+  under `parameters.monitoring` (`log_every_n_steps`, `eval_strategy` with `eval_steps`,
+  `include` / `exclude` name globs, `flush_every_points` / `flush_every_seconds` for how
+  often metric points are written, and `learning_curve` / `system_metrics`). `MlModel.parameters`, `createModel` and `updateModel` use
+  `ModelParameters`. A refusal of one of these names `monitoring.<setting>` as its field.
+- `npm test` also type-checks the type-level tests (`tests/*.test-d.ts`), through
+  `npm run test:types`.
+- The training curves can be configured. `TrainingCurves` takes `metrics` (which metrics to
+  draw), `groupBy` (`'group'`, or `'none'` for one chart), `xAxis` (`'step'` or `'epoch'`),
+  `pollIntervalMs`, `smoothing` (a moving-average weight from 0) and `logScale`, and
+  `TrainingMonitor` passes them through. Unset, the curves look and poll as before.
+- App-wide defaults for those settings, through the plugin's `trainingCurves` option or
+  `provide('vmlb:trainingCurves', …)`. A prop overrides its default. `TrainingCurvesOptions` is
+  exported.
+- The resource readings a run takes with `monitoring.system_metrics` on are drawn one
+  chart per unit, each titled with it: Memory (MB), GPU use (%), Speed (samples/s)
+  and Time remaining (s). Its value axis names the unit. `CurveChart` has the
+  `unit`. It is the point's `unit` from legal-ml-core; a point without one gets it
+  from the end of its name through `metricUnitOf(name)`.
+  A host matching the single System chart's title must update.
+- A default slot on `TrainingCurves` lets a host draw the curves its own way. It gets the
+  configured `charts`, the `stages` and the raw `points`. `curveCharts` takes the same
+  settings as a second argument (`CurveChartOptions`), and a chart with grouping off has the
+  group `all`.
+- `TrainingMetricPoint` has `group` (`TrainingMetricGroup`: `train`, `eval`, `system` or
+  `stage`) and, for fine-tuning, `training_step`, the trainer's own step. `step` stays the
+  polling cursor. A point without a group gets one from its name, as legal-ml-core does.
+  It also has `x_kind` (`TrainingXKind`: `step`, `iteration` or `training_examples`), what
+  its `training_step` counts, and `unit`, a system point's unit. A chart's x-axis title
+  follows `x_kind`, so logistic regression's loss by iteration is drawn against
+  Iteration, not Training step. A point without `x_kind` gets it from its name through
+  `xKindOf`, which is exported.
+  `TRAINING_METRIC_GROUPS`, `metricGroupOf`, `curveCharts` and `stageEvents` are exported
+  for hosts that draw their own curves.
 - `TrainingMonitor` has a Stop training button while a run is in progress. It asks inline
   before stopping, so hosts need no dialog of their own. A stopped run then reads Training
   stopped, with Train again, instead of Training failed, and the component emits `stopped`.
@@ -40,6 +81,11 @@ tagged `vX.Y.Z`.
 
 ### Changed
 
+- `TrainingCurves` draws one chart per group (Training, Evaluation, System), each against
+  the training step, falling back to the epoch. Stage markers are listed as labelled events
+  instead of lines at 1.0. The single `#vmlb-training-curves` chart is now one
+  `.vmlb-curves-chart` per group, with plot ids `vmlb-training-curves-<group>`.
+- The demo adapter's training run has a loss curve and two evaluations as well as its stages.
 - `ModelCreateWizard` opens the model step on the guide questions instead of folding them away. "Choose a model myself"
   swaps them for the full grid, and "Help me choose instead" brings them back. The default model is still chosen, so
   skipping the questions changes nothing. The `details.vmlb-chooser` disclosure and its "Help me choose a model"
