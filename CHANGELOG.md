@@ -11,6 +11,59 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- `TrainingMonitor` has a Stop training button while a run is in progress. It asks inline
+  before stopping, so hosts need no dialog of their own. A stopped run then reads Training
+  stopped, with Train again, instead of Training failed, and the component emits `stopped`.
+  When the run ends before the stop arrives, it says so.
+- `useTraining().stop()` resolves to `'stopped'`, `'finished'` (the run ended first) or
+  `'error'` (still running; `error` says why and polling continues), and `isStopping` is
+  true while it is in flight.
+- `ModelParameterForm`, the settings form from `ModelCreateWizard`, can be used on its own,
+  for example to change a trained Model's settings. Give it `modelType`, the starting
+  `parameters` (missing ones take their defaults), and optionally `modelInfo`, `rowCount`,
+  `labels`, `refusedField` and `refusalId`. It reports the settings to send in a `change`
+  event. The wizard looks and behaves as before.
+- `MLAdapter.updateModel(id, { name?, parameters? })`, optional, renames a Model or replaces
+  its settings. `createSelfHostedAdapter` sends it as `PUT /models/<id>`, and a refusal keeps
+  its `field` as with `createModel`.
+- The guide settles settings as well as the Model, and says why in one or two plain sentences. A `GuideOption` can
+  carry `settings: { parameters, why }`. Its answers on rules a colleague can follow, getting the most results right,
+  and setting unusual documents aside now come with a shorter tree, more trees and comparing documents by their words.
+- The guide fits its advice to the Dataset. When the most common label is at least three times the rarest, it weights
+  rare labels up wherever the Model can. Below 1,000 documents it recommends a Model other than LegalBERT or RoBERTa.
+  `adviseFor(option, facts?, context?)` gives this advice to a host. Its settings go through the same schema and rules
+  as the settings form, using the backend's catalogue when given, so the backend does not refuse them.
+- `ModelQuestionTree` takes optional `rowCount`, `labelCounts`, `catalogue` and `availableModels`, and
+  `ModelCreateWizard` passes them. The wizard now reads the Dataset's overview even when the Dataset declares its labels.
+
+### Changed
+
+- `ModelCreateWizard` opens the model step on the guide questions instead of folding them away. "Choose a model myself"
+  swaps them for the full grid, and "Help me choose instead" brings them back. The default model is still chosen, so
+  skipping the questions changes nothing. The `details.vmlb-chooser` disclosure and its "Help me choose a model"
+  summary are gone, and `.vmlb-show-models` now reads "Choose a model myself".
+- The guide's questions and answers are in plain words, and its recommendation gives the reason for the answer
+  instead of the model's technical description. Hosts or tests that match the old wording must update it.
+- `ModelQuestionTree`'s `select` event is `select(modelType, parameters)`, and now sends the recommended settings
+  with the Model. With `autoApply` it sends them again if the Dataset's facts arrive later and change the advice.
+
+### Removed
+
+- Named entity recognition and text summarisation offer no models, and `decisionTreeFor` and `quickGuideFor`
+  return `null` for them, because the backend cannot train them yet. The wizard says so instead of offering
+  LegalBERT and RoBERTa. It reads "A Model cannot be trained for … yet. Choose a Dataset with another task type."
+
+### Fixed
+
+- A component mounted with `mountComponent` now follows the props passed later through
+  `updateProps`. Before, it kept the props it was mounted with.
+- Without the backend's catalogue, the settings form and the guide keep to legal-ml-core's limits: Maximum Tree
+  Depth stops at 50, Regularisation (C) at 100, and Number of Clusters at the Dataset's rows, with the other
+  numbers' maxima to match. Before, they could offer values the backend refuses. `ParameterFieldSchema` gains
+  `atMostRows`.
+
 ## [0.5.5] - 2026-10-31
 
 ### Added

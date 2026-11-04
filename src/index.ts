@@ -9,6 +9,7 @@ import DatasetManager from './components/DatasetManager.vue'
 import ModelCreateWizard from './components/ModelCreateWizard.vue'
 import ModelDetail from './components/ModelDetail.vue'
 import ModelList from './components/ModelList.vue'
+import ModelParameterForm from './components/ModelParameterForm.vue'
 import ModelQuestionTree from './components/ModelQuestionTree.vue'
 import ParameterPerformanceExplorer from './components/ParameterPerformanceExplorer.vue'
 import ConfusionMatrix from './components/shared/ConfusionMatrix.vue'
@@ -48,6 +49,7 @@ export const VueLegalMlBuilderPlugin = {
     app.component('ModelList', ModelList)
     app.component('ModelCreateWizard', ModelCreateWizard)
     app.component('ModelDetail', ModelDetail)
+    app.component('ModelParameterForm', ModelParameterForm)
     app.component('ModelQuestionTree', ModelQuestionTree)
     app.component('TrainingMonitor', TrainingMonitor)
     app.component('TrainingCurves', TrainingCurves)
@@ -78,6 +80,7 @@ export {
   ModelDetail,
   ModelLens,
   ModelList,
+  ModelParameterForm,
   ModelQuestionTree,
   ParameterPerformanceExplorer,
   PlotlyChart,
@@ -109,11 +112,11 @@ export { useTrainingCurves } from './composables/useTrainingCurves'
 export { allModelInfo, modelsByTaskType, parameterRules, parameterSchemas, quickGuideFor, taskTypeLabel } from './components/modelCatalogData'
 export { classColor, defaultLabels, lensCopy, lensFamily } from './lens/modelLens'
 export type { LensCopy, LensFamily, LensPoint } from './lens/modelLens'
-export { decisionTreeFor } from './lens/modelGuide'
+export { adviseFor, decisionTreeFor, IMBALANCE_RATIO, SMALL_DATASET_ROWS } from './lens/modelGuide'
 export { ANNOTATION_STATE, annotationControls, annotationState, canSaveAnnotation, labelledRows, nothingToAnnotateReason } from './annotation/annotationState'
 export type { AnnotationControls, AnnotationScreenState, EntitySpan } from './annotation/annotationState'
 export { STRATEGY_COPY, holdoutClassText, retrainPrompt, trainingWarning, verificationText } from './annotation/activeLearning'
-export type { DecisionTree, GuideNode, GuideOption } from './lens/modelGuide'
+export type { DatasetFacts, DecisionTree, GuideAdvice, GuideContext, GuideNode, GuideOption } from './lens/modelGuide'
 
 export type {
   ActiveLearningRound,
