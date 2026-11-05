@@ -236,6 +236,119 @@ export interface ActiveLearningState {
 }
 
 // ---------------------------------------------------------------------------
+// LLM assistance — mirrors legal-ml-core's /api/llm responses. Single-label
+// classification only. A suggestion is not a label until a person confirms it.
+// ---------------------------------------------------------------------------
+
+/** Whose key a request would use: the platform's shared key, the user's own, or none. */
+export type LlmMode = 'shared' | 'byok' | 'none'
+
+export interface LlmStatus {
+  mode: LlmMode
+  /** Where text is sent, named as the user must acknowledge it. Null without access. */
+  destination: string | null
+  model: string | null
+  shared_key_allowed: boolean
+  /** The user's own key, without the key itself, which is never returned. */
+  key: { base_url: string; model: string } | null
+  /** Tokens left this month on the shared key; null for an own key or no limit. */
+  remaining_tokens: number | null
+  /** Sent when asked about a Dataset: whether its Project acknowledged `destination`. */
+  acknowledged?: boolean
+}
+
+export interface LlmKeyInput {
+  base_url: string
+  model: string
+  api_key: string
+}
+
+export interface LlmAcknowledgement {
+  destination: string
+  created_at: string
+}
+
+export interface LlmPrompt {
+  /** 0 is the unedited default. */
+  version: number
+  template: string
+  /** Label name to its definition. */
+  definitions: Record<string, string>
+  created_at?: string
+}
+
+export type LlmSuggestionStatus = 'pending' | 'accepted' | 'corrected' | 'rejected' | 'bulk_accepted'
+
+export interface LlmSuggestion {
+  id: Id
+  task_id: Id
+  model: string
+  prompt_version: number
+  label: string
+  rationale: string
+  status: LlmSuggestionStatus
+  created_at: string
+}
+
+export interface LlmSuggestionBatch {
+  suggestions: LlmSuggestion[]
+  /** Items that already had a suggestion from this model and prompt. */
+  skipped: number
+  /** Answers that failed the output check and were discarded. */
+  invalid: number
+}
+
+/** How often the latest model and prompt matched people's decisions. Bulk accept
+ * unlocks at `min_sample` checked items with a `rate` of at least `threshold`. */
+export interface LlmAgreement {
+  model: string | null
+  prompt_version: number | null
+  checked: number
+  agreed: number
+  rate: number | null
+  min_sample: number
+  threshold: number
+  unlocked: boolean
+}
+
+export interface LlmEstimate {
+  tasks: number
+  estimated_tokens: number
+  remaining_tokens: number | null
+  within_budget: boolean
+  destination: string
+}
+
+export type LlmJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'budget_exhausted'
+
+export interface LlmJob {
+  status: LlmJobStatus
+  total: number
+  done: number
+  created?: number
+  invalid?: number
+  error?: string
+}
+
+/** The `code` legal-ml-core puts on an LLM refusal. */
+export type LlmErrorCode =
+  | 'no_llm_access'
+  | 'acknowledgement_required'
+  | 'destination_changed'
+  | 'budget_exhausted'
+  | 'prompt_rejected'
+  | 'agreement_not_met'
+  | 'credential_unusable'
+  | 'llm_failed'
+
+/** An adapter's rejection of an LLM call. `code` says what to offer next, and
+ * `destination` is the current one when it must be acknowledged again. */
+export interface LlmRefusalError extends Error {
+  code?: LlmErrorCode | string
+  destination?: string
+}
+
+// ---------------------------------------------------------------------------
 // Model catalog / parameter schema — mirrors legal-ml-core's AVAILABLE_MODELS
 // and the parameterSchemas convention from the app's original model-create wizard.
 // ---------------------------------------------------------------------------
@@ -399,6 +512,30 @@ export interface MLAdapter {
   correctActiveLearningLabel?(datasetId: Id, from: string, to: string): Promise<ActiveLearningState>
   retrainActiveLearning?(datasetId: Id): Promise<{ job_id: Id | null }>
   verifyActiveLearning?(datasetId: Id): Promise<void>
+
+  // LLM assistance. Optional: without `getLlmStatus` the workspace shows no LLM
+  // controls. Each rejects with an `LlmRefusalError`.
+  getLlmStatus?(datasetId?: Id): Promise<LlmStatus>
+  /** Write-only: the key is never returned. */
+  saveLlmKey?(key: LlmKeyInput): Promise<{ base_url: string; model: string }>
+  deleteLlmKey?(): Promise<void>
+  /** `destination` must be the one the user was shown. */
+  acknowledgeLlmDestination?(datasetId: Id, destination: string): Promise<LlmAcknowledgement>
+  getLlmPrompt?(datasetId: Id): Promise<LlmPrompt>
+  /** Checks the prompt and saves it as a new version, or rejects with the reason. */
+  updateLlmPrompt?(datasetId: Id, prompt: { template: string; definitions: Record<string, string> }): Promise<LlmPrompt>
+  createLlmSuggestions?(datasetId: Id, taskIds: Id[]): Promise<LlmSuggestionBatch>
+  listLlmSuggestions?(datasetId: Id, status?: LlmSuggestionStatus): Promise<LlmSuggestion[]>
+  /** Accepts a suggestion, or corrects it when `label` differs. */
+  confirmLlmSuggestion?(suggestionId: Id, label?: string): Promise<{ suggestion: LlmSuggestion; task: AnnotationTask }>
+  rejectLlmSuggestion?(suggestionId: Id): Promise<LlmSuggestion>
+  getLlmAgreement?(datasetId: Id): Promise<LlmAgreement>
+  bulkAcceptLlmSuggestions?(datasetId: Id): Promise<{ accepted: number; agreement: LlmAgreement }>
+  /** Leave `taskIds` out for every pending item in the Dataset. */
+  estimateLlmAnnotation?(datasetId: Id, taskIds?: Id[]): Promise<LlmEstimate>
+  /** Starts a job on the worker, once the user has seen the estimate. */
+  startLlmAnnotation?(datasetId: Id, taskIds?: Id[]): Promise<{ job_id: Id; estimate: LlmEstimate }>
+  getLlmJob?(jobId: Id): Promise<LlmJob>
 }
 
 // ---------------------------------------------------------------------------
