@@ -182,6 +182,17 @@ export interface ActiveLearningStartOptions {
   min_per_class?: number
   holdout_percent?: number
   seed_source?: 'random' | 'llm'
+  /** Required, true, with an LLM seed: the user has seen `estimateActiveLearningSeed`. */
+  confirm_estimate?: boolean
+}
+
+/** The LLM job choosing an LLM-suggested first batch. `unknown` once the server forgets it. */
+export interface ActiveLearningSeed {
+  job_id?: Id
+  status: LlmJobStatus | 'unknown'
+  done?: number
+  total?: number
+  error?: string
 }
 
 export interface ActiveLearningRound {
@@ -208,6 +219,8 @@ export interface ActiveLearningState {
   label_counts: Record<string, number>
   /** The Dataset names no labels, so one can be typed wrong and corrected. */
   typed_labels: boolean
+  /** Only with an LLM-suggested first batch. */
+  seed?: ActiveLearningSeed
   retrain: {
     new_labels: number
     allowed: boolean
@@ -253,6 +266,8 @@ export interface LlmStatus {
   key: { base_url: string; model: string } | null
   /** Tokens left this month on the shared key; null for an own key or no limit. */
   remaining_tokens: number | null
+  /** The most items one suggestions request may ask for. Older servers omit it. */
+  max_sync_tasks?: number
   /** Sent when asked about a Dataset: whether its Project acknowledged `destination`. */
   acknowledged?: boolean
 }
@@ -512,6 +527,8 @@ export interface MLAdapter {
   correctActiveLearningLabel?(datasetId: Id, from: string, to: string): Promise<ActiveLearningState>
   retrainActiveLearning?(datasetId: Id): Promise<{ job_id: Id | null }>
   verifyActiveLearning?(datasetId: Id): Promise<void>
+  /** What an LLM-suggested first batch would send and cost. Nothing starts. */
+  estimateActiveLearningSeed?(datasetId: Id, options: { batch_size: number; holdout_percent: number }): Promise<LlmEstimate>
 
   // LLM assistance. Optional: without `getLlmStatus` the workspace shows no LLM
   // controls. Each rejects with an `LlmRefusalError`.

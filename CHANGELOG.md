@@ -33,6 +33,15 @@ tagged `vX.Y.Z`.
   - labels the next items in the queue, or every pending item, as a job on the worker,
     after a cost estimate, and follows its progress;
   - at the monthly limit, says so and offers an own key.
+- An LLM-suggested first batch in `ActiveLearningPanel` (legal-ml-core 0.8.0), offered
+  when the server's `seed_sources.llm` is true and the adapter implements the new
+  `estimateActiveLearningSeed`. Start first shows what the LLM labels, the tokens and
+  the destination, and starts only on "Start with the LLM"; over the monthly limit it
+  offers an own key instead. If the Project has not allowed the destination, it asks,
+  then starts. While the LLM chooses the batch the panel shows its progress, and the
+  workspace serves the batch once it is ready; if the LLM fails, the random order
+  stays.
+- The suggestion batch follows the server's `max_sync_tasks` when the status reports it.
 - Optional `MLAdapter` methods for every `/api/llm` route (`getLlmStatus`, `saveLlmKey`,
   `deleteLlmKey`, `acknowledgeLlmDestination`, `getLlmPrompt`, `updateLlmPrompt`,
   `createLlmSuggestions`, `listLlmSuggestions`, `confirmLlmSuggestion`,

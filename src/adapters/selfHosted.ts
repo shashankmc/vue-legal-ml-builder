@@ -240,6 +240,9 @@ export function createSelfHostedAdapter(opts: SelfHostedAdapterOptions): MLAdapt
     async startActiveLearning(datasetId: Id, options: ActiveLearningStartOptions): Promise<ActiveLearningState> {
       return post(`/active-learning/datasets/${datasetId}/start`, options)
     },
+    async estimateActiveLearningSeed(datasetId: Id, options): Promise<LlmEstimate> {
+      return post(`/active-learning/datasets/${datasetId}/seed-estimate`, options)
+    },
     async setActiveLearningStrategy(datasetId: Id, strategy: string): Promise<ActiveLearningState> {
       return put(`/active-learning/datasets/${datasetId}/strategy`, { strategy })
     },

@@ -232,6 +232,19 @@ describe('LLM assistance: suggestions for the batch', () => {
     wrapper.unmount()
   })
 
+  it('asks for as many items as the server takes in one request', async () => {
+    const pending = Array.from({ length: 6 }, (_, i) => item(`t${i}`, 'x', { item_index: i, score: null }))
+    const { adapter, wrapper } = await mounted({
+      listAnnotationTasks: vi.fn().mockResolvedValue(pending),
+      getLlmStatus: vi.fn().mockResolvedValue(llmStatus({ max_sync_tasks: 3 })),
+    })
+
+    await click(wrapper, 'Suggest labels for this batch')
+
+    expect(adapter.createLlmSuggestions).toHaveBeenCalledWith('ds-1', ['t0', 't1', 't2'])
+    wrapper.unmount()
+  })
+
   it('asks for the item on screen when the adapter cannot list items', async () => {
     const { adapter, wrapper } = await mounted()
 

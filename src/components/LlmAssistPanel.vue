@@ -82,7 +82,9 @@ async function onBulkAccept() {
 async function batchIds(): Promise<Id[]> {
   if (!props.adapter.listAnnotationTasks) return props.currentTaskId ? [props.currentTaskId] : []
   const pending = await props.adapter.listAnnotationTasks(props.projectId, { status: 'pending', datasetId: props.datasetId })
-  return queueOrder(pending).slice(0, SUGGEST_BATCH_SIZE).map((task) => task.id)
+  return queueOrder(pending)
+    .slice(0, status.value?.max_sync_tasks ?? SUGGEST_BATCH_SIZE)
+    .map((task) => task.id)
 }
 
 /** The key is read from the form when sent and cleared from it straight after. */

@@ -111,6 +111,7 @@ routes, and `createSelfHostedAdapter` implements them all:
 | `getLlmAgreement(datasetId)` / `bulkAcceptLlmSuggestions(datasetId)` | `GET /llm/datasets/<id>/agreement`, `POST …/bulk-accept` | The agreement check, and bulk accept once it passes |
 | `estimateLlmAnnotation(datasetId, taskIds?)` / `startLlmAnnotation(datasetId, taskIds?)` | `POST /llm/datasets/<id>/annotate/estimate`, `…/annotate` | Labelling many items at once, estimate first |
 | `getLlmJob(jobId)` | `GET /llm/jobs/<id>` | Following that job |
+| `estimateActiveLearningSeed(datasetId, { batch_size, holdout_percent })` | `POST /active-learning/datasets/<id>/seed-estimate` | Pricing an LLM-suggested first batch before Start |
 
 A suggestion is never a label: it shows on its item with the LLM's rationale, and
 becomes one only when the user accepts it, picks another label (a correction) or bulk

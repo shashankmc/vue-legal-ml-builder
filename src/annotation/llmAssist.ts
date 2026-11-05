@@ -1,7 +1,7 @@
 import type { AnnotationTask } from '../types'
 import { count } from './annotationState'
 
-/** legal-ml-core's default for `LLM_MAX_SYNC_TASKS`, which its API does not report. */
+/** legal-ml-core's default for `LLM_MAX_SYNC_TASKS`, for servers whose status does not report `max_sync_tasks`. */
 export const SUGGEST_BATCH_SIZE = 10
 
 /** Pending items as the queue serves them: scored items best first, the rest in row order. */

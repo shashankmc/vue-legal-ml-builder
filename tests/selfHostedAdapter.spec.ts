@@ -232,6 +232,19 @@ describe('createSelfHostedAdapter LLM methods', () => {
     expect(bulk.result).toEqual({ accepted: 12, agreement })
   })
 
+  it('prices an LLM-suggested first batch', async () => {
+    const priced = await call(estimate, (a) => a.estimateActiveLearningSeed!('ds-1', { batch_size: 20, holdout_percent: 20 }))
+
+    expect(priced.calls).toEqual([
+      expect.objectContaining({
+        url: '/api/active-learning/datasets/ds-1/seed-estimate',
+        method: 'POST',
+        body: { batch_size: 20, holdout_percent: 20 },
+      }),
+    ])
+    expect(priced.result).toEqual(estimate)
+  })
+
   it('estimates, starts and follows a standalone job', async () => {
     const subset = await call(estimate, (a) => a.estimateLlmAnnotation!('ds-1', ['t1', 't2']))
     expect(subset.calls).toEqual([expect.objectContaining({ url: '/api/llm/datasets/ds-1/annotate/estimate', method: 'POST', body: { task_ids: ['t1', 't2'] } })])
