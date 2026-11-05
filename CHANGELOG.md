@@ -11,6 +11,38 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+### Added
+
+- LLM suggestions in `AnnotationWorkspace`, for single-label classification, through a
+  new `LlmAssistPanel` (legal-ml-core 0.7.0 `/api/llm`). It appears only when the adapter
+  implements `getLlmStatus` and the Dataset names two labels, so Legal Blocks adapters
+  are unchanged. The panel:
+  - says whether the shared key, the user's own key or none is in use, where text is
+    sent, and the shared key's tokens left this month;
+  - adds and deletes an own key (base URL, model, key). The key is write-only: it is
+    cleared from the form once sent and never shown again;
+  - asks each Project to acknowledge the destination the backend names before anything
+    is sent, and again when it changes;
+  - suggests labels for the current batch. Each suggestion shows on its item with the
+    rationale, with Accept and Reject; choosing another label corrects it. None is a
+    label until confirmed;
+  - shows the agreement check (items checked out of the host's minimum, agreement
+    against its threshold) and keeps bulk accept locked until it passes;
+  - edits the prompt under "Advanced": label definitions and the template, saved as a
+    new version, with the backend's reason when an edit is refused;
+  - labels the next items in the queue, or every pending item, as a job on the worker,
+    after a cost estimate, and follows its progress;
+  - at the monthly limit, says so and offers an own key.
+- Optional `MLAdapter` methods for every `/api/llm` route (`getLlmStatus`, `saveLlmKey`,
+  `deleteLlmKey`, `acknowledgeLlmDestination`, `getLlmPrompt`, `updateLlmPrompt`,
+  `createLlmSuggestions`, `listLlmSuggestions`, `confirmLlmSuggestion`,
+  `rejectLlmSuggestion`, `getLlmAgreement`, `bulkAcceptLlmSuggestions`,
+  `estimateLlmAnnotation`, `startLlmAnnotation`, `getLlmJob`), implemented by
+  `createSelfHostedAdapter`. Its refusals keep the backend's `code` and `destination`
+  (`LlmRefusalError`). The `Llm*` types, `LlmAssistPanel` and `useLlmAssist` are exported.
+- `useAnnotation` has `confirmSuggestion`, which accepts or corrects a suggestion for the
+  item on screen and moves on.
+
 ## [0.6.0] - 2026-11-05
 
 ### Added

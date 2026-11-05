@@ -71,7 +71,9 @@ Or per component, for direct (non-plugin) usage; the prop overrides the plugin o
 `DatasetManager`, `DatasetEda`, `ModelList`, `ModelCreateWizard`, `ModelDetail`,
 `TrainingMonitor` (composes `TrainingCurves`), `ParameterPerformanceExplorer`,
 `AnnotationWorkspace` (composes `ActiveLearningPanel` when the adapter has the
-optional active learning methods and the task is single-label classification),
+optional active learning methods and the task is single-label classification, and
+`LlmAssistPanel` when the adapter has the optional LLM methods; see
+[LLM suggestions](#llm-suggestions)),
 plus shared primitives `ConfusionMatrix`/`PlotlyChart`/`ModelLens`/
 `MlBuilderThemeProvider`.
 
@@ -86,6 +88,42 @@ of training examples (their `training_step`), whatever `groupBy` and `xAxis` say
 `isLearningCurvePoint(point)` tells them apart in a custom slot. Each point's
 `x_kind` says what its `training_step` counts, and titles the x-axis: Training
 step, Iteration (logistic regression's loss by iteration) or Training examples.
+
+## LLM suggestions
+
+`AnnotationWorkspace` shows `LlmAssistPanel` above the item for single-label
+classification (`classification`, `document_classification`,
+`judgment_prediction`) when the adapter implements `getLlmStatus`, a `datasetId` is
+given and the Dataset names at least two labels. An adapter without the LLM methods
+(Legal Blocks) shows no LLM controls. The methods mirror legal-ml-core's `/api/llm`
+routes, and `createSelfHostedAdapter` implements them all:
+
+| Method | Route | Used for |
+| --- | --- | --- |
+| `getLlmStatus(datasetId?)` | `GET /llm/status` | Shared key, own key or none; destination; tokens left; whether the Project acknowledged |
+| `saveLlmKey({ base_url, model, api_key })` | `PUT /llm/key` | Adding an own key. Write-only: the key is never returned |
+| `deleteLlmKey()` | `DELETE /llm/key` | Deleting it |
+| `acknowledgeLlmDestination(datasetId, destination)` | `POST /llm/datasets/<id>/acknowledgement` | Agreeing to the destination shown, before anything is sent |
+| `getLlmPrompt(datasetId)` / `updateLlmPrompt(datasetId, { template, definitions })` | `GET`/`PUT /llm/datasets/<id>/prompt` | The prompt under Advanced, saved as a new version once checked |
+| `createLlmSuggestions(datasetId, taskIds)` | `POST /llm/datasets/<id>/suggestions` | Suggest labels for this batch |
+| `listLlmSuggestions(datasetId, status?)` | `GET /llm/datasets/<id>/suggestions` | Suggestions waiting on their items |
+| `confirmLlmSuggestion(id, label?)` / `rejectLlmSuggestion(id)` | `POST /llm/suggestions/<id>/confirm`, `/reject` | Accept, correct or reject one suggestion |
+| `getLlmAgreement(datasetId)` / `bulkAcceptLlmSuggestions(datasetId)` | `GET /llm/datasets/<id>/agreement`, `POST …/bulk-accept` | The agreement check, and bulk accept once it passes |
+| `estimateLlmAnnotation(datasetId, taskIds?)` / `startLlmAnnotation(datasetId, taskIds?)` | `POST /llm/datasets/<id>/annotate/estimate`, `…/annotate` | Labelling many items at once, estimate first |
+| `getLlmJob(jobId)` | `GET /llm/jobs/<id>` | Following that job |
+
+A suggestion is never a label: it shows on its item with the LLM's rationale, and
+becomes one only when the user accepts it, picks another label (a correction) or bulk
+accepts after the agreement check passes. "Suggest labels for this batch" asks for the
+next pending items in queue order (up to 10, legal-ml-core's default
+`LLM_MAX_SYNC_TASKS`), read with `listAnnotationTasks`; without it, the item on screen.
+Each method rejects with an `LlmRefusalError` whose `code` (`budget_exhausted`,
+`acknowledgement_required`, `destination_changed`, …) and `destination` the panel reads
+to tell the user what to do next. A custom adapter should set them the same way.
+
+The own key is read from the form when it is sent and cleared from it straight after;
+it is not kept in component state or storage. The panel polls a standalone job every
+`pollInterval` milliseconds (plugin option, default 3000).
 
 ## Configuring the training curves
 
