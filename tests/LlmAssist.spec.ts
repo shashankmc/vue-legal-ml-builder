@@ -113,6 +113,15 @@ describe('LLM assistance: status and own key', () => {
     wrapper.unmount()
   })
 
+  it('says when the saved own key cannot be used', async () => {
+    const status = llmStatus({ mode: 'none', destination: null, model: null, remaining_tokens: null, acknowledged: false, key: { base_url: 'https://api.example.com/v1', model: 'gpt-x' } })
+    const { wrapper } = await mounted({ getLlmStatus: vi.fn().mockResolvedValue(status) })
+
+    expect(panel(wrapper).text()).toContain("Your own key can't be used right now. Delete it and add it again with a public https base URL.")
+    expect(button(wrapper, 'Delete your key')).toBeDefined()
+    wrapper.unmount()
+  })
+
   it('saves an own key and clears it from the form', async () => {
     const status = llmStatus({ mode: 'none', destination: null, model: null, remaining_tokens: null, acknowledged: false })
     const getLlmStatus = vi.fn().mockResolvedValue(status)

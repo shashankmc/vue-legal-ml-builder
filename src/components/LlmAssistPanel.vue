@@ -120,6 +120,7 @@ watch(suggestions, (value) => emit('suggestions', value))
       <p v-else-if="status.mode === 'byok'" class="vmlb-llm-status">
         Suggestions use your own key. Text is sent to <strong>{{ status.destination }}</strong>.
       </p>
+      <p v-else-if="status.key" class="vmlb-llm-status">Your own key can't be used right now. Delete it and add it again with a public https base URL.</p>
       <p v-else class="vmlb-llm-status">LLM suggestions are not available for your account. Add your own API key to use them.</p>
 
       <div v-if="hasAccess && !ready" class="vmlb-llm-ack">
@@ -153,7 +154,7 @@ watch(suggestions, (value) => emit('suggestions', value))
           class="vmlb-llm-bar"
           role="progressbar"
           aria-label="Agreement check"
-          :aria-valuenow="agreement.checked"
+          :aria-valuenow="Math.min(agreement.checked, agreement.min_sample)"
           aria-valuemin="0"
           :aria-valuemax="agreement.min_sample"
         >
