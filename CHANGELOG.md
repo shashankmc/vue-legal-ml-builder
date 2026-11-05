@@ -11,6 +11,8 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-05
+
 ### Added
 
 - `TrainingCurves` draws a classical run's learning curve (legal-ml-core
@@ -283,7 +285,8 @@ tagged `vX.Y.Z`.
   monitoring), extracted from the `reducing_digital_divide` SvelteKit frontend
   and driven through a host-supplied `MLAdapter`.
 
-[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.5.5...v0.6.0
 [0.5.5]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.5.2...v0.5.3
