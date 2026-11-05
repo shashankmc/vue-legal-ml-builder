@@ -9,7 +9,8 @@ const props = defineProps<{
   datasetId: Id
 }>()
 
-const { status, error, notice, isBusy, budgetExhausted, hasAccess, refresh, saveKey, deleteKey } = useLlmAssist(props.adapter)
+const { status, error, notice, isBusy, budgetExhausted, hasAccess, ready, refresh, saveKey, deleteKey, acknowledge } =
+  useLlmAssist(props.adapter)
 
 function tokens(value: number) {
   return value.toLocaleString('en')
@@ -50,6 +51,14 @@ watch(() => props.datasetId, (id) => refresh(id))
       </p>
       <p v-else class="vmlb-llm-status">LLM suggestions are not available for your account. Add your own API key to use them.</p>
 
+      <div v-if="hasAccess && !ready" class="vmlb-llm-ack">
+        <p>
+          Before anything is sent, confirm that text from this Project may be sent to {{ status.destination }}.
+          You are asked again if this changes.
+        </p>
+        <button class="vmlb-btn-primary" :disabled="isBusy" @click="acknowledge(datasetId)">Allow sending to {{ status.destination }}</button>
+      </div>
+
       <div v-if="status.key" class="vmlb-llm-own vmlb-muted">
         <span>Your own key: {{ status.key.model }} at {{ status.key.base_url }}</span>
         <button class="vmlb-btn-tertiary" :disabled="isBusy" @click="deleteKey(datasetId)">Delete your key</button>
@@ -81,6 +90,8 @@ watch(() => props.datasetId, (id) => refresh(id))
 .vmlb-llm { margin-bottom: 1.25rem; padding: 1.25rem 1.5rem; font-size: 0.875rem; }
 .vmlb-llm-title { margin: 0 0 0.35rem; font-size: 1rem; font-weight: 600; }
 .vmlb-llm-status { margin: 0.35rem 0; }
+.vmlb-llm-ack { margin: 0.75rem 0; padding: 0.75rem 0.85rem; border-radius: var(--vmlb-radius-md); background: var(--vmlb-accent-soft); }
+.vmlb-llm-ack p { margin: 0 0 0.5rem; }
 .vmlb-llm-own { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.8125rem; }
 .vmlb-llm-more { margin-top: 0.75rem; }
 .vmlb-llm-more summary { cursor: pointer; font-weight: 600; }

@@ -64,5 +64,13 @@ export function useLlmAssist(adapter: MLAdapter) {
     }, 'Failed to delete your key')
   }
 
-  return { status, error, notice, isBusy, budgetExhausted, hasAccess, ready, refresh, saveKey, deleteKey }
+  /** Names the destination the user was shown, so a stale screen can't agree to another. */
+  function acknowledge(datasetId: Id) {
+    return run(datasetId, async () => {
+      await adapter.acknowledgeLlmDestination!(datasetId, status.value!.destination!)
+      await loadStatus(datasetId)
+    }, 'Failed to save your confirmation')
+  }
+
+  return { status, error, notice, isBusy, budgetExhausted, hasAccess, ready, refresh, saveKey, deleteKey, acknowledge }
 }

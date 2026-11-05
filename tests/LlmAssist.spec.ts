@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import AnnotationWorkspace from '../src/components/AnnotationWorkspace.vue'
 import type { MLAdapter } from '../src/types'
 import { createTestAdapter } from './testAdapter'
-import { llmMethods, llmStatus } from './fixtures/llm'
+import { llmMethods, llmStatus, refusal } from './fixtures/llm'
 
 function item(id: string, text: string, extra = {}) {
   return { id, dataset_id: 'ds-1', item_index: 0, text, status: 'pending' as const, created_at: '', updated_at: '', ...extra }
@@ -158,6 +158,48 @@ describe('LLM assistance: status and own key', () => {
 
     expect(adapter.deleteLlmKey).toHaveBeenCalled()
     expect(panel(wrapper).text()).toContain('the shared key')
+    wrapper.unmount()
+  })
+})
+
+describe('LLM assistance: acknowledging the destination', () => {
+  const unacknowledged = llmStatus({ acknowledged: false })
+
+  it('asks before anything is sent, naming the destination the backend gives', async () => {
+    const { adapter, wrapper } = await mounted({ getLlmStatus: vi.fn().mockResolvedValue(unacknowledged) })
+
+    expect(panel(wrapper).text()).toContain('Before anything is sent, confirm that text from this Project may be sent to openrouter.ai.')
+    expect(button(wrapper, 'Allow sending to openrouter.ai')).toBeDefined()
+    expect(button(wrapper, 'Suggest labels for this batch')).toBeUndefined()
+    expect(adapter.createLlmSuggestions).not.toHaveBeenCalled()
+    expect(adapter.getLlmAgreement).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('acknowledges that destination and then offers suggestions', async () => {
+    const getLlmStatus = vi.fn().mockResolvedValueOnce(unacknowledged).mockResolvedValue(llmStatus())
+    const { adapter, wrapper } = await mounted({ getLlmStatus })
+
+    await click(wrapper, 'Allow sending to openrouter.ai')
+
+    expect(adapter.acknowledgeLlmDestination).toHaveBeenCalledWith('ds-1', 'openrouter.ai')
+    expect(panel(wrapper).text()).not.toContain('Before anything is sent')
+    wrapper.unmount()
+  })
+
+  it('shows the new destination when it changed meanwhile', async () => {
+    const moved = llmStatus({ acknowledged: false, mode: 'byok', destination: 'api.example.com' })
+    const getLlmStatus = vi.fn().mockResolvedValueOnce(unacknowledged).mockResolvedValue(moved)
+    const acknowledgeLlmDestination = vi.fn().mockRejectedValue(
+      refusal('The LLM destination has changed. Please review it again.', 'destination_changed', { destination: 'api.example.com' }),
+    )
+    const { wrapper } = await mounted({ getLlmStatus, acknowledgeLlmDestination })
+
+    await click(wrapper, 'Allow sending to openrouter.ai')
+
+    expect(panel(wrapper).text()).toContain('The LLM destination has changed. Please review it again.')
+    expect(button(wrapper, 'Allow sending to api.example.com')).toBeDefined()
+    expect(button(wrapper, 'Allow sending to openrouter.ai')).toBeUndefined()
     wrapper.unmount()
   })
 })
