@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { count } from '../annotation/annotationState'
 import { SUGGEST_BATCH_SIZE, percent, queueOrder, tokens } from '../annotation/llmAssist'
 import { useLlmAssist } from '../composables/useLlmAssist'
@@ -10,6 +10,8 @@ const props = defineProps<{
   adapter: MLAdapter
   projectId: Id
   datasetId: Id
+  /** The Dataset's labels, which the prompt defines. */
+  labels: string[]
   /** The item on screen, the batch when the adapter cannot list items. */
   currentTaskId?: Id | null
   /** Bumped by the host after each saved label, to refresh what is waiting. */
@@ -22,9 +24,30 @@ const emit = defineEmits<{
 }>()
 
 const {
-  status, suggestions, agreement, error, notice, isBusy, budgetExhausted, hasAccess, ready,
-  refresh, refreshProgress, saveKey, deleteKey, acknowledge, suggest, bulkAccept,
+  status, suggestions, agreement, prompt, promptError, error, notice, isBusy, budgetExhausted, hasAccess, ready,
+  refresh, refreshProgress, saveKey, deleteKey, acknowledge, suggest, bulkAccept, loadPrompt, savePrompt,
 } = useLlmAssist(props.adapter)
+
+// The edit in progress. It stays as typed when the backend refuses it.
+const template = ref('')
+const definitions = ref<Record<string, string>>({})
+
+watch(prompt, (value) => {
+  if (!value) return
+  template.value = value.template
+  definitions.value = Object.fromEntries(props.labels.map((label) => [label, value.definitions[label] ?? '']))
+})
+
+function onPromptToggle(event: Event) {
+  if ((event.target as HTMLDetailsElement).open && !prompt.value) loadPrompt(props.datasetId)
+}
+
+function onSavePrompt() {
+  const filled = Object.entries(definitions.value)
+    .map(([label, text]) => [label, text.trim()] as const)
+    .filter(([, text]) => text)
+  savePrompt(props.datasetId, { template: template.value, definitions: Object.fromEntries(filled) })
+}
 
 async function onBulkAccept() {
   if (await bulkAccept(props.datasetId)) emit('labelled')
@@ -122,11 +145,35 @@ watch(suggestions, (value) => emit('suggestions', value))
         <button class="vmlb-btn-secondary" :disabled="isBusy || !agreement.unlocked" @click="onBulkAccept">Accept all waiting suggestions</button>
       </div>
 
+      <details v-if="ready" class="vmlb-llm-more vmlb-llm-prompt" @toggle="onPromptToggle">
+        <summary>Advanced: the prompt</summary>
+        <div v-if="promptError" class="vmlb-alert-error"><Icon name="alert" /> {{ promptError }}</div>
+        <form v-if="prompt" class="vmlb-llm-prompt-form" @submit.prevent="onSavePrompt">
+          <p class="vmlb-muted">
+            {{ prompt.version === 0 ? 'Version 0, the default' : `Version ${prompt.version}` }}.
+            Each saved edit is checked, then kept as a new version.
+          </p>
+          <div v-for="label in labels" :key="label" class="vmlb-field">
+            <label :for="`vmlb-llm-def-${label}`">Definition of {{ label }}</label>
+            <textarea :id="`vmlb-llm-def-${label}`" v-model="definitions[label]" :name="`definition-${label}`" rows="2" maxlength="500" />
+          </div>
+          <div class="vmlb-field">
+            <label for="vmlb-llm-template">Template</label>
+            <textarea id="vmlb-llm-template" v-model="template" name="template" rows="8" maxlength="4000" />
+          </div>
+          <p class="vmlb-muted">
+            Keep <code>{labels}</code> and <code>{text}</code> in the template, once each. <code>{examples}</code> adds up to
+            five items you labelled.
+          </p>
+          <button class="vmlb-btn-secondary" type="submit" :disabled="isBusy || budgetExhausted">Save as a new version</button>
+        </form>
+      </details>
+
       <div v-if="status.key" class="vmlb-llm-own vmlb-muted">
         <span>Your own key: {{ status.key.model }} at {{ status.key.base_url }}</span>
         <button class="vmlb-btn-tertiary" :disabled="isBusy" @click="deleteKey(datasetId)">Delete your key</button>
       </div>
-      <details v-else class="vmlb-llm-more" :open="!hasAccess || budgetExhausted">
+      <details v-else class="vmlb-llm-more vmlb-llm-add-key" :open="!hasAccess || budgetExhausted">
         <summary>Add your own API key</summary>
         <form class="vmlb-llm-key" autocomplete="off" @submit.prevent="onSaveKey">
           <p class="vmlb-muted">Any OpenAI-compatible service works. The key is stored encrypted and never shown again.</p>
@@ -162,6 +209,8 @@ watch(suggestions, (value) => emit('suggestions', value))
 .vmlb-llm-agreement-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.35rem; }
 .vmlb-llm-bar { width: 100%; height: 0.4rem; overflow: hidden; background: var(--vmlb-surface-sunken); border: 1px solid var(--vmlb-border); border-radius: 999px; }
 .vmlb-llm-bar-fill { width: 100%; height: 100%; background: var(--vmlb-accent); transform-origin: left center; transition: transform 0.35s var(--vmlb-ease); }
+.vmlb-llm-prompt-form { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+.vmlb-llm-prompt-form textarea { font-family: var(--vmlb-font-mono, monospace); font-size: 0.8125rem; }
 .vmlb-llm-own { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.8125rem; }
 .vmlb-llm-more { margin-top: 0.75rem; }
 .vmlb-llm-more summary { cursor: pointer; font-weight: 600; }

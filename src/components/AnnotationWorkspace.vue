@@ -296,6 +296,7 @@ async function onLabelHoldout() {
       :adapter="adapter"
       :project-id="projectId"
       :dataset-id="datasetId"
+      :labels="namedLabels"
       :current-task-id="task?.id ?? null"
       :labels-version="labelsVersion"
       @suggestions="suggestions = $event"

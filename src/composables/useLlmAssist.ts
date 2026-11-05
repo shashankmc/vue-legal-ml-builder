@@ -1,7 +1,7 @@
-import { computed, ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 import { count } from '../annotation/annotationState'
 import { batchSummary } from '../annotation/llmAssist'
-import type { Id, LlmAgreement, LlmKeyInput, LlmRefusalError, LlmStatus, LlmSuggestion, MLAdapter } from '../types'
+import type { Id, LlmAgreement, LlmKeyInput, LlmPrompt, LlmRefusalError, LlmStatus, LlmSuggestion, MLAdapter } from '../types'
 
 /** Refusals after which the status on screen is out of date. */
 const STATUS_CODES = ['no_llm_access', 'acknowledgement_required', 'destination_changed', 'credential_unusable']
@@ -13,6 +13,9 @@ export function useLlmAssist(adapter: MLAdapter) {
   /** Suggestions still waiting for a person. None of them is a label. */
   const suggestions = ref<LlmSuggestion[]>([])
   const agreement = ref<LlmAgreement | null>(null)
+  const prompt = ref<LlmPrompt | null>(null)
+  /** Why the backend refused a prompt edit, shown beside the editor. */
+  const promptError = ref<string | null>(null)
   const error = ref<string | null>(null)
   const notice = ref('')
   const isBusy = ref(false)
@@ -43,15 +46,16 @@ export function useLlmAssist(adapter: MLAdapter) {
     agreement.value = check ?? null
   }
 
-  async function run(datasetId: Id, action: () => Promise<void>, fallback: string) {
+  async function run(datasetId: Id, action: () => Promise<void>, fallback: string, errorRef: Ref<string | null> = error) {
     isBusy.value = true
     error.value = null
+    errorRef.value = null
     notice.value = ''
     try {
       await action()
     } catch (err) {
       const refusal = err as LlmRefusalError
-      error.value = err instanceof Error ? err.message : fallback
+      errorRef.value = err instanceof Error ? err.message : fallback
       if (refusal?.code === 'budget_exhausted') budgetExhausted.value = true
       if (STATUS_CODES.includes(refusal?.code ?? '')) await loadStatus(datasetId).catch(() => undefined)
     } finally {
@@ -60,6 +64,11 @@ export function useLlmAssist(adapter: MLAdapter) {
   }
 
   function refresh(datasetId: Id) {
+    if (datasetId !== currentId) {
+      suggestions.value = []
+      agreement.value = null
+      prompt.value = null
+    }
     currentId = datasetId
     return run(datasetId, () => loadStatus(datasetId), 'Failed to load LLM access')
   }
@@ -122,8 +131,24 @@ export function useLlmAssist(adapter: MLAdapter) {
     }, 'Failed to get suggestions')
   }
 
+  function loadPrompt(datasetId: Id) {
+    return run(datasetId, async () => {
+      const next = await adapter.getLlmPrompt!(datasetId)
+      if (datasetId === currentId) prompt.value = next
+    }, 'Failed to load the prompt', promptError)
+  }
+
+  /** The backend checks the edit, with an LLM among its checks, before it keeps it. */
+  function savePrompt(datasetId: Id, edit: { template: string; definitions: Record<string, string> }) {
+    return run(datasetId, async () => {
+      prompt.value = await adapter.updateLlmPrompt!(datasetId, edit)
+      await loadStatus(datasetId)
+      notice.value = `Saved as version ${prompt.value.version}. The agreement check starts again for it.`
+    }, 'Failed to save the prompt', promptError)
+  }
+
   return {
-    status, suggestions, agreement, error, notice, isBusy, budgetExhausted, hasAccess, ready,
-    refresh, refreshProgress, saveKey, deleteKey, acknowledge, suggest, bulkAccept,
+    status, suggestions, agreement, prompt, promptError, error, notice, isBusy, budgetExhausted, hasAccess, ready,
+    refresh, refreshProgress, saveKey, deleteKey, acknowledge, suggest, bulkAccept, loadPrompt, savePrompt,
   }
 }

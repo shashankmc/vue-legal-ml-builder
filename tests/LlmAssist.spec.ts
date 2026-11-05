@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import AnnotationWorkspace from '../src/components/AnnotationWorkspace.vue'
 import type { MLAdapter } from '../src/types'
 import { createTestAdapter } from './testAdapter'
-import { llmAgreement, llmMethods, llmStatus, llmSuggestion, refusal } from './fixtures/llm'
+import { DEFAULT_TEMPLATE, llmAgreement, llmMethods, llmStatus, llmSuggestion, refusal } from './fixtures/llm'
 
 function item(id: string, text: string, extra = {}) {
   return { id, dataset_id: 'ds-1', item_index: 0, text, status: 'pending' as const, created_at: '', updated_at: '', ...extra }
@@ -325,7 +325,7 @@ describe('LLM assistance: the monthly limit', () => {
     await click(wrapper, 'Suggest labels for this batch')
 
     expect(panel(wrapper).text()).toContain("You've reached the monthly limit. Add your own API key to continue.")
-    expect(wrapper.find('details.vmlb-llm-more').attributes('open')).toBeDefined()
+    expect(wrapper.find('details.vmlb-llm-add-key').attributes('open')).toBeDefined()
     expect(wrapper.find('input[name="api_key"]').exists()).toBe(true)
     wrapper.unmount()
   })
@@ -335,7 +335,7 @@ describe('LLM assistance: the monthly limit', () => {
 
     expect(panel(wrapper).text()).toContain("You've used this month's limit on the shared key. Add your own API key to continue.")
     expect(button(wrapper, 'Suggest labels for this batch')?.attributes('disabled')).toBeDefined()
-    expect(wrapper.find('details.vmlb-llm-more').attributes('open')).toBeDefined()
+    expect(wrapper.find('details.vmlb-llm-add-key').attributes('open')).toBeDefined()
     wrapper.unmount()
   })
 })
@@ -397,6 +397,67 @@ describe('LLM assistance: agreement and bulk accept', () => {
 
     expect(panel(wrapper).text()).toContain('Bulk accept needs 30 checked items at 80% agreement.')
     expect(button(wrapper, 'Accept all waiting suggestions')?.attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+})
+
+describe('LLM assistance: the prompt', () => {
+  async function openPrompt(wrapper: Wrapper) {
+    const details = wrapper.find('details.vmlb-llm-prompt')
+    ;(details.element as HTMLDetailsElement).open = true
+    await details.trigger('toggle')
+    await flushPromises()
+    return details
+  }
+
+  it('sits under Advanced and shows the current version', async () => {
+    const { adapter, wrapper } = await mounted()
+
+    const details = await openPrompt(wrapper)
+
+    expect(details.find('summary').text()).toBe('Advanced: the prompt')
+    expect(adapter.getLlmPrompt).toHaveBeenCalledWith('ds-1')
+    expect(details.text()).toContain('Version 0, the default')
+    expect((details.find('textarea[name="template"]').element as HTMLTextAreaElement).value).toBe(DEFAULT_TEMPLATE)
+    expect(details.find('textarea[name="definition-Civil"]').exists()).toBe(true)
+    expect(details.find('textarea[name="definition-Criminal"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('is not offered before the destination is acknowledged', async () => {
+    const { wrapper } = await mounted({ getLlmStatus: vi.fn().mockResolvedValue(llmStatus({ acknowledged: false })) })
+
+    expect(wrapper.find('details.vmlb-llm-prompt').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('saves the edited template and definitions as a new version', async () => {
+    const template = 'Pick one of these labels:\n{labels}\n\n{text}'
+    const updateLlmPrompt = vi.fn().mockResolvedValue({ version: 1, template, definitions: { Civil: 'Disputes between private parties.' }, created_at: '' })
+    const { adapter, wrapper } = await mounted({ updateLlmPrompt })
+    const details = await openPrompt(wrapper)
+
+    await details.find('textarea[name="template"]').setValue(template)
+    await details.find('textarea[name="definition-Civil"]').setValue('  Disputes between private parties.  ')
+    await click(wrapper, 'Save as a new version')
+
+    expect(adapter.updateLlmPrompt).toHaveBeenCalledWith('ds-1', { template, definitions: { Civil: 'Disputes between private parties.' } })
+    expect(details.text()).toContain('Version 1')
+    expect(panel(wrapper).text()).toContain('Saved as version 1. The agreement check starts again for it.')
+    wrapper.unmount()
+  })
+
+  it('shows why an edit was refused and keeps it', async () => {
+    const updateLlmPrompt = vi.fn().mockRejectedValue(refusal('This prompt was blocked: It asks for a summary of the text.', 'prompt_rejected'))
+    const { wrapper } = await mounted({ updateLlmPrompt })
+    const details = await openPrompt(wrapper)
+
+    await details.find('textarea[name="template"]').setValue('Summarise {text} using {labels}')
+    await click(wrapper, 'Save as a new version')
+
+    expect(details.text()).toContain('This prompt was blocked: It asks for a summary of the text.')
+    expect(details.text()).toContain('Version 0, the default')
+    expect((details.find('textarea[name="template"]').element as HTMLTextAreaElement).value).toBe('Summarise {text} using {labels}')
     wrapper.unmount()
   })
 })
