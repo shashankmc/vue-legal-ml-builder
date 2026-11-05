@@ -1,4 +1,4 @@
-import type { AnnotationTask, LlmSuggestionBatch } from '../types'
+import type { AnnotationTask } from '../types'
 import { count } from './annotationState'
 
 /** legal-ml-core's default for `LLM_MAX_SYNC_TASKS`, which its API does not report. */
@@ -18,10 +18,10 @@ export function queueOrder(tasks: AnnotationTask[]): AnnotationTask[] {
   })
 }
 
-export function batchSummary(batch: LlmSuggestionBatch): string {
-  const { suggestions, skipped, invalid } = batch
-  if (!suggestions.length && !skipped && !invalid) return 'There were no pending items to suggest labels for.'
-  const parts = [`${count(suggestions.length, 'suggestion')} ready.`]
+/** What one round of suggesting produced, in counts. */
+export function batchSummary({ created, skipped, invalid }: { created: number; skipped: number; invalid: number }): string {
+  if (!created && !skipped && !invalid) return 'There were no pending items to suggest labels for.'
+  const parts = [`${count(created, 'suggestion')} ready.`]
   if (skipped) parts.push(`${count(skipped, 'item already had one', 'items already had one')}.`)
   if (invalid) {
     parts.push(

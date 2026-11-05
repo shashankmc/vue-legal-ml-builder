@@ -1,5 +1,5 @@
 import { mount, flushPromises } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import AnnotationWorkspace from '../src/components/AnnotationWorkspace.vue'
 import type { MLAdapter } from '../src/types'
 import { createTestAdapter } from './testAdapter'
@@ -458,6 +458,124 @@ describe('LLM assistance: the prompt', () => {
     expect(details.text()).toContain('This prompt was blocked: It asks for a summary of the text.')
     expect(details.text()).toContain('Version 0, the default')
     expect((details.find('textarea[name="template"]').element as HTMLTextAreaElement).value).toBe('Summarise {text} using {labels}')
+    wrapper.unmount()
+  })
+})
+
+describe('LLM assistance: labelling many items at once', () => {
+  const estimate = { tasks: 3, estimated_tokens: 4200, remaining_tokens: 150000, within_budget: true, destination: 'openrouter.ai' }
+  const pending = [item('t3', 'c', { item_index: 3 }), item('t1', 'a', { item_index: 1 }), item('t2', 'b', { item_index: 2 })]
+
+  afterEach(() => vi.useRealTimers())
+
+  function section(wrapper: Wrapper) {
+    return wrapper.find('details.vmlb-llm-standalone')
+  }
+
+  it('estimates the cost of the next items before anything starts', async () => {
+    const estimateLlmAnnotation = vi.fn().mockResolvedValue({ ...estimate, tasks: 2 })
+    const { adapter, wrapper } = await mounted({ listAnnotationTasks: vi.fn().mockResolvedValue(pending), estimateLlmAnnotation })
+
+    expect(section(wrapper).find('summary').text()).toBe('Label many items at once')
+    await section(wrapper).find('input[name="count"]').setValue(2)
+    await click(wrapper, 'Estimate the cost')
+
+    expect(estimateLlmAnnotation).toHaveBeenCalledWith('ds-1', ['t1', 't2'])
+    expect(adapter.startLlmAnnotation).not.toHaveBeenCalled()
+    const text = section(wrapper).text()
+    expect(text).toContain('2 items, about 4,200 tokens. Text is sent to openrouter.ai.')
+    expect(text).toContain('150,000 tokens left this month.')
+    expect(button(wrapper, 'Start labelling 2 items')).toBeDefined()
+    wrapper.unmount()
+  })
+
+  it('estimates the whole Dataset without naming items', async () => {
+    const estimateLlmAnnotation = vi.fn().mockResolvedValue(estimate)
+    const { wrapper } = await mounted({ listAnnotationTasks: vi.fn().mockResolvedValue(pending), estimateLlmAnnotation })
+
+    await section(wrapper).find('input[value="all"]').setValue(true)
+    await click(wrapper, 'Estimate the cost')
+
+    expect(estimateLlmAnnotation).toHaveBeenCalledWith('ds-1', undefined)
+    wrapper.unmount()
+  })
+
+  it('will not start a job larger than the monthly limit', async () => {
+    const estimateLlmAnnotation = vi.fn().mockResolvedValue({ ...estimate, estimated_tokens: 900000, within_budget: false })
+    const { wrapper } = await mounted({ estimateLlmAnnotation })
+
+    await click(wrapper, 'Estimate the cost')
+
+    expect(section(wrapper).text()).toContain('This is more than your remaining monthly limit. Label fewer items, or add your own API key.')
+    expect(button(wrapper, 'Start labelling 3 items')?.attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+
+  it('starts the job it estimated and follows it until done', async () => {
+    vi.useFakeTimers()
+    const listAnnotationTasks = vi.fn().mockResolvedValue(pending)
+    const estimateLlmAnnotation = vi.fn().mockResolvedValue(estimate)
+    const startLlmAnnotation = vi.fn().mockResolvedValue({ job_id: 'job-1', estimate })
+    const getLlmJob = vi.fn()
+      .mockResolvedValueOnce({ status: 'running', total: 3, done: 1, created: 1, invalid: 0 })
+      .mockResolvedValue({ status: 'completed', total: 3, done: 3, created: 2, invalid: 1 })
+    const listLlmSuggestions = vi.fn().mockResolvedValue([])
+    const { wrapper } = await mounted({ listAnnotationTasks, estimateLlmAnnotation, startLlmAnnotation, getLlmJob, listLlmSuggestions })
+
+    await click(wrapper, 'Estimate the cost')
+    await click(wrapper, 'Start labelling 3 items')
+    expect(startLlmAnnotation).toHaveBeenCalledWith('ds-1', ['t1', 't2', 't3'])
+    expect(getLlmJob).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(getLlmJob).toHaveBeenCalledWith('job-1')
+    expect(section(wrapper).text()).toContain('1 of 3 items done')
+    expect(section(wrapper).find('[role="progressbar"]').attributes('aria-valuenow')).toBe('1')
+
+    const listed = listLlmSuggestions.mock.calls.length
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(section(wrapper).text()).toContain('Done. 2 suggestions ready. 1 answer was discarded because it did not give one of your labels.')
+    expect(listLlmSuggestions.mock.calls.length).toBeGreaterThan(listed)
+
+    await vi.advanceTimersByTimeAsync(9000)
+    expect(getLlmJob).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+
+  it('says why a job stopped at the monthly limit and offers an own key', async () => {
+    vi.useFakeTimers()
+    const getLlmJob = vi.fn().mockResolvedValue({
+      status: 'budget_exhausted', total: 3, done: 1, created: 1, invalid: 0,
+      error: 'The monthly limit was reached. Add your own API key to continue.',
+    })
+    const { wrapper } = await mounted({
+      estimateLlmAnnotation: vi.fn().mockResolvedValue(estimate),
+      startLlmAnnotation: vi.fn().mockResolvedValue({ job_id: 'job-1', estimate }),
+      getLlmJob,
+    })
+
+    await click(wrapper, 'Estimate the cost')
+    await click(wrapper, 'Start labelling 3 items')
+    await vi.advanceTimersByTimeAsync(3000)
+
+    expect(section(wrapper).text()).toContain('The monthly limit was reached. Add your own API key to continue.')
+    expect(wrapper.find('details.vmlb-llm-add-key').attributes('open')).toBeDefined()
+    wrapper.unmount()
+  })
+
+  it('says why a job failed', async () => {
+    vi.useFakeTimers()
+    const { wrapper } = await mounted({
+      estimateLlmAnnotation: vi.fn().mockResolvedValue(estimate),
+      startLlmAnnotation: vi.fn().mockResolvedValue({ job_id: 'job-1', estimate }),
+      getLlmJob: vi.fn().mockResolvedValue({ status: 'failed', total: 3, done: 0, error: 'The annotation job failed.' }),
+    })
+
+    await click(wrapper, 'Estimate the cost')
+    await click(wrapper, 'Start labelling 3 items')
+    await vi.advanceTimersByTimeAsync(3000)
+
+    expect(section(wrapper).text()).toContain('The annotation job failed.')
     wrapper.unmount()
   })
 })

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { count } from '../annotation/annotationState'
-import { SUGGEST_BATCH_SIZE, percent, queueOrder, tokens } from '../annotation/llmAssist'
+import { SUGGEST_BATCH_SIZE, batchSummary, percent, queueOrder, tokens } from '../annotation/llmAssist'
 import { useLlmAssist } from '../composables/useLlmAssist'
 import type { Id, LlmSuggestion, MLAdapter } from '../types'
 import Icon from './shared/Icon.vue'
@@ -25,8 +25,33 @@ const emit = defineEmits<{
 
 const {
   status, suggestions, agreement, prompt, promptError, error, notice, isBusy, budgetExhausted, hasAccess, ready,
+  estimate, job,
   refresh, refreshProgress, saveKey, deleteKey, acknowledge, suggest, bulkAccept, loadPrompt, savePrompt,
-} = useLlmAssist(props.adapter)
+  estimateJob, clearEstimate, startJob,
+} = useLlmAssist(props.adapter, inject<number>('vmlb:pollInterval', 3000))
+
+const canLabelMany = computed(
+  () => !!props.adapter.estimateLlmAnnotation && !!props.adapter.startLlmAnnotation && !!props.adapter.getLlmJob,
+)
+// Choosing items needs the list of pending items; without it, the whole Dataset.
+const scope = ref<'next' | 'all'>(props.adapter.listAnnotationTasks ? 'next' : 'all')
+const jobSize = ref(50)
+watch([scope, jobSize], clearEstimate)
+
+const jobRunning = computed(() => job.value?.status === 'queued' || job.value?.status === 'running')
+const jobSummary = computed(() => {
+  const value = job.value
+  if (value?.status !== 'completed') return ''
+  const created = value.created ?? 0
+  const invalid = value.invalid ?? 0
+  return `Done. ${batchSummary({ created, invalid, skipped: Math.max(value.done - created - invalid, 0) })}`
+})
+
+async function jobIds(): Promise<Id[] | undefined> {
+  if (scope.value === 'all' || !props.adapter.listAnnotationTasks) return undefined
+  const pending = await props.adapter.listAnnotationTasks(props.projectId, { status: 'pending', datasetId: props.datasetId })
+  return queueOrder(pending).slice(0, Math.max(1, jobSize.value)).map((task) => task.id)
+}
 
 // The edit in progress. It stays as typed when the backend refuses it.
 const template = ref('')
@@ -145,6 +170,56 @@ watch(suggestions, (value) => emit('suggestions', value))
         <button class="vmlb-btn-secondary" :disabled="isBusy || !agreement.unlocked" @click="onBulkAccept">Accept all waiting suggestions</button>
       </div>
 
+      <details v-if="ready && canLabelMany" class="vmlb-llm-more vmlb-llm-standalone" :open="!!job || !!estimate">
+        <summary>Label many items at once</summary>
+        <p class="vmlb-muted">
+          The LLM suggests a label for each item while you work. Suggestions wait for you to accept them, as above.
+        </p>
+        <fieldset class="vmlb-llm-scope" :disabled="jobRunning">
+          <label v-if="adapter.listAnnotationTasks">
+            <input v-model="scope" type="radio" name="vmlb-llm-scope" value="next" />
+            The next <input v-model.number="jobSize" name="count" type="number" min="1" aria-label="Number of items" /> items in the queue
+          </label>
+          <label><input v-model="scope" type="radio" name="vmlb-llm-scope" value="all" /> Every pending item in the Dataset</label>
+        </fieldset>
+        <button class="vmlb-btn-secondary" :disabled="isBusy || jobRunning || budgetExhausted" @click="estimateJob(datasetId, jobIds)">
+          Estimate the cost
+        </button>
+
+        <div v-if="estimate" class="vmlb-llm-estimate">
+          <p>
+            {{ count(estimate.tasks, 'item') }}, about {{ tokens(estimate.estimated_tokens) }} tokens. Text is sent to
+            {{ estimate.destination }}.
+            <template v-if="estimate.remaining_tokens !== null">{{ tokens(estimate.remaining_tokens) }} tokens left this month.</template>
+          </p>
+          <p v-if="!estimate.within_budget" class="vmlb-llm-warning" role="status">
+            <Icon name="alert" /> This is more than your remaining monthly limit. Label fewer items, or add your own API key.
+          </p>
+          <button class="vmlb-btn-primary" :disabled="isBusy || !estimate.within_budget || !estimate.tasks" @click="startJob(datasetId)">
+            Start labelling {{ count(estimate.tasks, 'item') }}
+          </button>
+        </div>
+
+        <div v-if="job" class="vmlb-llm-job">
+          <div class="vmlb-llm-agreement-head">
+            <span class="vmlb-label">{{ job.status === 'queued' ? 'Waiting for the worker' : 'Labelling' }}</span>
+            <span class="vmlb-muted vmlb-num">{{ job.done }} of {{ count(job.total, 'item') }} done</span>
+          </div>
+          <div
+            class="vmlb-llm-bar"
+            role="progressbar"
+            aria-label="Labelling progress"
+            :aria-valuenow="job.done"
+            aria-valuemin="0"
+            :aria-valuemax="job.total"
+          >
+            <div class="vmlb-llm-bar-fill" :style="{ transform: `scaleX(${job.total ? job.done / job.total : 0})` }" />
+          </div>
+          <p v-if="jobSummary" role="status">{{ jobSummary }}</p>
+          <div v-if="job.error" class="vmlb-alert-error"><Icon name="alert" /> {{ job.error }}</div>
+        </div>
+      </details>
+
       <details v-if="ready" class="vmlb-llm-more vmlb-llm-prompt" @toggle="onPromptToggle">
         <summary>Advanced: the prompt</summary>
         <div v-if="promptError" class="vmlb-alert-error"><Icon name="alert" /> {{ promptError }}</div>
@@ -211,6 +286,10 @@ watch(suggestions, (value) => emit('suggestions', value))
 .vmlb-llm-bar-fill { width: 100%; height: 100%; background: var(--vmlb-accent); transform-origin: left center; transition: transform 0.35s var(--vmlb-ease); }
 .vmlb-llm-prompt-form { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
 .vmlb-llm-prompt-form textarea { font-family: var(--vmlb-font-mono, monospace); font-size: 0.8125rem; }
+.vmlb-llm-scope { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.5rem 0 0.75rem; padding: 0; border: 0; }
+.vmlb-llm-scope input[type='number'] { width: 4.5rem; padding: 0.15rem 0.3rem; font: inherit; }
+.vmlb-llm-estimate, .vmlb-llm-job { margin-top: 0.75rem; }
+.vmlb-llm-estimate p, .vmlb-llm-job p { margin: 0.4rem 0; }
 .vmlb-llm-own { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.8125rem; }
 .vmlb-llm-more { margin-top: 0.75rem; }
 .vmlb-llm-more summary { cursor: pointer; font-weight: 600; }

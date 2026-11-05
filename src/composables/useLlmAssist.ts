@@ -1,14 +1,15 @@
-import { computed, ref, type Ref } from 'vue'
+import { computed, onUnmounted, ref, type Ref } from 'vue'
 import { count } from '../annotation/annotationState'
 import { batchSummary } from '../annotation/llmAssist'
-import type { Id, LlmAgreement, LlmKeyInput, LlmPrompt, LlmRefusalError, LlmStatus, LlmSuggestion, MLAdapter } from '../types'
+import type { Id, LlmAgreement, LlmEstimate, LlmJob, LlmKeyInput, LlmPrompt, LlmRefusalError, LlmStatus, LlmSuggestion, MLAdapter } from '../types'
+import { createPollLoop, type PollLoop } from '../utils/polling'
 
 /** Refusals after which the status on screen is out of date. */
 const STATUS_CODES = ['no_llm_access', 'acknowledgement_required', 'destination_changed', 'credential_unusable']
 
 /** A Dataset's LLM access and suggestions. Nothing is sent to an LLM until the
  * Project has acknowledged the destination the backend names. */
-export function useLlmAssist(adapter: MLAdapter) {
+export function useLlmAssist(adapter: MLAdapter, pollIntervalMs = 3000) {
   const status = ref<LlmStatus | null>(null)
   /** Suggestions still waiting for a person. None of them is a label. */
   const suggestions = ref<LlmSuggestion[]>([])
@@ -21,6 +22,12 @@ export function useLlmAssist(adapter: MLAdapter) {
   const isBusy = ref(false)
   /** The monthly limit of the shared key is used up. */
   const budgetExhausted = ref(false)
+  /** A standalone job's estimate, the items it covers (all pending when
+   * undefined), and the job once started. */
+  const estimate = ref<LlmEstimate | null>(null)
+  const job = ref<LlmJob | null>(null)
+  let estimatedIds: Id[] | undefined
+  let jobLoop: PollLoop | null = null
   /** The Dataset on screen. A reply about any other is dropped. */
   let currentId: Id | null = null
 
@@ -31,7 +38,8 @@ export function useLlmAssist(adapter: MLAdapter) {
     const next = await adapter.getLlmStatus!(datasetId)
     if (datasetId !== currentId) return
     status.value = next
-    budgetExhausted.value = next.mode === 'shared' && next.remaining_tokens === 0
+    // A refusal at the limit outlasts a status read; an own key ends it.
+    budgetExhausted.value = next.mode === 'shared' && (next.remaining_tokens === 0 || budgetExhausted.value)
     if (ready.value) await loadProgress(datasetId)
   }
 
@@ -65,9 +73,12 @@ export function useLlmAssist(adapter: MLAdapter) {
 
   function refresh(datasetId: Id) {
     if (datasetId !== currentId) {
+      stopJob()
       suggestions.value = []
       agreement.value = null
       prompt.value = null
+      estimate.value = null
+      job.value = null
     }
     currentId = datasetId
     return run(datasetId, () => loadStatus(datasetId), 'Failed to load LLM access')
@@ -127,7 +138,7 @@ export function useLlmAssist(adapter: MLAdapter) {
     return run(datasetId, async () => {
       const batch = await adapter.createLlmSuggestions!(datasetId, await taskIds())
       await loadStatus(datasetId)
-      notice.value = batchSummary(batch)
+      notice.value = batchSummary({ created: batch.suggestions.length, skipped: batch.skipped, invalid: batch.invalid })
     }, 'Failed to get suggestions')
   }
 
@@ -147,8 +158,54 @@ export function useLlmAssist(adapter: MLAdapter) {
     }, 'Failed to save the prompt', promptError)
   }
 
+  function stopJob() {
+    jobLoop?.stop()
+    jobLoop = null
+  }
+
+  /** Nothing is sent: the backend counts tokens for the items. */
+  function estimateJob(datasetId: Id, taskIds: () => Promise<Id[] | undefined>) {
+    return run(datasetId, async () => {
+      estimate.value = null
+      job.value = null
+      const ids = await taskIds()
+      const next = await adapter.estimateLlmAnnotation!(datasetId, ids)
+      if (datasetId !== currentId) return
+      estimatedIds = ids
+      estimate.value = next
+    }, 'Failed to estimate the cost')
+  }
+
+  function clearEstimate() {
+    estimate.value = null
+  }
+
+  /** Starts the job on the items it estimated, then follows it on the worker. */
+  function startJob(datasetId: Id) {
+    return run(datasetId, async () => {
+      const { job_id: jobId, estimate: confirmed } = await adapter.startLlmAnnotation!(datasetId, estimatedIds)
+      estimate.value = null
+      job.value = { status: 'queued', total: confirmed.tasks, done: 0 }
+      stopJob()
+      jobLoop = createPollLoop(async () => {
+        const next = await adapter.getLlmJob!(jobId)
+        if (datasetId !== currentId) return stopJob()
+        job.value = next
+        if (next.status === 'queued' || next.status === 'running') return
+        stopJob()
+        if (next.status === 'budget_exhausted') budgetExhausted.value = true
+        await loadStatus(datasetId)
+      }, pollIntervalMs)
+      jobLoop.start()
+    }, 'Failed to start labelling')
+  }
+
+  onUnmounted(stopJob)
+
   return {
     status, suggestions, agreement, prompt, promptError, error, notice, isBusy, budgetExhausted, hasAccess, ready,
+    estimate, job,
     refresh, refreshProgress, saveKey, deleteKey, acknowledge, suggest, bulkAccept, loadPrompt, savePrompt,
+    estimateJob, clearEstimate, startJob,
   }
 }
