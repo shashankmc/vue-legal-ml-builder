@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
-import type { Id, LlmKeyInput, LlmRefusalError, LlmStatus, MLAdapter } from '../types'
+import { batchSummary } from '../annotation/llmAssist'
+import type { Id, LlmKeyInput, LlmRefusalError, LlmStatus, LlmSuggestion, MLAdapter } from '../types'
 
 /** Refusals after which the status on screen is out of date. */
 const STATUS_CODES = ['no_llm_access', 'acknowledgement_required', 'destination_changed', 'credential_unusable']
@@ -8,6 +9,8 @@ const STATUS_CODES = ['no_llm_access', 'acknowledgement_required', 'destination_
  * Project has acknowledged the destination the backend names. */
 export function useLlmAssist(adapter: MLAdapter) {
   const status = ref<LlmStatus | null>(null)
+  /** Suggestions still waiting for a person. None of them is a label. */
+  const suggestions = ref<LlmSuggestion[]>([])
   const error = ref<string | null>(null)
   const notice = ref('')
   const isBusy = ref(false)
@@ -24,6 +27,12 @@ export function useLlmAssist(adapter: MLAdapter) {
     if (datasetId !== currentId) return
     status.value = next
     budgetExhausted.value = next.mode === 'shared' && next.remaining_tokens === 0
+    if (ready.value) await loadSuggestions(datasetId)
+  }
+
+  async function loadSuggestions(datasetId: Id) {
+    const next = (await adapter.listLlmSuggestions?.(datasetId, 'pending')) ?? []
+    if (datasetId === currentId) suggestions.value = next
   }
 
   async function run(datasetId: Id, action: () => Promise<void>, fallback: string) {
@@ -72,5 +81,22 @@ export function useLlmAssist(adapter: MLAdapter) {
     }, 'Failed to save your confirmation')
   }
 
-  return { status, error, notice, isBusy, budgetExhausted, hasAccess, ready, refresh, saveKey, deleteKey, acknowledge }
+  /** After a label was saved elsewhere: the waiting suggestions may have changed. */
+  function refreshSuggestions(datasetId: Id) {
+    if (!ready.value) return
+    return run(datasetId, () => loadSuggestions(datasetId), 'Failed to load suggestions')
+  }
+
+  function suggest(datasetId: Id, taskIds: () => Promise<Id[]>) {
+    return run(datasetId, async () => {
+      const batch = await adapter.createLlmSuggestions!(datasetId, await taskIds())
+      await loadStatus(datasetId)
+      notice.value = batchSummary(batch)
+    }, 'Failed to get suggestions')
+  }
+
+  return {
+    status, suggestions, error, notice, isBusy, budgetExhausted, hasAccess, ready,
+    refresh, refreshSuggestions, saveKey, deleteKey, acknowledge, suggest,
+  }
 }

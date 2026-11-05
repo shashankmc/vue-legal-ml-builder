@@ -78,10 +78,17 @@ export function useAnnotation(adapter: MLAdapter) {
     return submit(() => adapter.skipAnnotation(task.value!.id), projectId, datasetId, 'Failed to skip item')
   }
 
+  /** Accepts an LLM suggestion for the item on screen, or corrects it with `label`. */
+  function confirmSuggestion(suggestionId: Id, label: string | undefined, projectId: Id, datasetId?: Id) {
+    const confirm = () =>
+      label === undefined ? adapter.confirmLlmSuggestion!(suggestionId) : adapter.confirmLlmSuggestion!(suggestionId, label)
+    return submit(confirm, projectId, datasetId, 'Failed to save the suggestion')
+  }
+
   function setHoldout(value: boolean, projectId: Id, datasetId?: Id) {
     holdout.value = value
     return loadNext(projectId, datasetId)
   }
 
-  return { task, stats, isLoading, isSubmitting, error, holdout, loadNext, save, skip, reviewSkipped, setHoldout }
+  return { task, stats, isLoading, isSubmitting, error, holdout, loadNext, save, skip, confirmSuggestion, reviewSkipped, setHoldout }
 }

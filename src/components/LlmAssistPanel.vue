@@ -1,19 +1,33 @@
 <script setup lang="ts">
 import { onMounted, watch } from 'vue'
+import { SUGGEST_BATCH_SIZE, queueOrder, tokens } from '../annotation/llmAssist'
 import { useLlmAssist } from '../composables/useLlmAssist'
-import type { Id, MLAdapter } from '../types'
+import type { Id, LlmSuggestion, MLAdapter } from '../types'
 import Icon from './shared/Icon.vue'
 
 const props = defineProps<{
   adapter: MLAdapter
+  projectId: Id
   datasetId: Id
+  /** The item on screen, the batch when the adapter cannot list items. */
+  currentTaskId?: Id | null
+  /** Bumped by the host after each saved label, to refresh what is waiting. */
+  labelsVersion: number
+}>()
+const emit = defineEmits<{
+  (e: 'suggestions', suggestions: LlmSuggestion[]): void
 }>()
 
-const { status, error, notice, isBusy, budgetExhausted, hasAccess, ready, refresh, saveKey, deleteKey, acknowledge } =
-  useLlmAssist(props.adapter)
+const {
+  status, suggestions, error, notice, isBusy, budgetExhausted, hasAccess, ready,
+  refresh, refreshSuggestions, saveKey, deleteKey, acknowledge, suggest,
+} = useLlmAssist(props.adapter)
 
-function tokens(value: number) {
-  return value.toLocaleString('en')
+/** The next pending items the queue would serve, as many as one request takes. */
+async function batchIds(): Promise<Id[]> {
+  if (!props.adapter.listAnnotationTasks) return props.currentTaskId ? [props.currentTaskId] : []
+  const pending = await props.adapter.listAnnotationTasks(props.projectId, { status: 'pending', datasetId: props.datasetId })
+  return queueOrder(pending).slice(0, SUGGEST_BATCH_SIZE).map((task) => task.id)
 }
 
 /** The key is read from the form when sent and cleared from it straight after. */
@@ -33,6 +47,8 @@ async function onSaveKey(event: Event) {
 
 onMounted(() => refresh(props.datasetId))
 watch(() => props.datasetId, (id) => refresh(id))
+watch(() => props.labelsVersion, () => refreshSuggestions(props.datasetId))
+watch(suggestions, (value) => emit('suggestions', value))
 </script>
 
 <template>
@@ -57,6 +73,20 @@ watch(() => props.datasetId, (id) => refresh(id))
           You are asked again if this changes.
         </p>
         <button class="vmlb-btn-primary" :disabled="isBusy" @click="acknowledge(datasetId)">Allow sending to {{ status.destination }}</button>
+      </div>
+
+      <p v-if="budgetExhausted && status.mode === 'shared' && !error" class="vmlb-llm-warning" role="status">
+        <Icon name="alert" /> You've used this month's limit on the shared key. Add your own API key to continue.
+      </p>
+
+      <div v-if="ready" class="vmlb-llm-actions">
+        <button class="vmlb-btn-primary" :disabled="isBusy || budgetExhausted" @click="suggest(datasetId, batchIds)">
+          <Icon name="spark" /> Suggest labels for this batch
+        </button>
+        <span class="vmlb-muted">
+          Each suggestion shows on its item. It is not a label until you accept it.
+          <template v-if="suggestions.length">{{ suggestions.length }} waiting.</template>
+        </span>
       </div>
 
       <div v-if="status.key" class="vmlb-llm-own vmlb-muted">
@@ -92,6 +122,8 @@ watch(() => props.datasetId, (id) => refresh(id))
 .vmlb-llm-status { margin: 0.35rem 0; }
 .vmlb-llm-ack { margin: 0.75rem 0; padding: 0.75rem 0.85rem; border-radius: var(--vmlb-radius-md); background: var(--vmlb-accent-soft); }
 .vmlb-llm-ack p { margin: 0 0 0.5rem; }
+.vmlb-llm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.85rem; margin: 0.75rem 0; }
+.vmlb-llm-warning { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0.75rem 0 0; padding: 0.65rem 0.85rem; border-radius: var(--vmlb-radius-md); background: var(--vmlb-warning-soft); color: var(--vmlb-text); }
 .vmlb-llm-own { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.8125rem; }
 .vmlb-llm-more { margin-top: 0.75rem; }
 .vmlb-llm-more summary { cursor: pointer; font-weight: 600; }

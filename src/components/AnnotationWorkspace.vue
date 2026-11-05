@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { MLAdapter } from '../types'
+import type { LlmSuggestion, MLAdapter } from '../types'
 import {
   ANNOTATION_STATE,
   addEntity,
@@ -48,7 +48,7 @@ const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
 const injectedHide = inject<boolean>('vmlb:hideAnnotation', false)
 const adapter = computed(() => props.adapter ?? injectedAdapter)
 const hidden = computed(() => props.hideAnnotation ?? injectedHide)
-const { task, stats, isLoading, isSubmitting, error, holdout, loadNext, save, skip, reviewSkipped, setHoldout } =
+const { task, stats, isLoading, isSubmitting, error, holdout, loadNext, save, skip, confirmSuggestion, reviewSkipped, setHoldout } =
   useAnnotation(adapter.value as MLAdapter)
 
 const datasetLabels = ref<string[]>([])
@@ -59,6 +59,8 @@ const customLabel = ref('')
 const showGuidelines = ref(true)
 const notice = ref('')
 const labelsVersion = ref(0)
+/** LLM suggestions waiting for a person, from LlmAssistPanel. */
+const suggestions = ref<LlmSuggestion[]>([])
 
 const textContainer = ref<HTMLElement | null>(null)
 const pendingSpan = ref<Omit<EntitySpan, 'type'> | null>(null)
@@ -103,6 +105,9 @@ const namedLabels = computed(() => (props.labels?.length ? props.labels : datase
 const showLlm = computed(
   () => controls.value === 'single' && !!props.datasetId && !!adapter.value?.getLlmStatus && namedLabels.value.length >= 2,
 )
+const suggestion = computed(() =>
+  showLlm.value && task.value ? suggestions.value.find((s) => s.task_id === task.value!.id && s.status === 'pending') ?? null : null,
+)
 
 function clearSelection() {
   selectedLabel.value = ''
@@ -144,9 +149,34 @@ async function onSave() {
     return
   }
   const label = controls.value === 'entities' ? JSON.stringify(entities.value) : selectedLabel.value
-  if (await save(label, props.projectId, props.datasetId)) {
+  // A label chosen over a waiting suggestion corrects it, so the agreement counts it.
+  const saved = suggestion.value
+    ? await confirmSuggestion(suggestion.value.id, label, props.projectId, props.datasetId)
+    : await save(label, props.projectId, props.datasetId)
+  if (saved) {
     notice.value = 'Annotation saved'
     labelsVersion.value += 1
+  }
+}
+
+async function onAcceptSuggestion() {
+  if (!suggestion.value) return
+  if (await confirmSuggestion(suggestion.value.id, undefined, props.projectId, props.datasetId)) {
+    notice.value = 'Suggestion accepted'
+    labelsVersion.value += 1
+  }
+}
+
+async function onRejectSuggestion() {
+  const rejected = suggestion.value
+  if (!rejected || isSubmitting.value) return
+  error.value = null
+  try {
+    await adapter.value!.rejectLlmSuggestion!(rejected.id)
+    suggestions.value = suggestions.value.filter((s) => s.id !== rejected.id)
+    notice.value = 'Suggestion rejected. Choose a label yourself.'
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to reject the suggestion'
   }
 }
 
@@ -255,7 +285,15 @@ async function onLabelHoldout() {
       @labels="usedLabels = $event"
     />
 
-    <LlmAssistPanel v-if="showLlm && adapter && datasetId" :adapter="adapter" :dataset-id="datasetId" />
+    <LlmAssistPanel
+      v-if="showLlm && adapter && datasetId"
+      :adapter="adapter"
+      :project-id="projectId"
+      :dataset-id="datasetId"
+      :current-task-id="task?.id ?? null"
+      :labels-version="labelsVersion"
+      @suggestions="suggestions = $event"
+    />
 
     <div v-if="error" class="vmlb-alert-error">
       <Icon name="alert" /> {{ error }}
@@ -304,6 +342,18 @@ async function onLabelHoldout() {
 
         <template v-else>
           <p class="vmlb-text">{{ task.text }}</p>
+
+          <div v-if="suggestion" class="vmlb-llm-suggestion" role="note" aria-label="LLM suggestion">
+            <p class="vmlb-llm-suggestion-head">
+              <span class="vmlb-label">LLM suggestion</span> <strong>{{ suggestion.label }}</strong>
+            </p>
+            <p class="vmlb-llm-rationale">{{ suggestion.rationale }}</p>
+            <p class="vmlb-muted">It is not a label until you accept it. Choose another label below to correct it.</p>
+            <div class="vmlb-llm-suggestion-actions">
+              <button class="vmlb-btn-secondary" :disabled="isSubmitting" @click="onAcceptSuggestion">Accept</button>
+              <button class="vmlb-btn-tertiary" :disabled="isSubmitting" @click="onRejectSuggestion">Reject</button>
+            </div>
+          </div>
 
           <div v-if="labelChoices.length" class="vmlb-label-grid" role="group" aria-label="Labels">
             <button
@@ -416,6 +466,15 @@ async function onLabelHoldout() {
 .vmlb-text-select { cursor: text; }
 .vmlb-text mark { padding: 0 0.15rem; border-radius: 0.2rem; }
 .vmlb-text sup { margin-left: 0.15rem; font-size: 0.625rem; font-weight: 700; opacity: 0.8; }
+.vmlb-llm-suggestion {
+  margin: -0.75rem 0 1.5rem; padding: 0.75rem 1rem;
+  border: 1px dashed var(--vmlb-accent); border-radius: var(--vmlb-radius-md);
+  background: var(--vmlb-accent-soft); font-size: 0.875rem;
+}
+.vmlb-llm-suggestion p { margin: 0 0 0.4rem; }
+.vmlb-llm-suggestion-head strong { margin-left: 0.35rem; color: var(--vmlb-accent-strong); }
+.vmlb-llm-rationale { line-height: 1.5; }
+.vmlb-llm-suggestion-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
 .vmlb-label-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
 .vmlb-label-btn {
   padding: 0.5rem 0.9rem;

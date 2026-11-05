@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import AnnotationWorkspace from '../src/components/AnnotationWorkspace.vue'
 import type { MLAdapter } from '../src/types'
 import { createTestAdapter } from './testAdapter'
-import { llmMethods, llmStatus, refusal } from './fixtures/llm'
+import { llmMethods, llmStatus, llmSuggestion, refusal } from './fixtures/llm'
 
 function item(id: string, text: string, extra = {}) {
   return { id, dataset_id: 'ds-1', item_index: 0, text, status: 'pending' as const, created_at: '', updated_at: '', ...extra }
@@ -200,6 +200,142 @@ describe('LLM assistance: acknowledging the destination', () => {
     expect(panel(wrapper).text()).toContain('The LLM destination has changed. Please review it again.')
     expect(button(wrapper, 'Allow sending to api.example.com')).toBeDefined()
     expect(button(wrapper, 'Allow sending to openrouter.ai')).toBeUndefined()
+    wrapper.unmount()
+  })
+})
+
+describe('LLM assistance: suggestions for the batch', () => {
+  it('asks for the next pending items, in the order the queue serves them', async () => {
+    const pending = [
+      item('t5', 'e', { item_index: 5, score: null }),
+      item('t2', 'b', { item_index: 2, score: 0.4 }),
+      item('t3', 'c', { item_index: 3, score: null }),
+      item('t1', 'a', { item_index: 1, score: 0.9 }),
+      ...Array.from({ length: 10 }, (_, i) => item(`u${i}`, 'x', { item_index: 10 + i, score: null })),
+    ]
+    const listAnnotationTasks = vi.fn().mockResolvedValue(pending)
+    const { adapter, wrapper } = await mounted({ listAnnotationTasks })
+
+    await click(wrapper, 'Suggest labels for this batch')
+
+    expect(listAnnotationTasks).toHaveBeenCalledWith('p1', { status: 'pending', datasetId: 'ds-1' })
+    expect(adapter.createLlmSuggestions).toHaveBeenCalledWith('ds-1', ['t1', 't2', 't3', 't5', 'u0', 'u1', 'u2', 'u3', 'u4', 'u5'])
+    wrapper.unmount()
+  })
+
+  it('asks for the item on screen when the adapter cannot list items', async () => {
+    const { adapter, wrapper } = await mounted()
+
+    await click(wrapper, 'Suggest labels for this batch')
+
+    expect(adapter.createLlmSuggestions).toHaveBeenCalledWith('ds-1', ['t1'])
+    wrapper.unmount()
+  })
+
+  it('says what came back', async () => {
+    const listLlmSuggestions = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([llmSuggestion()])
+    const createLlmSuggestions = vi.fn().mockResolvedValue({ suggestions: [llmSuggestion(), llmSuggestion({ id: 's2', task_id: 't2' })], skipped: 1, invalid: 1 })
+    const { wrapper } = await mounted({ createLlmSuggestions, listLlmSuggestions })
+
+    await click(wrapper, 'Suggest labels for this batch')
+
+    expect(panel(wrapper).text()).toContain('2 suggestions ready. 1 item already had one. 1 answer was discarded because it did not give one of your labels.')
+    expect(wrapper.text()).toContain('The clause sets out a penalty for an offence.')
+    wrapper.unmount()
+  })
+
+  it('shows the suggestion on its item with the rationale, not as a label', async () => {
+    const { adapter, wrapper } = await mounted({ listLlmSuggestions: vi.fn().mockResolvedValue([llmSuggestion()]) })
+
+    const card = wrapper.find('[aria-label="LLM suggestion"]')
+    expect(card.text()).toContain('Criminal')
+    expect(card.text()).toContain('The clause sets out a penalty for an offence.')
+    expect(card.text()).toContain('It is not a label until you accept it.')
+    expect(adapter.listLlmSuggestions).toHaveBeenCalledWith('ds-1', 'pending')
+    expect(adapter.confirmLlmSuggestion).not.toHaveBeenCalled()
+    expect(adapter.saveAnnotation).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('does not show a suggestion for another item', async () => {
+    const { wrapper } = await mounted({ listLlmSuggestions: vi.fn().mockResolvedValue([llmSuggestion({ task_id: 't9' })]) })
+
+    expect(wrapper.find('[aria-label="LLM suggestion"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('accepts a suggestion, then moves on', async () => {
+    const getNextAnnotationTask = vi.fn()
+      .mockResolvedValueOnce({ task: item('t1', 'Clause one.'), stats: { total: 4, annotated: 1, percentage: 25 } })
+      .mockResolvedValue({ task: item('t2', 'Clause two.'), stats: { total: 4, annotated: 2, percentage: 50 } })
+    const { adapter, wrapper } = await mounted({ getNextAnnotationTask, listLlmSuggestions: vi.fn().mockResolvedValue([llmSuggestion()]) })
+
+    await click(wrapper, 'Accept')
+
+    expect(adapter.confirmLlmSuggestion).toHaveBeenCalledWith('s1')
+    expect(adapter.saveAnnotation).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Clause two.')
+    wrapper.unmount()
+  })
+
+  it('rejects a suggestion and leaves the item to label by hand', async () => {
+    const { adapter, wrapper } = await mounted({ listLlmSuggestions: vi.fn().mockResolvedValueOnce([llmSuggestion()]).mockResolvedValue([]) })
+
+    await click(wrapper, 'Reject')
+
+    expect(adapter.rejectLlmSuggestion).toHaveBeenCalledWith('s1')
+    expect(wrapper.find('[aria-label="LLM suggestion"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Clause one.')
+    expect(adapter.saveAnnotation).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('records a different label as a correction of the suggestion', async () => {
+    const { adapter, wrapper } = await mounted({ listLlmSuggestions: vi.fn().mockResolvedValue([llmSuggestion()]) })
+
+    await click(wrapper, 'Civil')
+    await click(wrapper, 'Save & Next')
+
+    expect(adapter.confirmLlmSuggestion).toHaveBeenCalledWith('s1', 'Civil')
+    expect(adapter.saveAnnotation).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('asks again for the acknowledgement when the backend wants it', async () => {
+    const getLlmStatus = vi.fn().mockResolvedValueOnce(llmStatus()).mockResolvedValue(llmStatus({ acknowledged: false }))
+    const createLlmSuggestions = vi.fn().mockRejectedValue(
+      refusal("Confirm that this project's text may be sent to openrouter.ai.", 'acknowledgement_required', { destination: 'openrouter.ai' }),
+    )
+    const { wrapper } = await mounted({ getLlmStatus, createLlmSuggestions })
+
+    await click(wrapper, 'Suggest labels for this batch')
+
+    expect(button(wrapper, 'Allow sending to openrouter.ai')).toBeDefined()
+    wrapper.unmount()
+  })
+})
+
+describe('LLM assistance: the monthly limit', () => {
+  it('says the limit is reached and offers an own key', async () => {
+    const createLlmSuggestions = vi.fn().mockRejectedValue(
+      refusal("You've reached the monthly limit. Add your own API key to continue.", 'budget_exhausted', { byok_available: true }),
+    )
+    const { wrapper } = await mounted({ createLlmSuggestions })
+
+    await click(wrapper, 'Suggest labels for this batch')
+
+    expect(panel(wrapper).text()).toContain("You've reached the monthly limit. Add your own API key to continue.")
+    expect(wrapper.find('details.vmlb-llm-more').attributes('open')).toBeDefined()
+    expect(wrapper.find('input[name="api_key"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('says so before a request when no shared tokens are left', async () => {
+    const { wrapper } = await mounted({ getLlmStatus: vi.fn().mockResolvedValue(llmStatus({ remaining_tokens: 0 })) })
+
+    expect(panel(wrapper).text()).toContain("You've used this month's limit on the shared key. Add your own API key to continue.")
+    expect(button(wrapper, 'Suggest labels for this batch')?.attributes('disabled')).toBeDefined()
+    expect(wrapper.find('details.vmlb-llm-more').attributes('open')).toBeDefined()
     wrapper.unmount()
   })
 })
