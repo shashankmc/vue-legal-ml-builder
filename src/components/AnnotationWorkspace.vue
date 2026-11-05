@@ -17,6 +17,7 @@ import type { EntitySpan } from '../annotation/annotationState'
 import { useAnnotation } from '../composables/useAnnotation'
 import { taskTypeLabel } from './modelCatalogData'
 import ActiveLearningPanel from './ActiveLearningPanel.vue'
+import LlmAssistPanel from './LlmAssistPanel.vue'
 import Icon from './shared/Icon.vue'
 
 const DEFAULT_ENTITY_TYPES = ['Person', 'Organization', 'Location', 'Date', 'Misc']
@@ -96,6 +97,11 @@ const segments = computed(() => nerSegments(task.value?.text ?? '', entities.val
 const skippedCount = computed(() => total.value - annotated.value - holdoutRemaining.value)
 const showLoop = computed(
   () => controls.value === 'single' && !!props.datasetId && !!adapter.value?.getActiveLearningState,
+)
+/** The labels an LLM may choose from: legal-ml-core needs the Dataset to name two. */
+const namedLabels = computed(() => (props.labels?.length ? props.labels : datasetLabels.value))
+const showLlm = computed(
+  () => controls.value === 'single' && !!props.datasetId && !!adapter.value?.getLlmStatus && namedLabels.value.length >= 2,
 )
 
 function clearSelection() {
@@ -248,6 +254,8 @@ async function onLabelHoldout() {
       @label-holdout="onLabelHoldout"
       @labels="usedLabels = $event"
     />
+
+    <LlmAssistPanel v-if="showLlm && adapter && datasetId" :adapter="adapter" :dataset-id="datasetId" />
 
     <div v-if="error" class="vmlb-alert-error">
       <Icon name="alert" /> {{ error }}
