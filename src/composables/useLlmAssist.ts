@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
+import { count } from '../annotation/annotationState'
 import { batchSummary } from '../annotation/llmAssist'
-import type { Id, LlmKeyInput, LlmRefusalError, LlmStatus, LlmSuggestion, MLAdapter } from '../types'
+import type { Id, LlmAgreement, LlmKeyInput, LlmRefusalError, LlmStatus, LlmSuggestion, MLAdapter } from '../types'
 
 /** Refusals after which the status on screen is out of date. */
 const STATUS_CODES = ['no_llm_access', 'acknowledgement_required', 'destination_changed', 'credential_unusable']
@@ -11,6 +12,7 @@ export function useLlmAssist(adapter: MLAdapter) {
   const status = ref<LlmStatus | null>(null)
   /** Suggestions still waiting for a person. None of them is a label. */
   const suggestions = ref<LlmSuggestion[]>([])
+  const agreement = ref<LlmAgreement | null>(null)
   const error = ref<string | null>(null)
   const notice = ref('')
   const isBusy = ref(false)
@@ -27,12 +29,18 @@ export function useLlmAssist(adapter: MLAdapter) {
     if (datasetId !== currentId) return
     status.value = next
     budgetExhausted.value = next.mode === 'shared' && next.remaining_tokens === 0
-    if (ready.value) await loadSuggestions(datasetId)
+    if (ready.value) await loadProgress(datasetId)
   }
 
-  async function loadSuggestions(datasetId: Id) {
-    const next = (await adapter.listLlmSuggestions?.(datasetId, 'pending')) ?? []
-    if (datasetId === currentId) suggestions.value = next
+  /** What is waiting, and how far the agreement check has got. */
+  async function loadProgress(datasetId: Id) {
+    const [waiting, check] = await Promise.all([
+      adapter.listLlmSuggestions?.(datasetId, 'pending'),
+      adapter.getLlmAgreement?.(datasetId),
+    ])
+    if (datasetId !== currentId) return
+    suggestions.value = waiting ?? []
+    agreement.value = check ?? null
   }
 
   async function run(datasetId: Id, action: () => Promise<void>, fallback: string) {
@@ -81,10 +89,29 @@ export function useLlmAssist(adapter: MLAdapter) {
     }, 'Failed to save your confirmation')
   }
 
-  /** After a label was saved elsewhere: the waiting suggestions may have changed. */
-  function refreshSuggestions(datasetId: Id) {
+  /** After a label was saved elsewhere: what is waiting and the check may have changed. */
+  async function refreshProgress(datasetId: Id) {
     if (!ready.value) return
-    return run(datasetId, () => loadSuggestions(datasetId), 'Failed to load suggestions')
+    try {
+      await loadProgress(datasetId)
+    } catch {
+      // A stale count is shown until the next refresh; the label itself was saved.
+    }
+  }
+
+  /** Resolves true when suggestions became labels. */
+  async function bulkAccept(datasetId: Id) {
+    let accepted = false
+    await run(datasetId, async () => {
+      try {
+        const result = await adapter.bulkAcceptLlmSuggestions!(datasetId)
+        accepted = true
+        notice.value = `${count(result.accepted, 'suggestion')} accepted.`
+      } finally {
+        await loadProgress(datasetId).catch(() => undefined)
+      }
+    }, 'Failed to accept the suggestions')
+    return accepted
   }
 
   function suggest(datasetId: Id, taskIds: () => Promise<Id[]>) {
@@ -96,7 +123,7 @@ export function useLlmAssist(adapter: MLAdapter) {
   }
 
   return {
-    status, suggestions, error, notice, isBusy, budgetExhausted, hasAccess, ready,
-    refresh, refreshSuggestions, saveKey, deleteKey, acknowledge, suggest,
+    status, suggestions, agreement, error, notice, isBusy, budgetExhausted, hasAccess, ready,
+    refresh, refreshProgress, saveKey, deleteKey, acknowledge, suggest, bulkAccept,
   }
 }

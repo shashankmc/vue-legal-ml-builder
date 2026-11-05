@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import AnnotationWorkspace from '../src/components/AnnotationWorkspace.vue'
 import type { MLAdapter } from '../src/types'
 import { createTestAdapter } from './testAdapter'
-import { llmMethods, llmStatus, llmSuggestion, refusal } from './fixtures/llm'
+import { llmAgreement, llmMethods, llmStatus, llmSuggestion, refusal } from './fixtures/llm'
 
 function item(id: string, text: string, extra = {}) {
   return { id, dataset_id: 'ds-1', item_index: 0, text, status: 'pending' as const, created_at: '', updated_at: '', ...extra }
@@ -336,6 +336,67 @@ describe('LLM assistance: the monthly limit', () => {
     expect(panel(wrapper).text()).toContain("You've used this month's limit on the shared key. Add your own API key to continue.")
     expect(button(wrapper, 'Suggest labels for this batch')?.attributes('disabled')).toBeDefined()
     expect(wrapper.find('details.vmlb-llm-more').attributes('open')).toBeDefined()
+    wrapper.unmount()
+  })
+})
+
+describe('LLM assistance: agreement and bulk accept', () => {
+  const partway = llmAgreement({ model: 'mistral-small', prompt_version: 0, checked: 12, agreed: 10, rate: 0.8333 })
+  const passed = llmAgreement({ model: 'mistral-small', prompt_version: 0, checked: 30, agreed: 27, rate: 0.9, unlocked: true })
+
+  it('shows the progress of the check, and keeps bulk accept locked', async () => {
+    const { wrapper } = await mounted({ getLlmAgreement: vi.fn().mockResolvedValue(partway) })
+
+    const text = panel(wrapper).text()
+    expect(text).toContain('12 of 30 items checked')
+    expect(text).toContain('10 of 12 suggestions matched your label (83%).')
+    expect(text).toContain('Bulk accept unlocks at 30 checked items with at least 80% agreement.')
+    expect(wrapper.find('[aria-label="LLM suggestions"] [role="progressbar"]').attributes('aria-valuenow')).toBe('12')
+    expect(button(wrapper, 'Accept all waiting suggestions')?.attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+
+  it('says when nothing has been checked yet', async () => {
+    const { wrapper } = await mounted()
+
+    expect(panel(wrapper).text()).toContain('0 of 30 items checked')
+    expect(panel(wrapper).text()).toContain('Accept or correct suggestions, or label their items yourself, to check the LLM against your own labels.')
+    wrapper.unmount()
+  })
+
+  it('reads the agreement again after a suggestion is accepted', async () => {
+    const { adapter, wrapper } = await mounted({ listLlmSuggestions: vi.fn().mockResolvedValue([llmSuggestion()]) })
+    const before = vi.mocked(adapter.getLlmAgreement!).mock.calls.length
+
+    await click(wrapper, 'Accept')
+
+    expect(vi.mocked(adapter.getLlmAgreement!).mock.calls.length).toBeGreaterThan(before)
+    wrapper.unmount()
+  })
+
+  it('accepts every waiting suggestion once the check passes, then reloads the queue', async () => {
+    const bulkAcceptLlmSuggestions = vi.fn().mockResolvedValue({ accepted: 12, agreement: passed })
+    const { adapter, wrapper } = await mounted({ getLlmAgreement: vi.fn().mockResolvedValue(passed), bulkAcceptLlmSuggestions })
+    expect(panel(wrapper).text()).toContain('27 of 30 suggestions matched your label (90%).')
+    const loads = vi.mocked(adapter.getNextAnnotationTask).mock.calls.length
+
+    await click(wrapper, 'Accept all waiting suggestions')
+
+    expect(bulkAcceptLlmSuggestions).toHaveBeenCalledWith('ds-1')
+    expect(panel(wrapper).text()).toContain('12 suggestions accepted.')
+    expect(vi.mocked(adapter.getNextAnnotationTask).mock.calls.length).toBeGreaterThan(loads)
+    wrapper.unmount()
+  })
+
+  it('shows why the backend refused a bulk accept', async () => {
+    const bulkAcceptLlmSuggestions = vi.fn().mockRejectedValue(refusal('Bulk accept needs 30 checked items at 80% agreement.', 'agreement_not_met'))
+    const getLlmAgreement = vi.fn().mockResolvedValueOnce(passed).mockResolvedValue(partway)
+    const { wrapper } = await mounted({ getLlmAgreement, bulkAcceptLlmSuggestions })
+
+    await click(wrapper, 'Accept all waiting suggestions')
+
+    expect(panel(wrapper).text()).toContain('Bulk accept needs 30 checked items at 80% agreement.')
+    expect(button(wrapper, 'Accept all waiting suggestions')?.attributes('disabled')).toBeDefined()
     wrapper.unmount()
   })
 })

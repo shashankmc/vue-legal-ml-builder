@@ -159,6 +159,12 @@ async function onSave() {
   }
 }
 
+/** Bulk accept labelled items behind the queue's back. */
+async function onLlmLabelled() {
+  labelsVersion.value += 1
+  await reload()
+}
+
 async function onAcceptSuggestion() {
   if (!suggestion.value) return
   if (await confirmSuggestion(suggestion.value.id, undefined, props.projectId, props.datasetId)) {
@@ -293,6 +299,7 @@ async function onLabelHoldout() {
       :current-task-id="task?.id ?? null"
       :labels-version="labelsVersion"
       @suggestions="suggestions = $event"
+      @labelled="onLlmLabelled"
     />
 
     <div v-if="error" class="vmlb-alert-error">

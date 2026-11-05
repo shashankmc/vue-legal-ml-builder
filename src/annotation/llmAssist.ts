@@ -34,3 +34,7 @@ export function batchSummary(batch: LlmSuggestionBatch): string {
 export function tokens(value: number): string {
   return value.toLocaleString('en-GB')
 }
+
+export function percent(share: number): string {
+  return `${Math.round(share * 100)}%`
+}

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, watch } from 'vue'
-import { SUGGEST_BATCH_SIZE, queueOrder, tokens } from '../annotation/llmAssist'
+import { count } from '../annotation/annotationState'
+import { SUGGEST_BATCH_SIZE, percent, queueOrder, tokens } from '../annotation/llmAssist'
 import { useLlmAssist } from '../composables/useLlmAssist'
 import type { Id, LlmSuggestion, MLAdapter } from '../types'
 import Icon from './shared/Icon.vue'
@@ -16,12 +17,18 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   (e: 'suggestions', suggestions: LlmSuggestion[]): void
+  /** Suggestions became labels without the workspace, so its queue is stale. */
+  (e: 'labelled'): void
 }>()
 
 const {
-  status, suggestions, error, notice, isBusy, budgetExhausted, hasAccess, ready,
-  refresh, refreshSuggestions, saveKey, deleteKey, acknowledge, suggest,
+  status, suggestions, agreement, error, notice, isBusy, budgetExhausted, hasAccess, ready,
+  refresh, refreshProgress, saveKey, deleteKey, acknowledge, suggest, bulkAccept,
 } = useLlmAssist(props.adapter)
+
+async function onBulkAccept() {
+  if (await bulkAccept(props.datasetId)) emit('labelled')
+}
 
 /** The next pending items the queue would serve, as many as one request takes. */
 async function batchIds(): Promise<Id[]> {
@@ -47,7 +54,7 @@ async function onSaveKey(event: Event) {
 
 onMounted(() => refresh(props.datasetId))
 watch(() => props.datasetId, (id) => refresh(id))
-watch(() => props.labelsVersion, () => refreshSuggestions(props.datasetId))
+watch(() => props.labelsVersion, () => refreshProgress(props.datasetId))
 watch(suggestions, (value) => emit('suggestions', value))
 </script>
 
@@ -89,6 +96,32 @@ watch(suggestions, (value) => emit('suggestions', value))
         </span>
       </div>
 
+      <div v-if="ready && agreement" class="vmlb-llm-agreement">
+        <div class="vmlb-llm-agreement-head">
+          <span class="vmlb-label">Agreement check</span>
+          <span class="vmlb-muted vmlb-num">{{ Math.min(agreement.checked, agreement.min_sample) }} of {{ count(agreement.min_sample, 'item') }} checked</span>
+        </div>
+        <div
+          class="vmlb-llm-bar"
+          role="progressbar"
+          aria-label="Agreement check"
+          :aria-valuenow="agreement.checked"
+          aria-valuemin="0"
+          :aria-valuemax="agreement.min_sample"
+        >
+          <div class="vmlb-llm-bar-fill" :style="{ transform: `scaleX(${Math.min(agreement.checked / agreement.min_sample, 1)})` }" />
+        </div>
+        <p v-if="agreement.checked && agreement.rate !== null">
+          {{ agreement.agreed }} of {{ count(agreement.checked, 'suggestion') }} matched your label ({{ percent(agreement.rate) }}).
+        </p>
+        <p v-else class="vmlb-muted">Accept or correct suggestions, or label their items yourself, to check the LLM against your own labels.</p>
+        <p class="vmlb-muted">
+          Bulk accept unlocks at {{ agreement.min_sample }} checked items with at least {{ percent(agreement.threshold) }} agreement.
+          A new prompt or model starts the check again.
+        </p>
+        <button class="vmlb-btn-secondary" :disabled="isBusy || !agreement.unlocked" @click="onBulkAccept">Accept all waiting suggestions</button>
+      </div>
+
       <div v-if="status.key" class="vmlb-llm-own vmlb-muted">
         <span>Your own key: {{ status.key.model }} at {{ status.key.base_url }}</span>
         <button class="vmlb-btn-tertiary" :disabled="isBusy" @click="deleteKey(datasetId)">Delete your key</button>
@@ -124,6 +157,11 @@ watch(suggestions, (value) => emit('suggestions', value))
 .vmlb-llm-ack p { margin: 0 0 0.5rem; }
 .vmlb-llm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.85rem; margin: 0.75rem 0; }
 .vmlb-llm-warning { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0.75rem 0 0; padding: 0.65rem 0.85rem; border-radius: var(--vmlb-radius-md); background: var(--vmlb-warning-soft); color: var(--vmlb-text); }
+.vmlb-llm-agreement { margin: 1rem 0; }
+.vmlb-llm-agreement p { margin: 0.4rem 0; }
+.vmlb-llm-agreement-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.35rem; }
+.vmlb-llm-bar { width: 100%; height: 0.4rem; overflow: hidden; background: var(--vmlb-surface-sunken); border: 1px solid var(--vmlb-border); border-radius: 999px; }
+.vmlb-llm-bar-fill { width: 100%; height: 100%; background: var(--vmlb-accent); transform-origin: left center; transition: transform 0.35s var(--vmlb-ease); }
 .vmlb-llm-own { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.8125rem; }
 .vmlb-llm-more { margin-top: 0.75rem; }
 .vmlb-llm-more summary { cursor: pointer; font-weight: 600; }
