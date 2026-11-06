@@ -143,3 +143,147 @@ describe('createSelfHostedAdapter', () => {
     expect(calls[0].url).toBe('/api/training/job-1/metrics?since_step=4')
   })
 })
+
+describe('createSelfHostedAdapter LLM methods', () => {
+  const suggestion = {
+    id: 's1', task_id: 't1', model: 'gpt-x', prompt_version: 0, label: 'Civil',
+    rationale: 'A contract dispute.', status: 'pending', created_at: '2026-11-05T10:00:00',
+  }
+  const agreement = { model: 'gpt-x', prompt_version: 0, checked: 30, agreed: 27, rate: 0.9, min_sample: 30, threshold: 0.8, unlocked: true }
+  const estimate = { tasks: 2, estimated_tokens: 1800, remaining_tokens: 200000, within_budget: true, destination: 'openrouter.ai' }
+
+  async function call(body: unknown, run: (adapter: ReturnType<typeof createSelfHostedAdapter>) => Promise<unknown>, status = 200) {
+    const calls = stubFetch(() => reply(status, body))
+    const result = await run(createSelfHostedAdapter({ apiUrl: '/api' }))
+    return { calls, result }
+  }
+
+  it('reads the status, for a Dataset when asked', async () => {
+    const status = { mode: 'shared', destination: 'openrouter.ai', model: 'gpt-x', shared_key_allowed: true, key: null, remaining_tokens: 1200, acknowledged: false }
+    const { calls, result } = await call(status, (a) => a.getLlmStatus!('ds 1'))
+    expect(calls).toEqual([expect.objectContaining({ url: '/api/llm/status?dataset_id=ds%201', method: undefined })])
+    expect(result).toEqual(status)
+
+    const plain = await call(status, (a) => a.getLlmStatus!())
+    expect(plain.calls[0].url).toBe('/api/llm/status')
+  })
+
+  it('saves and deletes the own key', async () => {
+    const key = { base_url: 'https://api.example.com/v1', model: 'm', api_key: 'sk-1' }
+    const saved = await call({ base_url: key.base_url, model: 'm' }, (a) => a.saveLlmKey!(key))
+    expect(saved.calls).toEqual([expect.objectContaining({ url: '/api/llm/key', method: 'PUT', body: key })])
+    expect(saved.result).toEqual({ base_url: key.base_url, model: 'm' })
+
+    const deleted = await call({ deleted: true }, (a) => a.deleteLlmKey!())
+    expect(deleted.calls).toEqual([expect.objectContaining({ url: '/api/llm/key', method: 'DELETE' })])
+  })
+
+  it('acknowledges the destination the user saw', async () => {
+    const ack = { destination: 'openrouter.ai', created_at: '2026-11-05T10:00:00' }
+    const { calls, result } = await call(ack, (a) => a.acknowledgeLlmDestination!('ds-1', 'openrouter.ai'))
+    expect(calls).toEqual([expect.objectContaining({ url: '/api/llm/datasets/ds-1/acknowledgement', method: 'POST', body: { destination: 'openrouter.ai' } })])
+    expect(result).toEqual(ack)
+  })
+
+  it('reads and saves the prompt', async () => {
+    const prompt = { version: 0, template: 'Label {labels} {text}', definitions: {} }
+    const read = await call(prompt, (a) => a.getLlmPrompt!('ds-1'))
+    expect(read.calls[0]).toEqual(expect.objectContaining({ url: '/api/llm/datasets/ds-1/prompt', method: undefined }))
+    expect(read.result).toEqual(prompt)
+
+    const edit = { template: 'Pick one of {labels} for {text}', definitions: { Civil: 'Private disputes' } }
+    const saved = await call({ ...edit, version: 1, created_at: '' }, (a) => a.updateLlmPrompt!('ds-1', edit))
+    expect(saved.calls).toEqual([expect.objectContaining({ url: '/api/llm/datasets/ds-1/prompt', method: 'PUT', body: edit })])
+    expect(saved.result).toEqual({ ...edit, version: 1, created_at: '' })
+  })
+
+  it('creates and lists suggestions', async () => {
+    const batch = { suggestions: [suggestion], skipped: 1, invalid: 0 }
+    const created = await call(batch, (a) => a.createLlmSuggestions!('ds-1', ['t1', 't2']))
+    expect(created.calls).toEqual([expect.objectContaining({ url: '/api/llm/datasets/ds-1/suggestions', method: 'POST', body: { task_ids: ['t1', 't2'] } })])
+    expect(created.result).toEqual(batch)
+
+    const listed = await call({ suggestions: [suggestion] }, (a) => a.listLlmSuggestions!('ds-1', 'pending'))
+    expect(listed.calls[0].url).toBe('/api/llm/datasets/ds-1/suggestions?status=pending')
+    expect(listed.result).toEqual([suggestion])
+  })
+
+  it('confirms, corrects and rejects a suggestion', async () => {
+    const task = { id: 't1', annotation_label: 'Civil', status: 'annotated', label_source: 'llm_confirmed' }
+    const accepted = await call({ suggestion: { ...suggestion, status: 'accepted' }, task }, (a) => a.confirmLlmSuggestion!('s1'))
+    expect(accepted.calls).toEqual([expect.objectContaining({ url: '/api/llm/suggestions/s1/confirm', method: 'POST', body: {} })])
+    expect(accepted.result).toEqual({ suggestion: { ...suggestion, status: 'accepted' }, task })
+
+    const corrected = await call({ suggestion, task }, (a) => a.confirmLlmSuggestion!('s1', 'Criminal'))
+    expect(corrected.calls[0].body).toEqual({ label: 'Criminal' })
+
+    const rejected = await call({ suggestion: { ...suggestion, status: 'rejected' } }, (a) => a.rejectLlmSuggestion!('s1'))
+    expect(rejected.calls).toEqual([expect.objectContaining({ url: '/api/llm/suggestions/s1/reject', method: 'POST' })])
+    expect(rejected.result).toEqual({ ...suggestion, status: 'rejected' })
+  })
+
+  it('reads the agreement and bulk accepts', async () => {
+    const read = await call(agreement, (a) => a.getLlmAgreement!('ds-1'))
+    expect(read.calls[0]).toEqual(expect.objectContaining({ url: '/api/llm/datasets/ds-1/agreement', method: undefined }))
+    expect(read.result).toEqual(agreement)
+
+    const bulk = await call({ accepted: 12, agreement }, (a) => a.bulkAcceptLlmSuggestions!('ds-1'))
+    expect(bulk.calls).toEqual([expect.objectContaining({ url: '/api/llm/datasets/ds-1/bulk-accept', method: 'POST' })])
+    expect(bulk.result).toEqual({ accepted: 12, agreement })
+  })
+
+  it('prices an LLM-suggested first batch', async () => {
+    const priced = await call(estimate, (a) => a.estimateActiveLearningSeed!('ds-1', { batch_size: 20, holdout_percent: 20 }))
+
+    expect(priced.calls).toEqual([
+      expect.objectContaining({
+        url: '/api/active-learning/datasets/ds-1/seed-estimate',
+        method: 'POST',
+        body: { batch_size: 20, holdout_percent: 20 },
+      }),
+    ])
+    expect(priced.result).toEqual(estimate)
+  })
+
+  it('estimates, starts and follows a standalone job', async () => {
+    const subset = await call(estimate, (a) => a.estimateLlmAnnotation!('ds-1', ['t1', 't2']))
+    expect(subset.calls).toEqual([expect.objectContaining({ url: '/api/llm/datasets/ds-1/annotate/estimate', method: 'POST', body: { task_ids: ['t1', 't2'] } })])
+    expect(subset.result).toEqual(estimate)
+
+    const whole = await call(estimate, (a) => a.estimateLlmAnnotation!('ds-1'))
+    expect(whole.calls[0].body).toEqual({})
+
+    const started = await call({ job_id: 'job-1', estimate }, (a) => a.startLlmAnnotation!('ds-1'), 202)
+    expect(started.calls).toEqual([expect.objectContaining({ url: '/api/llm/datasets/ds-1/annotate', method: 'POST', body: { confirm_estimate: true } })])
+    expect(started.result).toEqual({ job_id: 'job-1', estimate })
+
+    const startedSubset = await call({ job_id: 'job-1', estimate }, (a) => a.startLlmAnnotation!('ds-1', ['t1']), 202)
+    expect(startedSubset.calls[0].body).toEqual({ task_ids: ['t1'], confirm_estimate: true })
+
+    const job = { status: 'running', total: 2, done: 1, created: 1, invalid: 0 }
+    const polled = await call(job, (a) => a.getLlmJob!('job-1'))
+    expect(polled.calls[0]).toEqual(expect.objectContaining({ url: '/api/llm/jobs/job-1', method: undefined }))
+    expect(polled.result).toEqual(job)
+  })
+
+  it('keeps the code and destination of an LLM refusal', async () => {
+    stubFetch(() => reply(409, { error: 'The LLM destination has changed. Please review it again.', code: 'destination_changed', destination: 'api.example.com' }))
+    const adapter = createSelfHostedAdapter({ apiUrl: '/api' })
+
+    const refused = await adapter.acknowledgeLlmDestination!('ds-1', 'openrouter.ai').catch((err) => err)
+
+    expect(refused.message).toBe('The LLM destination has changed. Please review it again.')
+    expect(refused.code).toBe('destination_changed')
+    expect(refused.destination).toBe('api.example.com')
+  })
+
+  it('adds no code for a refusal that sends none', async () => {
+    stubFetch(() => reply(404, { error: 'Dataset not found' }))
+    const adapter = createSelfHostedAdapter({ apiUrl: '/api' })
+
+    const refused = await adapter.getLlmAgreement!('ds-1').catch((err) => err)
+
+    expect('code' in refused).toBe(false)
+    expect('destination' in refused).toBe(false)
+  })
+})

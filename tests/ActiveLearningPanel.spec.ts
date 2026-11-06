@@ -326,3 +326,99 @@ describe('the holdout', () => {
     expect(wrapper.text()).toContain('The score could not be checked. Try again.')
   })
 })
+
+describe('an LLM-suggested first batch', () => {
+  const LLM_SETTINGS = { ...SETTINGS, seed_sources: { random: true, llm: true } }
+  const ESTIMATE = { tasks: 60, estimated_tokens: 12000, remaining_tokens: 200000, within_budget: true, destination: 'OpenRouter' }
+
+  function withLlmSeed(state: ActiveLearningState | { active: false }, overrides = {}) {
+    return mounted(state, {
+      getActiveLearningSettings: vi.fn().mockResolvedValue(LLM_SETTINGS),
+      estimateActiveLearningSeed: vi.fn().mockResolvedValue(ESTIMATE),
+      acknowledgeLlmDestination: vi.fn().mockResolvedValue({ destination: 'OpenRouter' }),
+      startActiveLearning: vi.fn().mockResolvedValue(loopState({ seed_source: 'llm', seed: { status: 'queued', done: 0, total: 60 } })),
+      ...overrides,
+    })
+  }
+
+  async function chooseLlmSeed(wrapper: Awaited<ReturnType<typeof mounted>>['wrapper']) {
+    await wrapper.find('input[name="vmlb-seed"][value="llm"]').setValue(true)
+    await button(wrapper, 'Start')!.trigger('click')
+    await flushPromises()
+  }
+
+  it('shows what it sends and costs before anything starts', async () => {
+    const { adapter, wrapper } = await withLlmSeed({ active: false })
+
+    await chooseLlmSeed(wrapper)
+
+    expect(adapter.estimateActiveLearningSeed).toHaveBeenCalledWith('ds-1', { batch_size: 20, holdout_percent: 20 })
+    expect(wrapper.text()).toContain('60 items')
+    expect(wrapper.text()).toContain('OpenRouter')
+    expect(adapter.startActiveLearning).not.toHaveBeenCalled()
+
+    await button(wrapper, 'Start with the LLM')!.trigger('click')
+    await flushPromises()
+    expect(adapter.startActiveLearning).toHaveBeenCalledWith('ds-1', expect.objectContaining({ seed_source: 'llm', confirm_estimate: true }))
+  })
+
+  it('does not start a seed over the monthly limit, and offers an own key', async () => {
+    const { adapter, wrapper } = await withLlmSeed(
+      { active: false },
+      { estimateActiveLearningSeed: vi.fn().mockResolvedValue({ ...ESTIMATE, within_budget: false, remaining_tokens: 100 }) },
+    )
+
+    await chooseLlmSeed(wrapper)
+
+    expect(button(wrapper, 'Start with the LLM')).toBeUndefined()
+    expect(wrapper.text()).toContain('more than you have left this month')
+    expect(wrapper.text()).toContain('your own API key')
+    expect(adapter.startActiveLearning).not.toHaveBeenCalled()
+  })
+
+  it('asks to allow the destination when the Project has not, then starts', async () => {
+    const refused = Object.assign(new Error("Confirm that this project's text may be sent to OpenRouter."), {
+      code: 'acknowledgement_required',
+      destination: 'OpenRouter',
+    })
+    const startActiveLearning = vi
+      .fn()
+      .mockRejectedValueOnce(refused)
+      .mockResolvedValue(loopState({ seed_source: 'llm', seed: { status: 'queued', done: 0, total: 60 } }))
+    const { adapter, wrapper } = await withLlmSeed({ active: false }, { startActiveLearning })
+
+    await chooseLlmSeed(wrapper)
+    await button(wrapper, 'Start with the LLM')!.trigger('click')
+    await flushPromises()
+    await button(wrapper, 'Allow sending text to OpenRouter')!.trigger('click')
+    await flushPromises()
+
+    expect(adapter.acknowledgeLlmDestination).toHaveBeenCalledWith('ds-1', 'OpenRouter')
+    expect(startActiveLearning).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows the LLM choosing the batch, then serves it', async () => {
+    vi.useFakeTimers()
+    const getActiveLearningState = vi
+      .fn()
+      .mockResolvedValueOnce(loopState({ seed_source: 'llm', seed: { status: 'running', done: 12, total: 60 } }))
+      .mockResolvedValue(loopState({ seed_source: 'llm', seed: { status: 'completed', done: 60, total: 60 } }))
+    const { adapter, wrapper } = await withLlmSeed({ active: false }, { getActiveLearningState })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('The LLM is choosing the first batch: 12 of 60')
+    const servedBefore = vi.mocked(adapter.getNextAnnotationTask!).mock.calls.length
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('The LLM is choosing the first batch')
+    expect(vi.mocked(adapter.getNextAnnotationTask!).mock.calls.length).toBeGreaterThan(servedBefore)
+  })
+
+  it('says the random order stays when the seed fails', async () => {
+    const { wrapper } = await withLlmSeed(loopState({ seed_source: 'llm', seed: { status: 'failed', error: 'The LLM did not answer.' } }))
+
+    expect(wrapper.text()).toContain('The LLM did not answer.')
+    expect(wrapper.text()).toContain('The first batch stays in random order.')
+  })
+})

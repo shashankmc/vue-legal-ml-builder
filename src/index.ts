@@ -5,6 +5,7 @@ import { createSelfHostedAdapter } from './adapters/selfHosted'
 import ActiveLearningPanel from './components/ActiveLearningPanel.vue'
 import AnnotationWorkspace from './components/AnnotationWorkspace.vue'
 import DatasetEda from './components/DatasetEda.vue'
+import LlmAssistPanel from './components/LlmAssistPanel.vue'
 import DatasetManager from './components/DatasetManager.vue'
 import ModelCreateWizard from './components/ModelCreateWizard.vue'
 import ModelDetail from './components/ModelDetail.vue'
@@ -57,6 +58,7 @@ export const VueLegalMlBuilderPlugin = {
     app.component('ParameterPerformanceExplorer', ParameterPerformanceExplorer)
     app.component('AnnotationWorkspace', AnnotationWorkspace)
     app.component('ActiveLearningPanel', ActiveLearningPanel)
+    app.component('LlmAssistPanel', LlmAssistPanel)
     app.component('ConfusionMatrix', ConfusionMatrix)
     app.component('ModelLens', ModelLens)
     app.component('PlotlyChart', PlotlyChart)
@@ -76,6 +78,7 @@ export {
   ConfusionMatrix,
   DatasetEda,
   DatasetManager,
+  LlmAssistPanel,
   MlBuilderThemeProvider,
   ModelCreateWizard,
   ModelDetail,
@@ -105,6 +108,7 @@ export { useActiveLearning } from './composables/useActiveLearning'
 export { useAnnotation } from './composables/useAnnotation'
 export { useDatasets } from './composables/useDatasets'
 export { useEda } from './composables/useEda'
+export { useLlmAssist } from './composables/useLlmAssist'
 export { useModels } from './composables/useModels'
 export { useParameterComparison } from './composables/useParameterComparison'
 export { useTraining } from './composables/useTraining'
@@ -133,6 +137,20 @@ export type {
   EdaResult,
   ExplanationResult,
   Id,
+  LlmAcknowledgement,
+  LlmAgreement,
+  LlmErrorCode,
+  LlmEstimate,
+  LlmJob,
+  LlmJobStatus,
+  LlmKeyInput,
+  LlmMode,
+  LlmPrompt,
+  LlmRefusalError,
+  LlmStatus,
+  LlmSuggestion,
+  LlmSuggestionBatch,
+  LlmSuggestionStatus,
   MLAdapter,
   MLBuilderPluginOptions,
   MlModel,

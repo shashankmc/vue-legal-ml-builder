@@ -8,6 +8,14 @@ import type {
   EdaResult,
   ExplanationResult,
   Id,
+  LlmAgreement,
+  LlmEstimate,
+  LlmJob,
+  LlmPrompt,
+  LlmRefusalError,
+  LlmStatus,
+  LlmSuggestion,
+  LlmSuggestionBatch,
   MLAdapter,
   MlModel,
   ModelCatalog,
@@ -38,8 +46,10 @@ function buildHeaders(getAuthToken?: () => string | null | undefined, extra: Hea
 async function parseOrThrow(res: Response) {
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const error: RefusalError = new Error(data.error || `Request failed: ${res.status} ${res.statusText}`)
+    const error: RefusalError & LlmRefusalError = new Error(data.error || `Request failed: ${res.status} ${res.statusText}`)
     if (typeof data.field === 'string') error.field = data.field
+    if (typeof data.code === 'string') error.code = data.code
+    if (typeof data.destination === 'string') error.destination = data.destination
     throw error
   }
   return data
@@ -230,6 +240,9 @@ export function createSelfHostedAdapter(opts: SelfHostedAdapterOptions): MLAdapt
     async startActiveLearning(datasetId: Id, options: ActiveLearningStartOptions): Promise<ActiveLearningState> {
       return post(`/active-learning/datasets/${datasetId}/start`, options)
     },
+    async estimateActiveLearningSeed(datasetId: Id, options): Promise<LlmEstimate> {
+      return post(`/active-learning/datasets/${datasetId}/seed-estimate`, options)
+    },
     async setActiveLearningStrategy(datasetId: Id, strategy: string): Promise<ActiveLearningState> {
       return put(`/active-learning/datasets/${datasetId}/strategy`, { strategy })
     },
@@ -242,6 +255,58 @@ export function createSelfHostedAdapter(opts: SelfHostedAdapterOptions): MLAdapt
     },
     async verifyActiveLearning(datasetId: Id): Promise<void> {
       await post(`/active-learning/datasets/${datasetId}/verify`)
+    },
+
+    // LLM assistance
+    async getLlmStatus(datasetId?: Id): Promise<LlmStatus> {
+      const query = datasetId ? `?dataset_id=${encodeURIComponent(String(datasetId))}` : ''
+      return get(`/llm/status${query}`)
+    },
+    async saveLlmKey(key) {
+      return put('/llm/key', key)
+    },
+    async deleteLlmKey(): Promise<void> {
+      await del('/llm/key')
+    },
+    async acknowledgeLlmDestination(datasetId: Id, destination: string) {
+      return post(`/llm/datasets/${datasetId}/acknowledgement`, { destination })
+    },
+    async getLlmPrompt(datasetId: Id): Promise<LlmPrompt> {
+      return get(`/llm/datasets/${datasetId}/prompt`)
+    },
+    async updateLlmPrompt(datasetId: Id, prompt): Promise<LlmPrompt> {
+      return put(`/llm/datasets/${datasetId}/prompt`, prompt)
+    },
+    async createLlmSuggestions(datasetId: Id, taskIds: Id[]): Promise<LlmSuggestionBatch> {
+      return post(`/llm/datasets/${datasetId}/suggestions`, { task_ids: taskIds })
+    },
+    async listLlmSuggestions(datasetId: Id, status?: string): Promise<LlmSuggestion[]> {
+      const query = status ? `?status=${encodeURIComponent(status)}` : ''
+      const data = await get(`/llm/datasets/${datasetId}/suggestions${query}`)
+      return data.suggestions
+    },
+    async confirmLlmSuggestion(suggestionId: Id, label?: string) {
+      return post(`/llm/suggestions/${suggestionId}/confirm`, label === undefined ? {} : { label })
+    },
+    async rejectLlmSuggestion(suggestionId: Id): Promise<LlmSuggestion> {
+      const data = await post(`/llm/suggestions/${suggestionId}/reject`)
+      return data.suggestion
+    },
+    async getLlmAgreement(datasetId: Id): Promise<LlmAgreement> {
+      return get(`/llm/datasets/${datasetId}/agreement`)
+    },
+    async bulkAcceptLlmSuggestions(datasetId: Id) {
+      return post(`/llm/datasets/${datasetId}/bulk-accept`)
+    },
+    async estimateLlmAnnotation(datasetId: Id, taskIds?: Id[]): Promise<LlmEstimate> {
+      return post(`/llm/datasets/${datasetId}/annotate/estimate`, taskIds ? { task_ids: taskIds } : {})
+    },
+    // The backend refuses a job the client has not confirmed the estimate for.
+    async startLlmAnnotation(datasetId: Id, taskIds?: Id[]) {
+      return post(`/llm/datasets/${datasetId}/annotate`, { ...(taskIds ? { task_ids: taskIds } : {}), confirm_estimate: true })
+    },
+    async getLlmJob(jobId: Id): Promise<LlmJob> {
+      return get(`/llm/jobs/${jobId}`)
     },
   }
 }

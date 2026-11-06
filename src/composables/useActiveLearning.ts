@@ -1,5 +1,12 @@
 import { computed, onUnmounted, ref } from 'vue'
-import type { ActiveLearningSettings, ActiveLearningStartOptions, ActiveLearningState, Id, MLAdapter } from '../types'
+import type {
+  ActiveLearningSettings,
+  ActiveLearningStartOptions,
+  ActiveLearningState,
+  Id,
+  LlmRefusalError,
+  MLAdapter,
+} from '../types'
 import { createPollLoop, type PollLoop } from '../utils/polling'
 
 const VERIFY_POLLS = 40
@@ -9,6 +16,8 @@ export function useActiveLearning(adapter: MLAdapter, pollIntervalMs = 3000, onR
   const state = ref<ActiveLearningState | { active: false } | null>(null)
   const settings = ref<ActiveLearningSettings | null>(null)
   const error = ref<string | null>(null)
+  /** The last refusal, for its `code` and `destination`. */
+  const refusal = ref<LlmRefusalError | null>(null)
   const isBusy = ref(false)
   const supported = !!adapter.getActiveLearningState
   let loop: PollLoop | null = null
@@ -22,20 +31,28 @@ export function useActiveLearning(adapter: MLAdapter, pollIntervalMs = 3000, onR
     loop = null
   }
 
+  function seeding(value: typeof state.value) {
+    return !!value?.active && ['queued', 'running'].includes(value.seed?.status ?? '')
+  }
+
   function isRunning(value: typeof state.value) {
-    return !!value?.active && ['training', 'scoring'].includes(value.round.status)
+    return !!value?.active && (['training', 'scoring'].includes(value.round.status) || seeding(value))
   }
 
   function pollIfRunning(datasetId: Id) {
     if (!isRunning(state.value) || loop) return
     const roundBefore = (state.value as ActiveLearningState).round.number
+    const seededBefore = seeding(state.value)
     loop = createPollLoop(async () => {
       const next = await adapter.getActiveLearningState!(datasetId)
       if (datasetId !== currentId) return
       state.value = next
       if (isRunning(next)) return
       stopPolling()
-      if (next.active && next.round.number > roundBefore) onReordered?.()
+      // A finished seed reorders the queue as a new round does.
+      if (next.active && (next.round.number > roundBefore || (seededBefore && next.seed?.status === 'completed'))) {
+        onReordered?.()
+      }
     }, pollIntervalMs)
     loop.start()
   }
@@ -43,10 +60,12 @@ export function useActiveLearning(adapter: MLAdapter, pollIntervalMs = 3000, onR
   async function run(action: () => Promise<void>, fallback: string) {
     isBusy.value = true
     error.value = null
+    refusal.value = null
     try {
       await action()
     } catch (err) {
       error.value = err instanceof Error ? err.message : fallback
+      refusal.value = err instanceof Error ? (err as LlmRefusalError) : null
     } finally {
       isBusy.value = false
     }
@@ -75,6 +94,7 @@ export function useActiveLearning(adapter: MLAdapter, pollIntervalMs = 3000, onR
   function start(datasetId: Id, options: ActiveLearningStartOptions) {
     return run(async () => {
       state.value = await adapter.startActiveLearning!(datasetId, options)
+      pollIfRunning(datasetId)
     }, 'Failed to start active learning')
   }
 
@@ -120,5 +140,5 @@ export function useActiveLearning(adapter: MLAdapter, pollIntervalMs = 3000, onR
 
   onUnmounted(stopPolling)
 
-  return { state, activeLoop, settings, error, isBusy, supported, refresh, refreshCounts, start, setStrategy, correctLabel, retrain, verify }
+  return { state, activeLoop, settings, error, refusal, isBusy, supported, refresh, refreshCounts, start, setStrategy, correctLabel, retrain, verify }
 }

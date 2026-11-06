@@ -2,8 +2,9 @@
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { STRATEGY_COPY, holdoutClassText, retrainPrompt, trainingWarning, verificationText } from '../annotation/activeLearning'
 import { count } from '../annotation/annotationState'
+import { tokens } from '../annotation/llmAssist'
 import { useActiveLearning } from '../composables/useActiveLearning'
-import type { Id, MLAdapter } from '../types'
+import type { Id, LlmEstimate, MLAdapter } from '../types'
 import Icon from './shared/Icon.vue'
 
 const props = defineProps<{
@@ -24,7 +25,7 @@ const emit = defineEmits<{
 }>()
 
 const pollInterval = inject<number>('vmlb:pollInterval', 3000)
-const { state, activeLoop, settings, error, isBusy, refresh, refreshCounts, start, setStrategy, correctLabel, retrain, verify } = useActiveLearning(
+const { state, activeLoop, settings, error, refusal, isBusy, refresh, refreshCounts, start, setStrategy, correctLabel, retrain, verify } = useActiveLearning(
   props.adapter,
   pollInterval,
   () => emit('reordered'),
@@ -35,8 +36,20 @@ const holdoutOn = ref(true)
 const holdoutPercent = ref(20)
 const batchSize = ref(20)
 const minPerClass = ref(5)
+const seedSource = ref<'random' | 'llm'>('random')
+/** Shown before an LLM seed starts: what it sends, where, and what it costs. */
+const seedEstimate = ref<LlmEstimate | null>(null)
 const correctFrom = ref('')
 const correctTo = ref('')
+
+const llmSeedOffered = computed(() => !!settings.value?.seed_sources.llm && !!props.adapter.estimateActiveLearningSeed)
+const seed = computed(() => activeLoop.value?.seed ?? null)
+const seedRunning = computed(() => ['queued', 'running'].includes(seed.value?.status ?? ''))
+const seedFailed = computed(() => ['failed', 'budget_exhausted'].includes(seed.value?.status ?? ''))
+/** The Project has not allowed its text to go to this destination. */
+const destinationToAllow = computed(() =>
+  refusal.value?.code === 'acknowledgement_required' ? (refusal.value.destination ?? null) : null,
+)
 
 const prompt = computed(() => (activeLoop.value ? retrainPrompt(activeLoop.value) : null))
 const warning = computed(() => (activeLoop.value ? trainingWarning(activeLoop.value) : ''))
@@ -86,15 +99,41 @@ async function onCorrect() {
   correctTo.value = ''
 }
 
-async function onStart() {
-  await start(props.datasetId, {
+function startOptions() {
+  return {
     strategy: strategy.value,
     batch_size: batchSize.value,
     min_per_class: minPerClass.value,
     holdout_percent: holdoutOn.value ? holdoutPercent.value : 0,
-    seed_source: 'random',
-  })
+  }
+}
+
+async function onStart() {
+  if (seedSource.value === 'llm') {
+    const { batch_size, holdout_percent } = startOptions()
+    error.value = null
+    try {
+      seedEstimate.value = await props.adapter.estimateActiveLearningSeed!(props.datasetId, { batch_size, holdout_percent })
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Could not price the LLM batch.'
+    }
+    return
+  }
+  await start(props.datasetId, { ...startOptions(), seed_source: 'random' })
   if (activeLoop.value) emit('started')
+}
+
+async function onStartWithLlm() {
+  await start(props.datasetId, { ...startOptions(), seed_source: 'llm', confirm_estimate: true })
+  if (activeLoop.value) {
+    seedEstimate.value = null
+    emit('started')
+  }
+}
+
+async function onAllowDestination(destination: string) {
+  await props.adapter.acknowledgeLlmDestination!(props.datasetId, destination)
+  await onStartWithLlm()
 }
 </script>
 
@@ -112,9 +151,13 @@ async function onStart() {
         <summary>Advanced</summary>
         <fieldset>
           <legend class="vmlb-label">First batch</legend>
-          <label><input type="radio" checked name="vmlb-seed" /> Random</label>
-          <label class="vmlb-muted">
-            <input type="radio" name="vmlb-seed" disabled /> Suggested by an LLM (not available yet)
+          <label><input v-model="seedSource" type="radio" name="vmlb-seed" value="random" /> Random</label>
+          <label v-if="llmSeedOffered">
+            <input v-model="seedSource" type="radio" name="vmlb-seed" value="llm" /> Suggested by an LLM
+            <span class="vmlb-muted">so every label is in it, even a rare one</span>
+          </label>
+          <label v-else class="vmlb-muted">
+            <input type="radio" name="vmlb-seed" value="llm" disabled /> Suggested by an LLM (not available yet)
           </label>
         </fieldset>
         <fieldset>
@@ -143,7 +186,28 @@ async function onStart() {
           </label>
         </fieldset>
       </details>
-      <button class="vmlb-btn-primary" :disabled="isBusy" @click="onStart">Start</button>
+      <div v-if="seedEstimate" class="vmlb-al-prompt" role="status">
+        <span>
+          The LLM labels {{ count(seedEstimate.tasks, 'item') }} to choose a first batch with every label in it. About
+          {{ tokens(seedEstimate.estimated_tokens) }} tokens, sent to {{ seedEstimate.destination }}.
+          <template v-if="!seedEstimate.within_budget">
+            That is more than you have left this month. Add your own API key under LLM suggestions to go ahead.
+          </template>
+        </span>
+        <button v-if="seedEstimate.within_budget" class="vmlb-btn-primary" :disabled="isBusy" @click="onStartWithLlm">
+          Start with the LLM
+        </button>
+        <button class="vmlb-btn-secondary" :disabled="isBusy" @click="seedEstimate = null">Cancel</button>
+      </div>
+      <button
+        v-if="destinationToAllow && adapter.acknowledgeLlmDestination"
+        class="vmlb-btn-primary"
+        :disabled="isBusy"
+        @click="onAllowDestination(destinationToAllow)"
+      >
+        Allow sending text to {{ destinationToAllow }}
+      </button>
+      <button v-if="!seedEstimate" class="vmlb-btn-primary" :disabled="isBusy" @click="onStart">Start</button>
     </template>
 
     <template v-else-if="activeLoop">
@@ -161,6 +225,12 @@ async function onStart() {
         </label>
       </div>
 
+      <p v-if="seedRunning" class="vmlb-al-prompt" role="status">
+        The LLM is choosing the first batch: {{ seed?.done ?? 0 }} of {{ seed?.total ?? '…' }}. You can label meanwhile.
+      </p>
+      <div v-else-if="seedFailed" class="vmlb-alert-error">
+        <Icon name="alert" /> {{ seed?.error }} The first batch stays in random order.
+      </div>
       <div v-if="activeLoop.round.error" class="vmlb-alert-error"><Icon name="alert" /> {{ activeLoop.round.error }}</div>
 
       <div v-if="prompt?.message" class="vmlb-al-prompt" :class="{ 'vmlb-al-prompt-ask': prompt.emphasised }">
