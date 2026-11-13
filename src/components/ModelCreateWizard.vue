@@ -334,7 +334,6 @@ async function createModel() {
             <div class="vmlb-model-card-head">
               <h3>{{ allModelInfo[type]?.label }}</h3>
               <span v-if="modelType === type" class="vmlb-badge">Selected</span>
-              <span v-else-if="!isUsable(type)" class="vmlb-badge vmlb-badge-muted">Not for this dataset</span>
             </div>
             <p class="vmlb-model-desc">{{ allModelInfo[type]?.shortDesc }}</p>
             <p v-if="unusableReason(type)" :id="`vmlb-why-${type}`" class="vmlb-model-why">{{ unusableReason(type) }}</p>
@@ -479,10 +478,12 @@ async function createModel() {
     box-shadow var(--vmlb-duration) var(--vmlb-ease);
 }
 .vmlb-model-card:hover { border-color: var(--vmlb-border-strong); transform: translateY(-1px); box-shadow: var(--vmlb-shadow-sm); }
-.vmlb-model-card.vmlb-unusable { opacity: 0.6; cursor: not-allowed; }
+/* A model that cannot train the dataset: its name and summary fade, its reason stays readable. */
+.vmlb-model-card.vmlb-unusable { cursor: not-allowed; background: var(--vmlb-surface-sunken); }
 .vmlb-model-card.vmlb-unusable:hover { transform: none; box-shadow: none; border-color: var(--vmlb-border); }
-.vmlb-model-why { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--vmlb-text); }
-.vmlb-badge-muted { background: var(--vmlb-surface-sunken); color: var(--vmlb-text-muted); }
+.vmlb-model-card.vmlb-unusable .vmlb-model-card-head,
+.vmlb-model-card.vmlb-unusable .vmlb-model-desc { opacity: 0.6; }
+.vmlb-model-why { margin: 0.5rem 0 0; font-size: 0.85rem; line-height: 1.45; color: var(--vmlb-text); }
 .vmlb-no-fit { margin: 0 0 1rem; padding: 0.75rem 1rem; border-radius: var(--vmlb-radius-md); border: 1px solid var(--vmlb-warning); background: var(--vmlb-warning-soft); color: var(--vmlb-text); }
 .vmlb-no-fit p { margin: 0.25rem 0; }
 .vmlb-model-card.vmlb-selected { border-color: var(--vmlb-accent); background: var(--vmlb-accent-soft); box-shadow: var(--vmlb-shadow-sm); }
