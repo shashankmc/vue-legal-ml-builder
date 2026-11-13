@@ -261,6 +261,9 @@ export function createMockAdapter(): MLAdapter {
         },
         labels: ['Obligation', 'Permission', 'Prohibition'],
         annotationLevel: 'document' as const,
+        labelSource: null,
+        fileLabel: null,
+        hint: null,
       })
     },
     async saveAnnotationAssignment(taskId, assignment) {

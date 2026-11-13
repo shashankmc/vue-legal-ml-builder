@@ -282,11 +282,12 @@ describe('AnnotationWorkspace on legal-annotation-kit', () => {
     wrapper.unmount()
   })
 
-  it('congratulates only finished real items', async () => {
+  it('says every item has a label, without claiming the user made them all', async () => {
+    // Since #147 labels from the file count too, so "You annotated" would be wrong.
     const { wrapper } = await mounted({ getNextAnnotationTask: queue(null, { total: 4, annotated: 4, percentage: 100 }) })
 
-    expect(wrapper.text()).toContain('All items annotated')
-    expect(wrapper.text()).toContain('You annotated 4 of 4 items.')
+    expect(wrapper.text()).toContain('Every item has a label')
+    expect(wrapper.text()).toContain('4 of 4 items are labelled.')
     wrapper.unmount()
   })
 

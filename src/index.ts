@@ -6,6 +6,7 @@ import ActiveLearningPanel from './components/ActiveLearningPanel.vue'
 import AnnotationWorkspace from './components/AnnotationWorkspace.vue'
 import DatasetEda from './components/DatasetEda.vue'
 import LlmAssistPanel from './components/LlmAssistPanel.vue'
+import LabelReview from './components/LabelReview.vue'
 import DatasetManager from './components/DatasetManager.vue'
 import ModelCreateWizard from './components/ModelCreateWizard.vue'
 import ModelDetail from './components/ModelDetail.vue'
@@ -78,6 +79,7 @@ export {
   ConfusionMatrix,
   DatasetEda,
   DatasetManager,
+  LabelReview,
   LlmAssistPanel,
   MlBuilderThemeProvider,
   ModelCreateWizard,
@@ -123,11 +125,13 @@ export { adviseFor, decisionTreeFor, IMBALANCE_RATIO, SMALL_DATASET_ROWS } from 
 export { ANNOTATION_STATE, annotationControls, annotationState, labelledRows, nothingToAnnotateReason } from './annotation/annotationState'
 export type { AnnotationControls, AnnotationScreenState } from './annotation/annotationState'
 export { kitLabelset, labelColour } from './annotation/labelColours'
+export { assignmentChanged, labelSourceText } from './annotation/review'
 export { STRATEGY_COPY, holdoutClassText, retrainPrompt, trainingWarning, verificationText } from './annotation/activeLearning'
 export type { DatasetFacts, DecisionTree, GuideAdvice, GuideContext, GuideNode, GuideOption } from './lens/modelGuide'
 
 export type {
   AnnotationAssignment,
+  AnnotationTaskPageFilter,
   ActiveLearningRound,
   ActiveLearningSettings,
   ActiveLearningStartOptions,

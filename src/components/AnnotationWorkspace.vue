@@ -17,6 +17,7 @@ import { useAnnotation } from '../composables/useAnnotation'
 import { taskTypeLabel } from './modelCatalogData'
 import ActiveLearningPanel from './ActiveLearningPanel.vue'
 import LlmAssistPanel from './LlmAssistPanel.vue'
+import LabelReview from './LabelReview.vue'
 import Icon from './shared/Icon.vue'
 
 const DEFAULT_ENTITY_TYPES = ['Person', 'Organization', 'Location', 'Date', 'Misc']
@@ -124,6 +125,16 @@ const proposals = computed<Proposal[]>(() =>
       }]
     : [],
 )
+
+// Review of the labels the Dataset already has: file labels included (#148).
+const reviewing = ref(false)
+const canReview = computed(
+  () => !!adapter.value?.pageAnnotationTasks && !!props.datasetId && !!controls.value && annotated.value > 0,
+)
+async function closeReview() {
+  reviewing.value = false
+  await reload()
+}
 
 async function reload() {
   await loadNext(props.projectId, props.datasetId)
@@ -283,7 +294,21 @@ async function onLabelHoldout() {
     <div v-if="error" class="vmlb-alert-error">
       <Icon name="alert" /> {{ error }}
     </div>
-    <div v-if="isLoading && !task" class="vmlb-annotation-skeleton">
+    <div v-if="canReview && !reviewing" class="vmlb-annotate-modes">
+      <button class="vmlb-btn-secondary" @click="reviewing = true">Review labels</button>
+      <span class="vmlb-muted">Go through the {{ count(annotated, 'label') }} this Dataset has, and change any.</span>
+    </div>
+    <LabelReview
+      v-if="reviewing && adapter && datasetId"
+      :adapter="adapter"
+      :project-id="projectId"
+      :dataset-id="datasetId"
+      :labels="offeredLabels"
+      :document-label-mode="controls === 'multi' ? 'multi' : 'single'"
+      @saved="labelsVersion += 1"
+      @close="closeReview"
+    />
+    <div v-else-if="isLoading && !task" class="vmlb-annotation-skeleton">
       <div class="vmlb-skeleton vmlb-skeleton-line" style="width: 90%" />
       <div class="vmlb-skeleton vmlb-skeleton-line" style="width: 75%" />
       <div class="vmlb-skeleton vmlb-skeleton-tile" />
@@ -302,6 +327,7 @@ async function onLabelHoldout() {
       </details>
 
       <p class="vmlb-muted vmlb-row-note">Row {{ task.item_index + 1 }} of the Dataset</p>
+      <p v-if="opened?.hint" class="vmlb-hint" role="note">The file lists: {{ opened.hint }}</p>
 
       <div class="vmlb-kit">
         <AnnotatorView
@@ -347,8 +373,8 @@ async function onLabelHoldout() {
 
     <div v-else-if="screenState === ANNOTATION_STATE.FINISHED" class="vmlb-empty">
       <Icon name="check" size="2rem" class="vmlb-empty-icon" />
-      <p class="vmlb-empty-title">All items annotated</p>
-      <p>You annotated {{ annotated }} of {{ count(total, 'item') }}.</p>
+      <p class="vmlb-empty-title">Every item has a label</p>
+      <p>{{ annotated }} of {{ count(total, 'item') }} are labelled. Review labels to change any of them.</p>
       <a v-if="backHref" :href="backHref" class="vmlb-btn-primary">Back to Project</a>
     </div>
 
@@ -408,40 +434,12 @@ async function onLabelHoldout() {
 .vmlb-guidelines-text { white-space: pre-wrap; line-height: 1.6; }
 .vmlb-annotate-holdout { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem; font-size: 0.875rem; }
 .vmlb-row-note { margin: 0 0 0.5rem; font-size: 0.75rem; }
-
-/* legal-annotation-kit reads its colours and radii from --lak-* variables; take
-   them from the builder's theme so light and dark follow it. */
-.vmlb-kit {
-  --lak-accent: var(--vmlb-accent);
-  --lak-on-accent: var(--vmlb-on-accent);
-  --lak-bg: var(--vmlb-surface);
-  --lak-fg: var(--vmlb-text);
-  --lak-fg-soft: var(--vmlb-text-subtle);
-  --lak-muted: var(--vmlb-text-muted);
-  --lak-surface: var(--vmlb-surface);
-  --lak-sidebar-bg: var(--vmlb-surface-sunken);
-  --lak-border: var(--vmlb-border);
-  --lak-border-strong: var(--vmlb-border-strong);
-  --lak-hover: var(--vmlb-accent-soft);
-  --lak-success: var(--vmlb-success);
-  --lak-warning: var(--vmlb-warning);
-  --lak-warning-bg: var(--vmlb-warning-soft);
-  --lak-warning-fg: var(--vmlb-text);
-  --lak-danger: var(--vmlb-error);
-  --lak-danger-bg: var(--vmlb-error-soft);
-  --lak-danger-border: var(--vmlb-error);
-  --lak-danger-fg: var(--vmlb-text);
-  --lak-progress-track: var(--vmlb-surface-sunken);
-  --lak-radius: var(--vmlb-radius-md);
-  --lak-radius-sm: var(--vmlb-radius-sm);
-  --lak-radius-lg: var(--vmlb-radius-lg);
-  height: min(70vh, 40rem);
-  overflow: hidden;
-  border: 1px solid var(--vmlb-border);
-  border-radius: var(--vmlb-radius-lg);
-  background: var(--vmlb-surface);
+.vmlb-annotate-modes { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-bottom: 1rem; font-size: 0.875rem; }
+.vmlb-hint {
+  margin: 0 0 0.5rem; padding: 0.4rem 0.6rem; border-left: 3px solid var(--vmlb-accent);
+  background: var(--vmlb-accent-soft); font-size: 0.8125rem;
 }
-.vmlb-kit > .vmlb-skeleton-tile { height: 100%; }
+
 .vmlb-new-label { display: flex; gap: 0.35rem; margin-bottom: 0.6rem; }
 .vmlb-new-label input {
   flex: 1; min-width: 0;

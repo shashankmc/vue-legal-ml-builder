@@ -500,3 +500,36 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* legal-annotation-kit reads its colours and radii from --lak-* variables; taken from the builder's theme so light and dark follow it. */
+.vmlb-kit {
+  --lak-accent: var(--vmlb-accent);
+  --lak-on-accent: var(--vmlb-on-accent);
+  --lak-bg: var(--vmlb-surface);
+  --lak-fg: var(--vmlb-text);
+  --lak-fg-soft: var(--vmlb-text-subtle);
+  --lak-muted: var(--vmlb-text-muted);
+  --lak-surface: var(--vmlb-surface);
+  --lak-sidebar-bg: var(--vmlb-surface-sunken);
+  --lak-border: var(--vmlb-border);
+  --lak-border-strong: var(--vmlb-border-strong);
+  --lak-hover: var(--vmlb-accent-soft);
+  --lak-success: var(--vmlb-success);
+  --lak-warning: var(--vmlb-warning);
+  --lak-warning-bg: var(--vmlb-warning-soft);
+  --lak-warning-fg: var(--vmlb-text);
+  --lak-danger: var(--vmlb-error);
+  --lak-danger-bg: var(--vmlb-error-soft);
+  --lak-danger-border: var(--vmlb-error);
+  --lak-danger-fg: var(--vmlb-text);
+  --lak-progress-track: var(--vmlb-surface-sunken);
+  --lak-radius: var(--vmlb-radius-md);
+  --lak-radius-sm: var(--vmlb-radius-sm);
+  --lak-radius-lg: var(--vmlb-radius-lg);
+  height: min(70vh, 40rem);
+  overflow: hidden;
+  border: 1px solid var(--vmlb-border);
+  border-radius: var(--vmlb-radius-lg);
+  background: var(--vmlb-surface);
+}
+.vmlb-kit > .vmlb-skeleton-tile { height: 100%; }
