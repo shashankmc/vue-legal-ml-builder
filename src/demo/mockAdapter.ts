@@ -252,6 +252,21 @@ export function createMockAdapter(): MLAdapter {
     async skipAnnotation(taskId) {
       return delay({ id: taskId, dataset_id: 'ds-1', item_index: 0, text: '', status: 'skipped', created_at: '', updated_at: '' })
     },
+    async getAnnotationAssignment(taskId) {
+      return delay({
+        document: { name: 'Lease clauses, item 1', full_text: 'The tenant shall pay rent on the first day of each month.' },
+        assignment: {
+          id: taskId, annotator: 'demo', order: 1, status: 'pending', confidence: 0,
+          annotations: [], document_annotations: [], document_relations: [],
+        },
+        labels: ['Obligation', 'Permission', 'Prohibition'],
+        annotationLevel: 'document' as const,
+      })
+    },
+    async saveAnnotationAssignment(taskId, assignment) {
+      const label = assignment.document_annotations[0]?.label ?? ''
+      return delay({ id: taskId, dataset_id: 'ds-1', item_index: 0, text: '', annotation_label: label, status: 'annotated', created_at: '', updated_at: '' })
+    },
   }
 }
 

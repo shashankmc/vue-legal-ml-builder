@@ -1,3 +1,4 @@
+import type { AnnotationLevel, Assignment } from 'legal-annotation-kit'
 import type { MlBuilderTheme } from './theme'
 import type { CurveChartOptions } from './utils/trainingCharts'
 
@@ -152,6 +153,18 @@ export interface AnnotationTask {
   is_holdout?: boolean
   created_at: string
   updated_at: string
+}
+
+/** A task opened for legal-annotation-kit: legal-ml-core's
+ * `GET /annotation/tasks/<id>/assignment`. */
+export interface AnnotationAssignment {
+  document: { name: string; full_text: string }
+  /** As last saved, or built by the server from the task's label. */
+  assignment: Assignment
+  /** The Dataset's labels; for typed labels, those saved on it so far. */
+  labels: string[]
+  /** `document` for single-label tasks, `word` for NER; null when not annotated. */
+  annotationLevel: AnnotationLevel | null
 }
 
 export interface AnnotationStats {
@@ -526,6 +539,11 @@ export interface MLAdapter {
   // Annotation
   getNextAnnotationTask(projectId: Id, datasetId?: Id, options?: { holdout?: boolean }): Promise<{ task: AnnotationTask | null; stats: AnnotationStats }>
   saveAnnotation(taskId: Id, label: unknown): Promise<AnnotationTask>
+  /** Open a task as a legal-annotation-kit Assignment, with its labels and level. */
+  getAnnotationAssignment(taskId: Id): Promise<AnnotationAssignment>
+  /** Save a task's Assignment; the server derives the label. Rejects with the
+   * server's reason when a rule is broken. */
+  saveAnnotationAssignment(taskId: Id, assignment: Assignment): Promise<AnnotationTask>
   skipAnnotation(taskId: Id): Promise<AnnotationTask>
   /** Optional: lets a user return to skipped items. */
   listAnnotationTasks?(projectId: Id, filter: { status?: string; datasetId?: Id }): Promise<AnnotationTask[]>

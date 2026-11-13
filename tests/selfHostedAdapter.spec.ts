@@ -296,3 +296,44 @@ describe('createSelfHostedAdapter LLM methods', () => {
     expect('destination' in refused).toBe(false)
   })
 })
+
+describe('createSelfHostedAdapter annotation assignments', () => {
+  const assignment = {
+    id: 't 1', annotator: 'u1', order: 1, status: 'done', confidence: 0,
+    annotations: [], document_annotations: [{ id: -1, label: 'Void', confidence: 0, metadata: null }], document_relations: [],
+  }
+  const opened = {
+    success: true,
+    document: { name: 'Contracts, item 1', full_text: 'The contract is void.' },
+    assignment,
+    labels: ['Void', 'Valid'],
+    annotation_level: 'document',
+  }
+
+  it('opens a task as an assignment with its text, labels and level', async () => {
+    const calls = stubFetch(() => reply(200, opened))
+    const result = await createSelfHostedAdapter({ apiUrl: '/api/' }).getAnnotationAssignment('t 1')
+    expect(calls).toEqual([expect.objectContaining({ url: '/api/annotation/tasks/t%201/assignment', method: undefined })])
+    expect(result).toEqual({
+      document: opened.document,
+      assignment,
+      labels: ['Void', 'Valid'],
+      annotationLevel: 'document',
+    })
+  })
+
+  it('saves an assignment with PUT and returns the task', async () => {
+    const task = { id: 't 1', annotation_label: 'Void', status: 'annotated' }
+    const calls = stubFetch(() => reply(200, { success: true, task }))
+    const result = await createSelfHostedAdapter({ apiUrl: '/api' }).saveAnnotationAssignment('t 1', assignment)
+    expect(calls).toEqual([expect.objectContaining({ url: '/api/annotation/tasks/t%201/assignment', method: 'PUT', body: assignment })])
+    expect(result).toEqual(task)
+  })
+
+  it('passes on the reason an assignment is refused', async () => {
+    stubFetch(() => reply(400, { success: false, error: 'Choose only one label for this item.' }))
+    await expect(createSelfHostedAdapter({ apiUrl: '/api' }).saveAnnotationAssignment('t1', assignment)).rejects.toThrow(
+      'Choose only one label for this item.',
+    )
+  })
+})

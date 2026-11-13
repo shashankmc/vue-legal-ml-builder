@@ -11,6 +11,37 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.9.0] - unreleased
+
+### Changed (breaking)
+
+- `AnnotationWorkspace` shows each item in
+  [legal-annotation-kit](https://github.com/shashankmc/vue-legal-annotation-kit)'s
+  `AnnotatorView` (BAIGLE ADR 0007). Two adapter methods are now **required**:
+  `getAnnotationAssignment(taskId)` → `AnnotationAssignment` and
+  `saveAnnotationAssignment(taskId, assignment)` → `AnnotationTask`
+  (legal-ml-core `GET`/`PUT /api/annotation/tasks/<id>/assignment`). Adapters
+  without them, such as Legal Blocks', must add them before upgrading.
+- The kit's Save replaces **Save & Next** and the N key; Skip moves into the kit's
+  header and keeps the S key. Single-label items take one tag at a time, NER spans
+  may not overlap, and relations, confidence and metadata are hidden.
+- A Dataset that names no labels gets a **New label** field above the labels;
+  a new label is saved with the first item that uses it.
+- `legal-annotation-kit` is a dependency (pinned by commit until it releases);
+  its stylesheet is bundled into `vue-legal-ml-builder/style.css`, and its colours
+  follow the builder theme, light and dark.
+
+### Added
+
+- `createSelfHostedAdapter` implements both methods; `AnnotationAssignment`,
+  `labelColour(name)` (a label's stable colour) and `kitLabelset(names)` are exported.
+
+### Unchanged
+
+- The queue, progress, holdout, end states, `ActiveLearningPanel` and
+  `LlmAssistPanel`, including the per-item LLM suggestion card: a label saved over
+  a waiting suggestion still confirms or corrects it.
+
 ## [0.8.0] - 2026-11-13
 
 ### Added

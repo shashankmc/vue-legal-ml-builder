@@ -22,9 +22,11 @@ export default defineConfig({
           fileName: (format) => `vue-legal-ml-builder.${format}.js`,
         },
         rollupOptions: {
-          external: ['vue', 'plotly.js-basic-dist'],
+          // legal-annotation-kit's code stays a dependency the host installs; its
+          // stylesheet (legal-annotation-kit/style.css) is bundled into ours.
+          external: ['vue', 'plotly.js-basic-dist', 'legal-annotation-kit'],
           output: {
-            globals: { vue: 'Vue', 'plotly.js-basic-dist': 'Plotly' },
+            globals: { vue: 'Vue', 'plotly.js-basic-dist': 'Plotly', 'legal-annotation-kit': 'LegalAnnotationKit' },
             exports: 'named',
           },
         },

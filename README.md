@@ -31,6 +31,10 @@ bundler must be able to resolve it. Add it as a direct dependency of the host
 pre-bundling otherwise may not see the transitive copy). Without it the chart
 components either break the host build (unresolved import) or render empty.
 
+`legal-annotation-kit` is a regular dependency, externalized from the library
+build, so it installs with the builder; its styles are already in
+`vue-legal-ml-builder/style.css`.
+
 ```ts
 import { createApp } from 'vue'
 import { VueLegalMlBuilderPlugin, createSelfHostedAdapter } from 'vue-legal-ml-builder'
@@ -70,7 +74,9 @@ Or per component, for direct (non-plugin) usage; the prop overrides the plugin o
 
 `DatasetManager`, `DatasetEda`, `ModelList`, `ModelCreateWizard`, `ModelDetail`,
 `TrainingMonitor` (composes `TrainingCurves`), `ParameterPerformanceExplorer`,
-`AnnotationWorkspace` (composes `ActiveLearningPanel` when the adapter has the
+`AnnotationWorkspace` (shows each item in legal-annotation-kit's `AnnotatorView`,
+through the required `getAnnotationAssignment` / `saveAnnotationAssignment`
+adapter methods; composes `ActiveLearningPanel` when the adapter has the
 optional active learning methods and the task is single-label classification, and
 `LlmAssistPanel` when the adapter has the optional LLM methods; see
 [LLM suggestions](#llm-suggestions)),
