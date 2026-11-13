@@ -131,6 +131,15 @@ describe('createSelfHostedAdapter', () => {
       expect('field' in refused).toBe(false)
     })
   })
+  it('fits the models to a Dataset, asking the server by its id', async () => {
+    const fit = { models: { svm: { name: 'Support Vector Machine', usable: false, reason: 'Not categories.' } }, advice: 'Give the rows a few categories.' }
+    const calls = stubFetch(() => reply(200, fit))
+    const adapter = createSelfHostedAdapter({ apiUrl: '/api', getAuthToken: () => 't' })
+
+    await expect(adapter.getModelFit!('ds 1')).resolves.toEqual(fit)
+    expect(calls[0].url).toBe('/api/models/available?dataset_id=ds%201')
+  })
+
   it('returns training metric points with their group and the training step', async () => {
     const point = {
       id: 'p1', training_job_id: 'job-1', step: 0, epoch: 0.5, training_step: 10,

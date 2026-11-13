@@ -19,6 +19,7 @@ import type {
   MLAdapter,
   MlModel,
   ModelCatalog,
+  ModelFit,
   ModelComparison,
   ParameterComparisonPoint,
   PredictionResult,
@@ -140,6 +141,9 @@ export function createSelfHostedAdapter(opts: SelfHostedAdapterOptions): MLAdapt
       const query = taskType ? `?task_type=${encodeURIComponent(taskType)}` : ''
       const data = await get(`/models/available${query}`)
       return taskType ? { [taskType]: data.models } : data.models
+    },
+    async getModelFit(datasetId: Id): Promise<ModelFit> {
+      return get(`/models/available?dataset_id=${encodeURIComponent(datasetId)}`)
     },
     async createModel(config): Promise<MlModel> {
       const data = await post('/models/', config)

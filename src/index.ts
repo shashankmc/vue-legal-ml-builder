@@ -155,6 +155,7 @@ export type {
   MLBuilderPluginOptions,
   MlModel,
   ModelCatalog,
+  ModelFit,
   ParameterRule,
   ModelComparison,
   ModelParameters,

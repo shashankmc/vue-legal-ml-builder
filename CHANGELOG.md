@@ -20,6 +20,7 @@ tagged `vX.Y.Z`.
   every model: those that cannot train the chosen Dataset are greyed out, cannot
   be chosen, and say why; the guide and the default choose only among the rest.
   When none fits, a note says so with the server's advice.
+- `createSelfHostedAdapter` implements `getModelFit`; `ModelFit` is exported.
 
 ## [0.7.0] - 2026-11-06
 
