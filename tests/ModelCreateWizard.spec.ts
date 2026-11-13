@@ -653,4 +653,73 @@ describe('ModelCreateWizard', () => {
       })
     })
   })
+
+  describe('fitted to the dataset (getModelFit)', () => {
+    const SVM_REASON =
+      'Support Vector Machine learns from labels that are categories, but this Dataset has 1,000 different labels in 1,000 labelled rows: fewer than 2 examples each.'
+    const ADVICE =
+      'These labels look like answers or free text, not categories. Give the rows a few categories (annotate them, or re-label the file) to train a model on them.'
+
+    function fit(usable: string[], reasons: Record<string, string> = {}, advice: string | null = null) {
+      const types = ['svm', 'logistic_regression', 'naive_bayes', 'kmeans', 'legalbert']
+      return {
+        models: Object.fromEntries(
+          types.map((t) => [t, { usable: usable.includes(t), reason: usable.includes(t) ? null : reasons[t] ?? 'Not for this Dataset.' }]),
+        ),
+        advice,
+      }
+    }
+
+    function card(wrapper: ReturnType<typeof mount>, label: string) {
+      return wrapper.findAll('.vmlb-model-card').find((c) => c.text().includes(label))!
+    }
+
+    it('asks the server about the dataset chosen before the wizard opened', async () => {
+      const getModelFit = vi.fn().mockResolvedValue(fit(['svm']))
+      const adapter = createTestAdapter({ listDatasets: vi.fn().mockResolvedValue([dataset()]), getModelFit })
+      mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+      await flushPromises()
+
+      expect(getModelFit).toHaveBeenCalledWith('ds-1')
+    })
+
+    it('lists every model, greying out those that cannot train the dataset with their reason', async () => {
+      const adapter = createTestAdapter({
+        listDatasets: vi.fn().mockResolvedValue([dataset()]),
+        getModelFit: vi.fn().mockResolvedValue(fit(['logistic_regression', 'naive_bayes'], { svm: SVM_REASON })),
+      })
+      const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+      await flushPromises()
+      // The guide proposes a usable model; the full list shows the rest, and why.
+      expect(wrapper.find('.vmlb-model-card.vmlb-selected').text()).not.toContain('Support Vector Machine')
+      await wrapper.findAll('button').find((b) => b.text() === 'Choose a model myself')!.trigger('click')
+
+      const svm = card(wrapper, 'Support Vector Machine')
+      expect(svm.attributes('aria-disabled')).toBe('true')
+      expect(svm.text()).toContain(SVM_REASON)
+      await svm.trigger('click')
+      expect(svm.classes()).not.toContain('vmlb-selected')
+
+      // Usable models come first, and can be chosen.
+      const cards = wrapper.findAll('.vmlb-model-card')
+      expect(cards[0].attributes('aria-disabled')).toBeUndefined()
+      await card(wrapper, 'Naive Bayes').trigger('click')
+      expect(card(wrapper, 'Naive Bayes').classes()).toContain('vmlb-selected')
+    })
+
+    it('when no model fits, says why and what would make the dataset trainable', async () => {
+      const adapter = createTestAdapter({
+        listDatasets: vi.fn().mockResolvedValue([dataset()]),
+        getModelFit: vi.fn().mockResolvedValue(fit([], { svm: SVM_REASON }, ADVICE)),
+      })
+      const wrapper = mount(ModelCreateWizard, { props: { adapter, datasetId: 'ds-1' } })
+      await flushPromises()
+
+      const note = wrapper.find('[role="note"]')
+      expect(note.text()).toContain('No model can train this dataset yet.')
+      expect(note.text()).toContain(ADVICE)
+      expect(wrapper.findAll('.vmlb-model-card').every((c) => c.attributes('aria-disabled') === 'true')).toBe(true)
+    })
+  })
 })
+
