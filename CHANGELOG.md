@@ -11,7 +11,7 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
-## [0.9.0] - unreleased
+## [0.9.0] - 2026-11-13
 
 ### Changed (breaking)
 
@@ -30,6 +30,12 @@ tagged `vX.Y.Z`.
 - `legal-annotation-kit` is a dependency (pinned by commit until it releases);
   its stylesheet is bundled into `vue-legal-ml-builder/style.css`, and its colours
   follow the builder theme, light and dark.
+- The LLM suggestion for the item on screen is a legal-annotation-kit proposal
+  (BAIGLE #140): Accept confirms it, **Change to…** corrects it, Reject rejects it,
+  and the agreement check refreshes. The builder's own suggestion card is gone.
+- Removed from the exports: `canSaveAnnotation`, `toggleLabel`, `nerSegments`,
+  `addEntity` and the `EntitySpan` type, and `save(label)` from `useAnnotation`;
+  the kit does that work now.
 
 ### Added
 
@@ -39,8 +45,8 @@ tagged `vX.Y.Z`.
 ### Unchanged
 
 - The queue, progress, holdout, end states, `ActiveLearningPanel` and
-  `LlmAssistPanel`, including the per-item LLM suggestion card: a label saved over
-  a waiting suggestion still confirms or corrects it.
+  `LlmAssistPanel` (key, acknowledgement, prompt, agreement, bulk accept and jobs).
+  A label saved over a waiting suggestion still confirms or corrects it.
 
 ## [0.8.0] - 2026-11-13
 
@@ -370,7 +376,9 @@ tagged `vX.Y.Z`.
   monitoring), extracted from the `reducing_digital_divide` SvelteKit frontend
   and driven through a host-supplied `MLAdapter`.
 
-[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.5.5...v0.6.0
 [0.5.5]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.5.4...v0.5.5

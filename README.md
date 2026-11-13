@@ -119,9 +119,14 @@ routes, and `createSelfHostedAdapter` implements them all:
 | `getLlmJob(jobId)` | `GET /llm/jobs/<id>` | Following that job |
 | `estimateActiveLearningSeed(datasetId, { batch_size, holdout_percent })` | `POST /active-learning/datasets/<id>/seed-estimate` | Pricing an LLM-suggested first batch before Start |
 
-A suggestion is never a label: it shows on its item with the LLM's rationale, and
-becomes one only when the user accepts it, picks another label (a correction) or bulk
-accepts after the agreement check passes. "Suggest labels for this batch" asks for the
+A suggestion is never a label. The one waiting for the item on screen is passed to
+legal-annotation-kit as a proposal: listed under **Suggestions** with the LLM's
+rationale and its model and prompt version. It becomes a label only when the user
+accepts it (`confirmLlmSuggestion(id)`), changes it to another label
+(`confirmLlmSuggestion(id, label)`, a correction), or bulk accepts after the agreement
+check passes; rejecting it calls `rejectLlmSuggestion(id)` and leaves the item to label
+by hand. Saving the item with a label of one's own also confirms or corrects it, so the
+agreement counts it. "Suggest labels for this batch" asks for the
 next pending items in queue order (up to 10, legal-ml-core's default
 `LLM_MAX_SYNC_TASKS`), read with `listAnnotationTasks`; without it, the item on screen.
 Each method rejects with an `LlmRefusalError` whose `code` (`budget_exhausted`,

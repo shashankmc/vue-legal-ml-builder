@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { AnnotatorView } from 'legal-annotation-kit'
-import type { Assignment } from 'legal-annotation-kit'
+import type { Assignment, Proposal } from 'legal-annotation-kit'
 import 'legal-annotation-kit/style.css'
 import type { AnnotationAssignment, AnnotationTask, LlmSuggestion, MLAdapter } from '../types'
 import {
@@ -112,6 +112,19 @@ const suggestion = computed(() =>
   showLlm.value && task.value ? suggestions.value.find((s) => s.task_id === task.value!.id && s.status === 'pending') ?? null : null,
 )
 
+/** The waiting suggestion as a kit proposal: never a label until accepted (BAIGLE ADR 0003). */
+const proposals = computed<Proposal[]>(() =>
+  suggestion.value
+    ? [{
+        id: suggestion.value.id,
+        kind: 'document',
+        label: suggestion.value.label,
+        rationale: suggestion.value.rationale,
+        source: `${suggestion.value.model} · prompt v${suggestion.value.prompt_version}`,
+      }]
+    : [],
+)
+
 async function reload() {
   await loadNext(props.projectId, props.datasetId)
 }
@@ -179,10 +192,11 @@ async function onLlmLabelled() {
   await reload()
 }
 
-async function onAcceptSuggestion() {
-  if (!suggestion.value) return
-  if (await confirmSuggestion(suggestion.value.id, undefined, props.projectId, props.datasetId)) {
-    notice.value = 'Suggestion accepted'
+/** Accepting confirms the suggestion; choosing another label for it corrects it. */
+async function onProposalAnswered(event: { proposal: Proposal; annotation: { label: string } }, corrected: boolean) {
+  const label = corrected ? event.annotation.label : undefined
+  if (await confirmSuggestion(String(event.proposal.id), label, props.projectId, props.datasetId)) {
+    notice.value = corrected ? 'Suggestion corrected' : 'Suggestion accepted'
     labelsVersion.value += 1
   }
 }
@@ -289,18 +303,6 @@ async function onLabelHoldout() {
 
       <p class="vmlb-muted vmlb-row-note">Row {{ task.item_index + 1 }} of the Dataset</p>
 
-      <div v-if="suggestion" class="vmlb-llm-suggestion" role="note" aria-label="LLM suggestion">
-        <p class="vmlb-llm-suggestion-head">
-          <span class="vmlb-label">LLM suggestion</span> <strong>{{ suggestion.label }}</strong>
-        </p>
-        <p class="vmlb-llm-rationale">{{ suggestion.rationale }}</p>
-        <p class="vmlb-muted">It is not a label until you accept it. Choose another label below to correct it.</p>
-        <div class="vmlb-llm-suggestion-actions">
-          <button class="vmlb-btn-secondary" :disabled="isSubmitting" @click="onAcceptSuggestion">Accept</button>
-          <button class="vmlb-btn-tertiary" :disabled="isSubmitting" @click="onRejectSuggestion">Reject</button>
-        </div>
-      </div>
-
       <div class="vmlb-kit">
         <AnnotatorView
           v-if="opened"
@@ -318,6 +320,10 @@ async function onLabelHoldout() {
           :document-label-mode="controls === 'multi' ? 'multi' : 'single'"
           :allow-overlap="controls !== 'entities'"
           :on-save="onKitSave"
+          :proposals="proposals"
+          @proposal-accepted="onProposalAnswered($event, false)"
+          @proposal-corrected="onProposalAnswered($event, true)"
+          @proposal-rejected="onRejectSuggestion"
         >
           <template #header-actions>
             <button v-if="!holdout" class="vmlb-btn-secondary vmlb-skip" :disabled="isSubmitting" title="Skip this item (S key)" @click="onSkip">
@@ -402,15 +408,6 @@ async function onLabelHoldout() {
 .vmlb-guidelines-text { white-space: pre-wrap; line-height: 1.6; }
 .vmlb-annotate-holdout { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem; font-size: 0.875rem; }
 .vmlb-row-note { margin: 0 0 0.5rem; font-size: 0.75rem; }
-.vmlb-llm-suggestion {
-  margin: 0 0 1rem; padding: 0.75rem 1rem;
-  border: 1px dashed var(--vmlb-accent); border-radius: var(--vmlb-radius-md);
-  background: var(--vmlb-accent-soft); font-size: 0.875rem;
-}
-.vmlb-llm-suggestion p { margin: 0 0 0.4rem; }
-.vmlb-llm-suggestion-head strong { margin-left: 0.35rem; color: var(--vmlb-accent-strong); }
-.vmlb-llm-rationale { line-height: 1.5; }
-.vmlb-llm-suggestion-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
 
 /* legal-annotation-kit reads its colours and radii from --lak-* variables; take
    them from the builder's theme so light and dark follow it. */

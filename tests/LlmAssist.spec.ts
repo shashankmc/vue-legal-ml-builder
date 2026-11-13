@@ -266,13 +266,16 @@ describe('LLM assistance: suggestions for the batch', () => {
     wrapper.unmount()
   })
 
-  it('shows the suggestion on its item with the rationale, not as a label', async () => {
+  it('shows the suggestion as a kit proposal with its rationale and source, not as a label', async () => {
     const { adapter, wrapper } = await mounted({ listLlmSuggestions: vi.fn().mockResolvedValue([llmSuggestion()]) })
 
-    const card = wrapper.find('[aria-label="LLM suggestion"]')
+    const card = wrapper.find('.proposal')
     expect(card.text()).toContain('Criminal')
+    expect(card.text()).toContain('Suggested')
     expect(card.text()).toContain('The clause sets out a penalty for an offence.')
-    expect(card.text()).toContain('It is not a label until you accept it.')
+    expect(card.text()).toContain('mistral-small · prompt v0')
+    expect(wrapper.find('[aria-label="LLM suggestion"]').exists()).toBe(false)
+    expect(wrapper.findAll('.doc-tag.is-tagged')).toHaveLength(0)
     expect(adapter.listLlmSuggestions).toHaveBeenCalledWith('ds-1', 'pending')
     expect(adapter.confirmLlmSuggestion).not.toHaveBeenCalled()
     expect(adapter.saveAnnotation).not.toHaveBeenCalled()
@@ -282,33 +285,59 @@ describe('LLM assistance: suggestions for the batch', () => {
   it('does not show a suggestion for another item', async () => {
     const { wrapper } = await mounted({ listLlmSuggestions: vi.fn().mockResolvedValue([llmSuggestion({ task_id: 't9' })]) })
 
-    expect(wrapper.find('[aria-label="LLM suggestion"]').exists()).toBe(false)
+    expect(wrapper.find('.proposal').exists()).toBe(false)
     wrapper.unmount()
   })
 
-  it('accepts a suggestion, then moves on', async () => {
+  it('accepts a suggestion from its proposal, then moves on', async () => {
     const getNextAnnotationTask = vi.fn()
       .mockResolvedValueOnce({ task: item('t1', 'Clause one.'), stats: { total: 4, annotated: 1, percentage: 25 } })
       .mockResolvedValue({ task: item('t2', 'Clause two.'), stats: { total: 4, annotated: 2, percentage: 50 } })
     const { adapter, wrapper } = await mounted({ getNextAnnotationTask, listLlmSuggestions: vi.fn().mockResolvedValue([llmSuggestion()]) })
 
-    await click(wrapper, 'Accept')
+    await wrapper.find('.proposal__btn--accept').trigger('click')
+    await flushPromises()
 
     expect(adapter.confirmLlmSuggestion).toHaveBeenCalledWith('s1')
-    expect(adapter.saveAnnotation).not.toHaveBeenCalled()
+    expect(adapter.saveAnnotationAssignment).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Clause two.')
     wrapper.unmount()
   })
 
-  it('rejects a suggestion and leaves the item to label by hand', async () => {
+  it('corrects a suggestion from its proposal', async () => {
+    const { adapter, wrapper } = await mounted({ listLlmSuggestions: vi.fn().mockResolvedValue([llmSuggestion()]) })
+
+    await wrapper.find('.proposal__correct').setValue('Civil')
+    await flushPromises()
+
+    expect(adapter.confirmLlmSuggestion).toHaveBeenCalledWith('s1', 'Civil')
+    expect(adapter.saveAnnotationAssignment).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('rejects a suggestion from its proposal and leaves the item to label by hand', async () => {
     const { adapter, wrapper } = await mounted({ listLlmSuggestions: vi.fn().mockResolvedValueOnce([llmSuggestion()]).mockResolvedValue([]) })
 
-    await click(wrapper, 'Reject')
+    await wrapper.findAll('.proposal__btn').find((b) => b.text() === 'Reject')!.trigger('click')
+    await flushPromises()
 
     expect(adapter.rejectLlmSuggestion).toHaveBeenCalledWith('s1')
-    expect(wrapper.find('[aria-label="LLM suggestion"]').exists()).toBe(false)
+    expect(wrapper.find('.proposal').exists()).toBe(false)
     expect(wrapper.text()).toContain('Clause one.')
+    expect(wrapper.findAll('.doc-tag.is-tagged')).toHaveLength(0)
     expect(adapter.saveAnnotation).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('says why when accepting fails, and keeps the item', async () => {
+    const confirmLlmSuggestion = vi.fn().mockRejectedValue(new Error('That label is not one of this dataset\'s labels.'))
+    const { wrapper } = await mounted({ confirmLlmSuggestion, listLlmSuggestions: vi.fn().mockResolvedValue([llmSuggestion()]) })
+
+    await wrapper.find('.proposal__btn--accept').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("That label is not one of this dataset's labels.")
+    expect(wrapper.text()).toContain('Clause one.')
     wrapper.unmount()
   })
 
@@ -392,7 +421,8 @@ describe('LLM assistance: agreement and bulk accept', () => {
     const { adapter, wrapper } = await mounted({ listLlmSuggestions: vi.fn().mockResolvedValue([llmSuggestion()]) })
     const before = vi.mocked(adapter.getLlmAgreement!).mock.calls.length
 
-    await click(wrapper, 'Accept')
+    await wrapper.find('.proposal__btn--accept').trigger('click')
+    await flushPromises()
 
     expect(vi.mocked(adapter.getLlmAgreement!).mock.calls.length).toBeGreaterThan(before)
     wrapper.unmount()
