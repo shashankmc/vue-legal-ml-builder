@@ -36,11 +36,18 @@ tagged `vX.Y.Z`.
 - `createSelfHostedAdapter` implements both methods; `AnnotationAssignment`,
   `labelColour(name)` (a label's stable colour) and `kitLabelset(names)` are exported.
 
+- The LLM suggestion for the item on screen is a legal-annotation-kit proposal
+  (BAIGLE #140): Accept confirms it, **Change to…** corrects it, Reject rejects it,
+  and the agreement check refreshes. The builder's own suggestion card is gone.
+- Removed from the exports: `canSaveAnnotation`, `toggleLabel`, `nerSegments`,
+  `addEntity` and the `EntitySpan` type, and `save(label)` from `useAnnotation`;
+  the kit does that work now.
+
 ### Unchanged
 
 - The queue, progress, holdout, end states, `ActiveLearningPanel` and
-  `LlmAssistPanel`, including the per-item LLM suggestion card: a label saved over
-  a waiting suggestion still confirms or corrects it.
+  `LlmAssistPanel` (key, acknowledgement, prompt, agreement, bulk accept and jobs).
+  A label saved over a waiting suggestion still confirms or corrects it.
 
 ## [0.8.0] - 2026-11-13
 

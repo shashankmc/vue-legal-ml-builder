@@ -12,13 +12,6 @@ export const ANNOTATION_STATE = {
 export type AnnotationScreenState = (typeof ANNOTATION_STATE)[keyof typeof ANNOTATION_STATE]
 export type AnnotationControls = 'single' | 'multi' | 'entities'
 
-export interface EntitySpan {
-  text: string
-  start: number
-  end: number
-  type: string
-}
-
 // Which selector each task type labels with. A type left out has no controls, and
 // legal-ml-core does not queue it either.
 const CONTROLS: Record<string, AnnotationControls> = {
@@ -32,13 +25,6 @@ const CONTROLS: Record<string, AnnotationControls> = {
 
 export function annotationControls(taskType: string): AnnotationControls | null {
   return CONTROLS[taskType] ?? null
-}
-
-/** NER may save with no entities: a passage can truly hold none. */
-export function canSaveAnnotation(taskType: string, selectedLabel: string): boolean {
-  const controls = annotationControls(taskType)
-  if (controls === 'entities') return true
-  return !!controls && !!selectedLabel?.trim()
 }
 
 const NO_ANNOTATION_REASONS: Record<string, string> = {
@@ -93,32 +79,4 @@ export function annotationState({
 /** `count(2, 'item')` reads "2 items". */
 export function count(n: number, singular: string, plural = `${singular}s`): string {
   return `${n.toLocaleString('en-GB')} ${n === 1 ? singular : plural}`
-}
-
-export function toggleLabel(selected: string, label: string): string {
-  const parts = selected ? selected.split(',').filter(Boolean) : []
-  const index = parts.indexOf(label)
-  if (index > -1) parts.splice(index, 1)
-  else parts.push(label)
-  return parts.join(',')
-}
-
-/** Render segments for entity spans, so highlights sit in the text. */
-export function nerSegments(text: string, entities: EntitySpan[]) {
-  if (!entities.length) return [{ text, type: null as string | null }]
-  const sorted = [...entities].sort((a, b) => a.start - b.start)
-  const parts: Array<{ text: string; type: string | null }> = []
-  let position = 0
-  for (const entity of sorted) {
-    if (entity.start > position) parts.push({ text: text.slice(position, entity.start), type: null })
-    parts.push({ text: text.slice(entity.start, entity.end), type: entity.type })
-    position = entity.end
-  }
-  if (position < text.length) parts.push({ text: text.slice(position), type: null })
-  return parts
-}
-
-export function addEntity(entities: EntitySpan[], span: Omit<EntitySpan, 'type'>, type: string): EntitySpan[] {
-  const overlaps = entities.some((e) => !(span.end <= e.start || span.start >= e.end))
-  return overlaps ? entities : [...entities, { ...span, type }]
 }

@@ -1,14 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   ANNOTATION_STATE,
-  addEntity,
   annotationControls,
   annotationState,
-  canSaveAnnotation,
   labelledRows,
-  nerSegments,
   nothingToAnnotateReason,
-  toggleLabel,
 } from '../src/annotation/annotationState'
 
 const state = (overrides = {}) =>
@@ -52,12 +48,6 @@ describe('annotation controls', () => {
     expect(annotationControls('ner')).toBe('entities')
     expect(annotationControls('summarization')).toBeNull()
   })
-  it('lets NER save with no entities, and refuses a blank label elsewhere', () => {
-    expect(canSaveAnnotation('ner', '')).toBe(true)
-    expect(canSaveAnnotation('classification', '  ')).toBe(false)
-    expect(canSaveAnnotation('classification', 'civil')).toBe(true)
-    expect(canSaveAnnotation('summarization', 'x')).toBe(false)
-  })
   it('explains why there is nothing to annotate', () => {
     expect(nothingToAnnotateReason('clustering')).toBe('Clustering groups documents by itself, so these rows need no labels.')
     expect(nothingToAnnotateReason('classification')).toBe('Every row with text already has a label, so it is ready to train a Model.')
@@ -73,23 +63,5 @@ describe('labelledRows', () => {
   })
   it('is 0% with no rows', () => {
     expect(labelledRows({ rowCount: 0, total: 0, annotated: 0 }).percentage).toBe(0)
-  })
-})
-
-describe('multi-label and NER helpers', () => {
-  it('toggles a label in a comma list', () => {
-    expect(toggleLabel('a,b', 'c')).toBe('a,b,c')
-    expect(toggleLabel('a,b', 'a')).toBe('b')
-  })
-  it('splits text into entity segments', () => {
-    expect(nerSegments('Alice met Bob', [{ text: 'Bob', start: 10, end: 13, type: 'Person' }])).toEqual([
-      { text: 'Alice met ', type: null },
-      { text: 'Bob', type: 'Person' },
-    ])
-  })
-  it('refuses an overlapping span', () => {
-    const entities = [{ text: 'Alice', start: 0, end: 5, type: 'Person' }]
-    expect(addEntity(entities, { text: 'lic', start: 1, end: 4 }, 'Misc')).toEqual(entities)
-    expect(addEntity(entities, { text: 'met', start: 6, end: 9 }, 'Misc')).toHaveLength(2)
   })
 })
