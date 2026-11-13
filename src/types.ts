@@ -408,6 +408,13 @@ export interface ModelTypeInfo {
 
 export type ModelCatalog = Record<string, Record<string, ModelTypeInfo>>
 
+/** Every model fitted to one Dataset: whether it can train it and, if not, why;
+ * `advice` says what would make the Dataset trainable when no model can. */
+export interface ModelFit {
+  models: Record<string, Partial<ModelTypeInfo> & { usable: boolean; reason: string | null }>
+  advice: string | null
+}
+
 // ---------------------------------------------------------------------------
 // Backend adapter — the entire contract a host app must implement. Components
 // never call an API directly; they call these methods (mirrors
@@ -490,6 +497,10 @@ export interface MLAdapter {
   listModels(datasetId?: Id): Promise<MlModel[]>
   getModel(id: Id): Promise<MlModel>
   getAvailableModelTypes(taskType?: string): Promise<ModelCatalog>
+  /** Optional: every model fitted to this Dataset, with reasons (legal-ml-core
+   * 0.11: GET /api/models/available?dataset_id=). Without it, models are offered
+   * by task type alone. */
+  getModelFit?(datasetId: Id): Promise<ModelFit>
   /** Rejects with an Error, a `RefusalError` when a refusal names a setting. */
   createModel(config: { name: string; dataset_id: Id; model_type: string; parameters: ModelParameters; project_id?: Id }): Promise<MlModel>
   /** Optional: renames a Model or replaces its settings. Rejects as `createModel` does. */

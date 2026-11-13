@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onMounted, reactive, ref, watch } from 'vue'
-import type { Dataset, MLAdapter, ModelTypeInfo, RefusalError } from '../types'
+import type { Dataset, MLAdapter, ModelFit, ModelTypeInfo, RefusalError } from '../types'
 import { allModelInfo, defaultModelFor, modelsByTaskType, taskTypeLabel } from './modelCatalogData'
 import ModelParameterForm from './ModelParameterForm.vue'
 import ModelLens from './shared/ModelLens.vue'
@@ -62,18 +62,38 @@ const backendInfo = ref<Record<string, ModelTypeInfo>>({})
 const overviewLabels = ref<string[] | null>(null)
 // How many documents carry each label, so the guide can weight rare labels up.
 const labelCounts = ref<Record<string, number> | null>(null)
+// Every model fitted to the dataset, with why it cannot train it (getModelFit).
+const fit = ref<ModelFit | null>(null)
 
 const staticModels = computed<string[]>(() =>
   selectedDataset.value ? (modelsByTaskType[selectedDataset.value.task_type] || []) : [],
 )
+// The models that can train the dataset: the guide and the default choose among these.
 const availableModels = computed<string[]>(() => {
   if (!selectedDataset.value) return []
+  if (fit.value) return fittedModels.value.filter((t) => isUsable(t))
   if (backendModels.value && backendModels.value.length) return backendModels.value
   return staticModels.value
 })
+// With a fit, the grid lists every model, usable first, so the rest can say why not.
+const fittedModels = computed<string[]>(() => {
+  if (!fit.value) return []
+  const known = Object.keys(fit.value.models).filter((t) => t in allModelInfo)
+  return [...known.filter((t) => fit.value!.models[t].usable), ...known.filter((t) => !fit.value!.models[t].usable)]
+})
+const listedModels = computed<string[]>(() => (fit.value ? fittedModels.value : availableModels.value))
+const nothingFits = computed(() => !!fit.value && fittedModels.value.length > 0 && availableModels.value.length === 0)
 const visibleModels = computed<string[]>(() =>
-  !showAllModels.value && availableModels.value.includes(modelType.value) ? [modelType.value] : availableModels.value,
+  !showAllModels.value && availableModels.value.includes(modelType.value) ? [modelType.value] : listedModels.value,
 )
+
+function isUsable(type: string) {
+  return !fit.value || fit.value.models[type]?.usable !== false
+}
+
+function unusableReason(type: string) {
+  return isUsable(type) ? null : fit.value?.models[type]?.reason ?? null
+}
 const hasGuide = computed(() => !!selectedDataset.value && decisionTreeFor(selectedDataset.value.task_type) !== null)
 const taskLabel = computed(() => (selectedDataset.value ? taskTypeLabel(selectedDataset.value.task_type) : ''))
 const datasetLabels = computed(() => (selectedDataset.value?.labels?.length ? selectedDataset.value.labels : overviewLabels.value))
@@ -123,7 +143,21 @@ onMounted(async () => {
 async function loadBackendModels() {
   backendModels.value = null
   backendInfo.value = {}
+  fit.value = null
   const dataset = selectedDataset.value
+  if (adapter.value?.getModelFit && dataset) {
+    try {
+      const answer = await adapter.value.getModelFit(dataset.id)
+      if (selectedDataset.value !== dataset) return
+      fit.value = answer
+      backendInfo.value = Object.fromEntries(
+        Object.entries(answer.models).filter(([, m]) => m.usable),
+      ) as Record<string, ModelTypeInfo>
+      return
+    } catch {
+      fit.value = null // fall back to the task type's catalogue
+    }
+  }
   if (!adapter.value?.getAvailableModelTypes || !dataset) return
   try {
     const catalog = await adapter.value.getAvailableModelTypes(dataset.task_type)
@@ -178,6 +212,7 @@ function onDatasetChange() {
 }
 
 function selectModelType(type: string, preset?: Record<string, unknown>) {
+  if (!isUsable(type)) return
   modelType.value = type
   expandedModelInfo.value = type
   initialParameters.value = { ...preset }
@@ -261,12 +296,16 @@ async function createModel() {
       <!-- Step 2: model type -->
       <section v-if="selectedDataset" class="vmlb-card">
         <h2 class="vmlb-step-title"><span class="vmlb-step-num">{{ firstStep + 1 }}</span> Select model type</h2>
-        <p v-if="!availableModels.length" class="vmlb-muted vmlb-indent vmlb-no-models">
+        <div v-if="nothingFits" role="note" class="vmlb-no-fit">
+          <p><strong>No model can train this dataset yet.</strong></p>
+          <p v-if="fit?.advice">{{ fit.advice }}</p>
+        </div>
+        <p v-else-if="!availableModels.length" class="vmlb-muted vmlb-indent vmlb-no-models">
           A Model cannot be trained for {{ taskLabel }} yet. Choose a Dataset with another task type.
         </p>
         <p v-else class="vmlb-muted vmlb-indent">Available models for <strong>{{ taskLabel }}</strong> tasks.</p>
 
-        <div v-if="!showAllModels && hasGuide" class="vmlb-chooser">
+        <div v-if="!showAllModels && hasGuide && !nothingFits" class="vmlb-chooser">
           <ModelQuestionTree
             :task-type="selectedDataset.task_type"
             :current-model-type="modelType"
@@ -284,17 +323,21 @@ async function createModel() {
             v-for="type in visibleModels"
             :key="type"
             class="vmlb-model-card"
-            :class="{ 'vmlb-selected': modelType === type }"
+            :class="{ 'vmlb-selected': modelType === type, 'vmlb-unusable': !isUsable(type) }"
             role="button"
-            tabindex="0"
+            :tabindex="isUsable(type) ? 0 : -1"
+            :aria-disabled="isUsable(type) ? undefined : 'true'"
+            :aria-describedby="isUsable(type) ? undefined : `vmlb-why-${type}`"
             @click="selectModelType(type)"
             @keydown.enter="selectModelType(type)"
           >
             <div class="vmlb-model-card-head">
               <h3>{{ allModelInfo[type]?.label }}</h3>
               <span v-if="modelType === type" class="vmlb-badge">Selected</span>
+              <span v-else-if="!isUsable(type)" class="vmlb-badge vmlb-badge-muted">Not for this dataset</span>
             </div>
             <p class="vmlb-model-desc">{{ allModelInfo[type]?.shortDesc }}</p>
+            <p v-if="unusableReason(type)" :id="`vmlb-why-${type}`" class="vmlb-model-why">{{ unusableReason(type) }}</p>
             <button type="button" class="vmlb-link-btn" @click.stop="toggleModelInfo(type)">
               {{ expandedModelInfo === type ? 'Hide details' : 'When should I use this?' }}
             </button>
@@ -312,7 +355,7 @@ async function createModel() {
           </div>
         </div>
         <button
-          v-if="visibleModels.length < availableModels.length"
+          v-if="visibleModels.length < listedModels.length"
           type="button"
           class="vmlb-link-btn vmlb-show-models"
           @click="showAllModels = true"
@@ -436,6 +479,12 @@ async function createModel() {
     box-shadow var(--vmlb-duration) var(--vmlb-ease);
 }
 .vmlb-model-card:hover { border-color: var(--vmlb-border-strong); transform: translateY(-1px); box-shadow: var(--vmlb-shadow-sm); }
+.vmlb-model-card.vmlb-unusable { opacity: 0.6; cursor: not-allowed; }
+.vmlb-model-card.vmlb-unusable:hover { transform: none; box-shadow: none; border-color: var(--vmlb-border); }
+.vmlb-model-why { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--vmlb-text); }
+.vmlb-badge-muted { background: var(--vmlb-surface-sunken); color: var(--vmlb-text-muted); }
+.vmlb-no-fit { margin: 0 0 1rem; padding: 0.75rem 1rem; border-radius: var(--vmlb-radius-md); border: 1px solid var(--vmlb-warning); background: var(--vmlb-warning-soft); color: var(--vmlb-text); }
+.vmlb-no-fit p { margin: 0.25rem 0; }
 .vmlb-model-card.vmlb-selected { border-color: var(--vmlb-accent); background: var(--vmlb-accent-soft); box-shadow: var(--vmlb-shadow-sm); }
 .vmlb-model-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
 .vmlb-model-card-head h3 { margin: 0; font-size: 0.9375rem; font-weight: 600; }

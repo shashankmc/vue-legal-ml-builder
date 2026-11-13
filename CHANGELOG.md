@@ -11,6 +11,16 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-13
+
+### Added
+
+- Optional adapter method `getModelFit(datasetId)` → `ModelFit` (legal-ml-core
+  0.11: `GET /api/models/available?dataset_id=`). With it, the model step lists
+  every model: those that cannot train the chosen Dataset are greyed out, cannot
+  be chosen, and say why; the guide and the default choose only among the rest.
+  When none fits, a note says so with the server's advice.
+
 ## [0.7.0] - 2026-11-06
 
 ### Added
