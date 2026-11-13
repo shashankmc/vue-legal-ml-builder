@@ -48,6 +48,9 @@ export function createTestAdapter(overrides: Partial<MLAdapter> = {}): MLAdapter
       assignment: emptyAssignment(taskId),
       labels: [],
       annotationLevel: 'document' as const,
+      labelSource: served.get(taskId)?.label_source ?? null,
+      fileLabel: served.get(taskId)?.file_label ?? null,
+      hint: null,
     })),
     saveAnnotationAssignment: vi.fn().mockResolvedValue({}),
 
@@ -65,5 +68,6 @@ export function createTestAdapter(overrides: Partial<MLAdapter> = {}): MLAdapter
     }) as unknown as T)
   adapter.getNextAnnotationTask = record(adapter.getNextAnnotationTask, (r: { task: AnnotationTask | null }) => (r?.task ? [r.task] : []))!
   adapter.listAnnotationTasks = record(adapter.listAnnotationTasks, (r: AnnotationTask[]) => r ?? [])
+  adapter.pageAnnotationTasks = record(adapter.pageAnnotationTasks, (r: { tasks: AnnotationTask[] }) => r?.tasks ?? [])
   return adapter
 }

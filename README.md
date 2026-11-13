@@ -95,6 +95,19 @@ of training examples (their `training_step`), whatever `groupBy` and `xAxis` say
 `x_kind` says what its `training_step` counts, and titles the x-axis: Training
 step, Iteration (logistic regression's loss by iteration) or Training examples.
 
+## Reviewing labels
+
+Every row with text is an annotation task (legal-ml-core 0.13), and a row the
+uploaded file labels starts labelled. When the adapter implements
+`pageAnnotationTasks` (legal-ml-core `GET /annotation/projects/<id>/tasks` with
+`status`, `label`, `limit`, `offset`, returning `total`), `AnnotationWorkspace`
+offers **Review labels** once a Dataset has any: its labelled items in row order,
+filterable by label, in the kit with Back/Next. Each shows where its label came
+from (the file, a person, an LLM) and, for a changed file label, what the file
+said. Only a real change is saved, as the person's label (`saveAnnotationAssignment`),
+so moving past a file label leaves it the file's. NER items whose file lists
+entity types show them as a hint above the text.
+
 ## LLM suggestions
 
 `AnnotationWorkspace` shows `LlmAssistPanel` above the item for single-label

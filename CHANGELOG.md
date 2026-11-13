@@ -11,6 +11,27 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-13
+
+### Added
+
+- **Review labels** in `AnnotationWorkspace` (BAIGLE #148): the Dataset's labelled
+  items in row order, filtered by label, in the kit with Back/Next. It says where
+  each label came from (`labelSourceText`) and what the file said for a changed
+  file label. Only a real change is saved (`assignmentChanged`), as a person's
+  label. Needs the new optional adapter method `pageAnnotationTasks(projectId,
+  { status, datasetId, label, includeHoldout, limit, offset })` → `{ tasks, total }`,
+  which `createSelfHostedAdapter` implements against legal-ml-core 0.13.
+- `AnnotationAssignment` carries `labelSource`, `fileLabel` and `hint`; an NER item
+  shows the file's entity types above the text. `AnnotationTask` has `file_label`.
+
+### Changed
+
+- A Dataset whose rows all have labels ends on "Every item has a label" with
+  Review labels, not on a dead end; the end state no longer says "You annotated",
+  as file labels count. The kit's theme mapping (`.vmlb-kit`) moves to the shared
+  stylesheet.
+
 ## [0.9.0] - 2026-11-13
 
 ### Changed (breaking)
@@ -376,7 +397,8 @@ tagged `vX.Y.Z`.
   monitoring), extracted from the `reducing_digital_divide` SvelteKit frontend
   and driven through a host-supplied `MLAdapter`.
 
-[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.6.0...v0.7.0
