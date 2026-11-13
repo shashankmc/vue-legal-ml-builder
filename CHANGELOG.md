@@ -30,18 +30,17 @@ tagged `vX.Y.Z`.
 - `legal-annotation-kit` is a dependency (pinned by commit until it releases);
   its stylesheet is bundled into `vue-legal-ml-builder/style.css`, and its colours
   follow the builder theme, light and dark.
-
-### Added
-
-- `createSelfHostedAdapter` implements both methods; `AnnotationAssignment`,
-  `labelColour(name)` (a label's stable colour) and `kitLabelset(names)` are exported.
-
 - The LLM suggestion for the item on screen is a legal-annotation-kit proposal
   (BAIGLE #140): Accept confirms it, **Change to…** corrects it, Reject rejects it,
   and the agreement check refreshes. The builder's own suggestion card is gone.
 - Removed from the exports: `canSaveAnnotation`, `toggleLabel`, `nerSegments`,
   `addEntity` and the `EntitySpan` type, and `save(label)` from `useAnnotation`;
   the kit does that work now.
+
+### Added
+
+- `createSelfHostedAdapter` implements both methods; `AnnotationAssignment`,
+  `labelColour(name)` (a label's stable colour) and `kitLabelset(names)` are exported.
 
 ### Unchanged
 
