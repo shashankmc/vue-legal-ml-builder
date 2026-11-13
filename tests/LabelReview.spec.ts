@@ -111,6 +111,40 @@ describe('Review labels', () => {
     wrapper.unmount()
   })
 
+  it('shows each item with its own labels and never saves one item\'s labels onto another', async () => {
+    // A real server answers the assignment after the page: the kit must not open
+    // the next item with the previous item's labels (found in BAIGLE #149 QA).
+    const slow = vi.fn(async (taskId: string) => {
+      await new Promise((r) => setTimeout(r, 20))
+      const task = ITEMS.find((t) => t.id === taskId)!
+      return {
+        document: { name: `Item ${task.item_index + 1}`, full_text: task.text },
+        assignment: { ...emptyAssignment(taskId), status: 'done', document_annotations: [tag(task.annotation_label!)] },
+        labels: ['Civil', 'Criminal'], annotationLevel: 'document' as const,
+        labelSource: task.label_source ?? null, fileLabel: task.file_label ?? null, hint: null,
+      }
+    })
+    const { adapter, wrapper } = await mounted({ getAnnotationAssignment: slow })
+    await click(wrapper, 'Review labels')
+    await new Promise((r) => setTimeout(r, 50))
+    await flushPromises()
+
+    await wrapper.find('.lak-annotator .btn--primary').trigger('click') // Next, to item 2 (Criminal)
+    await new Promise((r) => setTimeout(r, 50))
+    await flushPromises()
+    const tagged = () => wrapper.findAll('.vmlb-review .doc-tag.is-tagged').map((t) => t.text().replace(/\s+\S$/, '').trim())
+    expect(header(wrapper)).toContain('Item 2')
+    expect(tagged()[0]).toMatch(/^Criminal/)
+
+    await wrapper.findAll('.lak-annotator button').find((b) => b.text().includes('Back'))!.trigger('click')
+    await new Promise((r) => setTimeout(r, 50))
+    await flushPromises()
+
+    expect(adapter.saveAnnotationAssignment).not.toHaveBeenCalled()
+    expect(tagged()[0]).toMatch(/^Civil/)
+    wrapper.unmount()
+  })
+
   it('saves a changed label as the person\'s, and nothing for labels left as they were', async () => {
     const { adapter, wrapper } = await mounted()
     await click(wrapper, 'Review labels')

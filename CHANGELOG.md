@@ -11,6 +11,17 @@ tagged `vX.Y.Z`.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-13
+
+### Fixed
+
+- **Review labels could save one item's labels onto another.** Moving to the
+  next item showed it with the previous item's labels until a real server
+  answered, and Back or Next then saved them onto it. The item and its labels
+  now arrive together. Found in BAIGLE #149 QA.
+- Two labels in a set no longer share a colour when their names hash alike
+  (Civil and Criminal did): `kitLabelset` gives a later one the next free colour.
+
 ## [0.10.0] - 2026-11-13
 
 ### Added
@@ -397,7 +408,8 @@ tagged `vX.Y.Z`.
   monitoring), extracted from the `reducing_digital_divide` SvelteKit frontend
   and driven through a host-supplied `MLAdapter`.
 
-[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/shashankmc/vue-legal-ml-builder/compare/v0.7.0...v0.8.0

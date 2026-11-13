@@ -123,10 +123,11 @@ describe('AnnotationWorkspace on legal-annotation-kit', () => {
     const view = kit(wrapper)
     expect(view.props('document').full_text).toBe('Clause one.')
     expect(view.props('annotationLevel')).toBe('document')
-    expect(view.props('labelset').labels).toEqual([
-      { name: 'Civil', color: labelColour('Civil') },
-      { name: 'Criminal', color: labelColour('Criminal') },
-    ])
+    // Civil and Criminal hash alike; the set gives Criminal the next free colour.
+    const labels = view.props('labelset').labels
+    expect(labels.map((l: { name: string }) => l.name)).toEqual(['Civil', 'Criminal'])
+    expect(labels[0].color).toBe(labelColour('Civil'))
+    expect(labels[1].color).not.toBe(labels[0].color)
     expect(view.props()).toMatchObject({
       navigation: false,
       draft: false,

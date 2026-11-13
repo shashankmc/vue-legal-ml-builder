@@ -24,3 +24,20 @@ describe('kitLabelset', () => {
     expect(kitLabelset(['B', 'A', 'B']).labels.map((l) => l.name)).toEqual(['B', 'A'])
   })
 })
+
+describe('kitLabelset colours', () => {
+  it('gives every label in a set its own colour, even when their names hash alike', () => {
+    // Civil and Criminal hash to the same palette slot (found in BAIGLE #149 QA).
+    expect(labelColour('Civil')).toBe(labelColour('Criminal'))
+
+    const colours = kitLabelset(['Civil', 'Criminal']).labels.map((l) => l.color)
+
+    expect(new Set(colours).size).toBe(2)
+    expect(colours[0]).toBe(labelColour('Civil'))
+  })
+
+  it('keeps distinct colours for up to the whole palette', () => {
+    const names = Array.from({ length: 12 }, (_, i) => `Label ${i}`)
+    expect(new Set(kitLabelset(names).labels.map((l) => l.color)).size).toBe(12)
+  })
+})
