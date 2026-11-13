@@ -2,6 +2,7 @@ import type {
   ActiveLearningSettings,
   ActiveLearningStartOptions,
   ActiveLearningState,
+  AnnotationAssignment,
   AnnotationTask,
   Dataset,
   DatasetUploadMeta,
@@ -220,6 +221,19 @@ export function createSelfHostedAdapter(opts: SelfHostedAdapterOptions): MLAdapt
     },
     async saveAnnotation(taskId: Id, label: unknown): Promise<AnnotationTask> {
       const data = await post(`/annotation/tasks/${taskId}/save`, { annotation_label: label })
+      return data.task
+    },
+    async getAnnotationAssignment(taskId: Id): Promise<AnnotationAssignment> {
+      const data = await get(`/annotation/tasks/${encodeURIComponent(String(taskId))}/assignment`)
+      return {
+        document: data.document,
+        assignment: data.assignment,
+        labels: data.labels ?? [],
+        annotationLevel: data.annotation_level ?? null,
+      }
+    },
+    async saveAnnotationAssignment(taskId: Id, assignment): Promise<AnnotationTask> {
+      const data = await put(`/annotation/tasks/${encodeURIComponent(String(taskId))}/assignment`, assignment)
       return data.task
     },
     async skipAnnotation(taskId: Id): Promise<AnnotationTask> {

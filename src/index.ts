@@ -122,10 +122,12 @@ export type { LensCopy, LensFamily, LensPoint } from './lens/modelLens'
 export { adviseFor, decisionTreeFor, IMBALANCE_RATIO, SMALL_DATASET_ROWS } from './lens/modelGuide'
 export { ANNOTATION_STATE, annotationControls, annotationState, canSaveAnnotation, labelledRows, nothingToAnnotateReason } from './annotation/annotationState'
 export type { AnnotationControls, AnnotationScreenState, EntitySpan } from './annotation/annotationState'
+export { kitLabelset, labelColour } from './annotation/labelColours'
 export { STRATEGY_COPY, holdoutClassText, retrainPrompt, trainingWarning, verificationText } from './annotation/activeLearning'
 export type { DatasetFacts, DecisionTree, GuideAdvice, GuideContext, GuideNode, GuideOption } from './lens/modelGuide'
 
 export type {
+  AnnotationAssignment,
   ActiveLearningRound,
   ActiveLearningSettings,
   ActiveLearningStartOptions,

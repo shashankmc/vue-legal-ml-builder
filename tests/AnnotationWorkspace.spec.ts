@@ -1,8 +1,15 @@
 import { mount, flushPromises } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import AnnotationWorkspace from '../src/components/AnnotationWorkspace.vue'
 import { VueLegalMlBuilderPlugin } from '../src/index'
-import { createTestAdapter } from './testAdapter'
+import { AnnotatorView } from 'legal-annotation-kit'
+import { labelColour } from '../src/annotation/labelColours'
+import { createTestAdapter, emptyAssignment } from './testAdapter'
+
+// jsdom has no layout; the kit's span view only needs ResizeObserver to exist.
+beforeAll(() => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+})
 
 function annotatingAdapter() {
   return createTestAdapter({
@@ -74,6 +81,7 @@ async function mounted(adapterOverrides = {}, props = {}) {
     getNextAnnotationTask: queue(item('t1', 'Clause one.')),
     getDataset: vi.fn().mockResolvedValue({ labels: ['Civil', 'Criminal'] }),
     saveAnnotation: vi.fn().mockResolvedValue({}),
+    saveAnnotationAssignment: vi.fn().mockResolvedValue({}),
     skipAnnotation: vi.fn().mockResolvedValue({}),
     ...adapterOverrides,
   })
@@ -92,91 +100,144 @@ async function clickText(wrapper: Awaited<ReturnType<typeof mounted>>['wrapper']
   await flushPromises()
 }
 
-describe('AnnotationWorkspace parity with the host screen', () => {
-  it('saves a chosen label only on Save & Next', async () => {
+async function chooseTag(wrapper: Awaited<ReturnType<typeof mounted>>['wrapper'], name: string) {
+  const tag = wrapper.findAll('.doc-tag').find((t) => t.text().startsWith(name))
+  if (!tag) throw new Error(`no tag "${name}"`)
+  await tag.trigger('click')
+}
+
+async function saveInKit(wrapper: Awaited<ReturnType<typeof mounted>>['wrapper']) {
+  await wrapper.find('.btn--save').trigger('click')
+  await flushPromises()
+}
+
+function kit(wrapper: Awaited<ReturnType<typeof mounted>>['wrapper']) {
+  return wrapper.findComponent(AnnotatorView)
+}
+
+describe('AnnotationWorkspace on legal-annotation-kit', () => {
+  it('opens a single-label item in the kit: one tag, the Dataset\'s labels, nothing but labels', async () => {
     const { adapter, wrapper } = await mounted()
 
-    await clickText(wrapper, 'Civil')
-    expect(adapter.saveAnnotation).not.toHaveBeenCalled()
-
-    await clickText(wrapper, 'Save & Next')
-    expect(adapter.saveAnnotation).toHaveBeenCalledWith('t1', 'Civil')
+    expect(adapter.getAnnotationAssignment).toHaveBeenCalledWith('t1')
+    const view = kit(wrapper)
+    expect(view.props('document').full_text).toBe('Clause one.')
+    expect(view.props('annotationLevel')).toBe('document')
+    expect(view.props('labelset').labels).toEqual([
+      { name: 'Civil', color: labelColour('Civil') },
+      { name: 'Criminal', color: labelColour('Criminal') },
+    ])
+    expect(view.props()).toMatchObject({
+      navigation: false,
+      draft: false,
+      documentLabelMode: 'single',
+      showRelations: false,
+      showConfidence: false,
+      showMetadata: false,
+    })
+    wrapper.unmount()
   })
 
-  it('refuses an empty label', async () => {
+  it('opens an NER item at the server\'s level with spans kept apart', async () => {
+    const { wrapper } = await mounted(
+      {
+        getDataset: vi.fn().mockResolvedValue({ labels: ['PERSON', 'ORG'] }),
+        getAnnotationAssignment: vi.fn(async (id: string) => ({
+          document: { name: 'Item', full_text: 'Smith sued Acme.' },
+          assignment: emptyAssignment(id),
+          labels: ['PERSON', 'ORG'],
+          annotationLevel: 'word' as const,
+        })),
+      },
+      { taskType: 'ner' },
+    )
+
+    expect(kit(wrapper).props('annotationLevel')).toBe('word')
+    expect(kit(wrapper).props('allowOverlap')).toBe(false)
+    expect(kit(wrapper).props('labelset').labels.map((l: { name: string }) => l.name)).toEqual(['PERSON', 'ORG'])
+    wrapper.unmount()
+  })
+
+  it('saves the kit\'s assignment and moves to the next item', async () => {
+    const next = queue(item('t1', 'Clause one.'))
+    next.mockResolvedValueOnce({ task: item('t1', 'Clause one.'), stats: { total: 4, annotated: 1, percentage: 25 } })
+    next.mockResolvedValueOnce({ task: item('t2', 'Clause two.'), stats: { total: 4, annotated: 2, percentage: 50 } })
+    const { adapter, wrapper } = await mounted({ getNextAnnotationTask: next })
+
+    await chooseTag(wrapper, 'Civil')
+    await saveInKit(wrapper)
+
+    expect(adapter.saveAnnotationAssignment).toHaveBeenCalledWith(
+      't1',
+      expect.objectContaining({ document_annotations: [expect.objectContaining({ label: 'Civil' })] }),
+    )
+    expect(adapter.saveAnnotation).not.toHaveBeenCalled()
+    expect(kit(wrapper).props('document').full_text).toBe('Clause two.')
+    wrapper.unmount()
+  })
+
+  it('refuses to save an item with no label', async () => {
     const { adapter, wrapper } = await mounted()
 
-    const save = wrapper.findAll('button').find((b) => b.text() === 'Save & Next')!
-    expect(save.attributes('disabled')).toBeDefined()
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n' }))
-    await flushPromises()
+    await saveInKit(wrapper)
 
-    expect(adapter.saveAnnotation).not.toHaveBeenCalled()
+    expect(adapter.saveAnnotationAssignment).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Choose a label for this item.')
+    wrapper.unmount()
   })
 
   it('keeps the item and shows why when a save fails', async () => {
-    const { wrapper } = await mounted({ saveAnnotation: vi.fn().mockRejectedValue(new Error('annotation_label must not be empty')) })
+    const { wrapper } = await mounted({
+      saveAnnotationAssignment: vi.fn().mockRejectedValue(new Error('Choose only one label for this item.')),
+    })
 
-    await clickText(wrapper, 'Civil')
-    await clickText(wrapper, 'Save & Next')
+    await chooseTag(wrapper, 'Civil')
+    await saveInKit(wrapper)
 
-    expect(wrapper.text()).toContain('annotation_label must not be empty')
-    expect(wrapper.text()).toContain('Clause one.')
+    expect(wrapper.text()).toContain('Choose only one label for this item.')
+    expect(kit(wrapper).props('document').full_text).toBe('Clause one.')
+    wrapper.unmount()
   })
 
-  it('takes the N and S keys, but not while typing', async () => {
+  it('skips from the kit\'s header, or with S when not typing', async () => {
     const { adapter, wrapper } = await mounted()
 
-    await clickText(wrapper, 'Civil')
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n' }))
+    const skip = wrapper.find('.lak-annotator .vmlb-skip')
+    expect(skip.exists()).toBe(true)
+    await skip.trigger('click')
     await flushPromises()
-    expect(adapter.saveAnnotation).toHaveBeenCalledTimes(1)
+    expect(adapter.skipAnnotation).toHaveBeenCalledTimes(1)
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'S' }))
     await flushPromises()
-    expect(adapter.skipAnnotation).toHaveBeenCalledTimes(1)
+    expect(adapter.skipAnnotation).toHaveBeenCalledTimes(2)
     wrapper.unmount()
   })
 
-  it('does not treat keys typed into the label box as commands', async () => {
+  it('adds a typed label where the Dataset names none, and saves it on the item', async () => {
     const { adapter, wrapper } = await mounted({ getDataset: vi.fn().mockResolvedValue({ labels: [] }) })
 
-    const input = wrapper.find('input[type="text"]')
-    await input.setValue('novel')
+    const input = wrapper.find('.vmlb-new-label input')
+    await input.setValue('  novel  ')
     await input.trigger('keydown', { key: 's' })
     await flushPromises()
-
     expect(adapter.skipAnnotation).not.toHaveBeenCalled()
+    await wrapper.find('.vmlb-new-label button').trigger('click')
+    await flushPromises()
+
+    expect(kit(wrapper).props('labelset').labels.map((l: { name: string }) => l.name)).toEqual(['novel'])
+    await chooseTag(wrapper, 'novel')
+    await saveInKit(wrapper)
+    expect(adapter.saveAnnotationAssignment).toHaveBeenCalledWith(
+      't1',
+      expect.objectContaining({ document_annotations: [expect.objectContaining({ label: 'novel' })] }),
+    )
     wrapper.unmount()
   })
 
-  it('saves a typed label where the Dataset names none', async () => {
-    const { adapter, wrapper } = await mounted({ getDataset: vi.fn().mockResolvedValue({ labels: [] }) })
-
-    await wrapper.find('input[type="text"]').setValue('  novel  ')
-    await clickText(wrapper, 'Save & Next')
-
-    expect(adapter.saveAnnotation).toHaveBeenCalledWith('t1', 'novel')
-    wrapper.unmount()
-  })
-
-  it('joins several labels on a multi-label Dataset', async () => {
-    const { adapter, wrapper } = await mounted({}, { taskType: 'multi-label' })
-
-    await clickText(wrapper, 'Civil')
-    await clickText(wrapper, 'Criminal')
-    await clickText(wrapper, 'Save & Next')
-
-    expect(adapter.saveAnnotation).toHaveBeenCalledWith('t1', 'Civil,Criminal')
-    wrapper.unmount()
-  })
-
-  it('saves NER with no entities as an empty list', async () => {
-    const { adapter, wrapper } = await mounted({}, { taskType: 'ner' })
-
-    await clickText(wrapper, 'Save & Next')
-
-    expect(adapter.saveAnnotation).toHaveBeenCalledWith('t1', '[]')
+  it('offers no new-label field where the Dataset names its labels', async () => {
+    const { wrapper } = await mounted()
+    expect(wrapper.find('.vmlb-new-label').exists()).toBe(false)
     wrapper.unmount()
   })
 

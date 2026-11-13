@@ -54,6 +54,13 @@ async function mounted(state: ActiveLearningState | { active: false }, overrides
   return { adapter, wrapper }
 }
 
+/** Choose a tag in the kit and press its Save. */
+async function saveTag(wrapper: Awaited<ReturnType<typeof mounted>>['wrapper'], name: string) {
+  await wrapper.findAll('.doc-tag').find((t) => t.text().startsWith(name))!.trigger('click')
+  await wrapper.find('.btn--save').trigger('click')
+  await flushPromises()
+}
+
 function button(wrapper: Awaited<ReturnType<typeof mounted>>['wrapper'], text: string) {
   return wrapper.findAll('button').find((b) => b.text() === text)
 }
@@ -166,9 +173,7 @@ describe('the running loop', () => {
   it('refreshes the counts after a saved label', async () => {
     const { adapter, wrapper } = await mounted(loopState())
 
-    await button(wrapper, 'Civil')!.trigger('click')
-    await button(wrapper, 'Save & Next')!.trigger('click')
-    await flushPromises()
+    await saveTag(wrapper, 'Civil')
 
     expect(adapter.getActiveLearningState).toHaveBeenCalledTimes(2)
   })
@@ -177,9 +182,7 @@ describe('the running loop', () => {
     vi.useFakeTimers()
     const { adapter, wrapper } = await mounted(loopState({ round: { ...loopState().round, status: 'scoring' } }))
 
-    await button(wrapper, 'Civil')!.trigger('click')
-    await button(wrapper, 'Save & Next')!.trigger('click')
-    await flushPromises()
+    await saveTag(wrapper, 'Civil')
 
     expect(adapter.getActiveLearningState).toHaveBeenCalledTimes(1)
   })
@@ -187,9 +190,7 @@ describe('the running loop', () => {
   it('does not reread the state after a save with no loop', async () => {
     const { adapter, wrapper } = await mounted({ active: false })
 
-    await button(wrapper, 'Civil')!.trigger('click')
-    await button(wrapper, 'Save & Next')!.trigger('click')
-    await flushPromises()
+    await saveTag(wrapper, 'Civil')
 
     expect(adapter.getActiveLearningState).toHaveBeenCalledTimes(1)
   })

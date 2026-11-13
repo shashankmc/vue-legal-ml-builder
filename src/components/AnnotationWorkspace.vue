@@ -1,19 +1,18 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import type { LlmSuggestion, MLAdapter } from '../types'
+import { AnnotatorView } from 'legal-annotation-kit'
+import type { Assignment } from 'legal-annotation-kit'
+import 'legal-annotation-kit/style.css'
+import type { AnnotationAssignment, AnnotationTask, LlmSuggestion, MLAdapter } from '../types'
 import {
   ANNOTATION_STATE,
-  addEntity,
   annotationControls,
   annotationState,
-  canSaveAnnotation,
   count,
   labelledRows,
-  nerSegments,
   nothingToAnnotateReason,
-  toggleLabel,
 } from '../annotation/annotationState'
-import type { EntitySpan } from '../annotation/annotationState'
+import { kitLabelset } from '../annotation/labelColours'
 import { useAnnotation } from '../composables/useAnnotation'
 import { taskTypeLabel } from './modelCatalogData'
 import ActiveLearningPanel from './ActiveLearningPanel.vue'
@@ -48,40 +47,47 @@ const injectedAdapter = inject<MLAdapter | null>('vmlb:adapter', null)
 const injectedHide = inject<boolean>('vmlb:hideAnnotation', false)
 const adapter = computed(() => props.adapter ?? injectedAdapter)
 const hidden = computed(() => props.hideAnnotation ?? injectedHide)
-const { task, stats, isLoading, isSubmitting, error, holdout, loadNext, save, skip, confirmSuggestion, reviewSkipped, setHoldout } =
-  useAnnotation(adapter.value as MLAdapter)
+const {
+  task, stats, isLoading, isSubmitting, error, holdout,
+  loadNext, saveAssignment, skip, confirmSuggestion, reviewSkipped, setHoldout,
+} = useAnnotation(adapter.value as MLAdapter)
 
 const datasetLabels = ref<string[]>([])
 const usedLabels = ref<string[]>([])
-const selectedLabel = ref('')
-const entities = ref<EntitySpan[]>([])
-const customLabel = ref('')
+/** Labels typed this session on a Dataset that names none; saved with an item. */
+const sessionLabels = ref<string[]>([])
+const newLabel = ref('')
 const showGuidelines = ref(true)
 const notice = ref('')
 const labelsVersion = ref(0)
 /** LLM suggestions waiting for a person, from LlmAssistPanel. */
 const suggestions = ref<LlmSuggestion[]>([])
-
-const textContainer = ref<HTMLElement | null>(null)
-const pendingSpan = ref<Omit<EntitySpan, 'type'> | null>(null)
-const popover = ref({ x: 0, y: 0 })
+/** The item on screen as legal-annotation-kit opens it. */
+const opened = ref<AnnotationAssignment | null>(null)
 
 const controls = computed(() => annotationControls(props.taskType))
-const labelChoices = computed(() => {
-  if (props.labels?.length) return props.labels
-  if (datasetLabels.value.length) return datasetLabels.value
-  if (controls.value === 'entities') return DEFAULT_ENTITY_TYPES
-  return usedLabels.value
+/** The labels an LLM may choose from: legal-ml-core needs the Dataset to name two. */
+const namedLabels = computed(() => (props.labels?.length ? props.labels : datasetLabels.value))
+/** A Dataset that names no labels takes labels typed here. */
+const typedLabels = computed(() => !!controls.value && !namedLabels.value.length)
+const offeredLabels = computed(() => {
+  const base = namedLabels.value.length
+    ? namedLabels.value
+    : opened.value?.labels.length
+      ? opened.value.labels
+      : controls.value === 'entities'
+        ? DEFAULT_ENTITY_TYPES
+        : usedLabels.value
+  return [...base, ...sessionLabels.value]
 })
-/** Free text only where the Dataset names no labels. */
-const allowsCustomLabel = computed(
-  () => controls.value === 'single' && !props.labels?.length && !datasetLabels.value.length,
+const labelset = computed(() => kitLabelset(offeredLabels.value))
+const annotationLevel = computed(
+  () => opened.value?.annotationLevel ?? (controls.value === 'entities' ? 'word' : 'document'),
 )
-const selectedSet = computed(() => new Set(selectedLabel.value.split(',').filter(Boolean)))
-const canSave = computed(() => canSaveAnnotation(props.taskType, selectedLabel.value))
 const total = computed(() => stats.value?.total ?? 0)
 const annotated = computed(() => stats.value?.annotated ?? 0)
 const holdoutRemaining = computed(() => stats.value?.holdout_remaining ?? 0)
+const position = computed(() => ({ current: Math.min(annotated.value + 1, Math.max(total.value, 1)), total: Math.max(total.value, 1) }))
 const screenState = computed(() =>
   annotationState({
     taskType: props.taskType,
@@ -95,26 +101,16 @@ const screenState = computed(() =>
 const share = computed(() =>
   labelledRows({ rowCount: props.rowCount, total: total.value, annotated: annotated.value }),
 )
-const segments = computed(() => nerSegments(task.value?.text ?? '', entities.value))
 const skippedCount = computed(() => total.value - annotated.value - holdoutRemaining.value)
 const showLoop = computed(
   () => controls.value === 'single' && !!props.datasetId && !!adapter.value?.getActiveLearningState,
 )
-/** The labels an LLM may choose from: legal-ml-core needs the Dataset to name two. */
-const namedLabels = computed(() => (props.labels?.length ? props.labels : datasetLabels.value))
 const showLlm = computed(
   () => controls.value === 'single' && !!props.datasetId && !!adapter.value?.getLlmStatus && namedLabels.value.length >= 2,
 )
 const suggestion = computed(() =>
   showLlm.value && task.value ? suggestions.value.find((s) => s.task_id === task.value!.id && s.status === 'pending') ?? null : null,
 )
-
-function clearSelection() {
-  selectedLabel.value = ''
-  entities.value = []
-  customLabel.value = ''
-  pendingSpan.value = null
-}
 
 async function reload() {
   await loadNext(props.projectId, props.datasetId)
@@ -126,8 +122,20 @@ async function loadDatasetLabels() {
     const dataset = await adapter.value?.getDataset(props.datasetId)
     datasetLabels.value = dataset?.labels ?? []
   } catch {
-    // The label names are a convenience: the screen still works by typing them.
+    // The label names are a convenience: typed labels still work without them.
     datasetLabels.value = []
+  }
+}
+
+/** Open the item on screen as an Assignment; the kit is shown once it has one. */
+async function openItem(item: AnnotationTask | null) {
+  opened.value = null
+  if (!item) return
+  try {
+    const result = await adapter.value!.getAnnotationAssignment(item.id)
+    if (task.value?.id === item.id) opened.value = result
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to open this item'
   }
 }
 
@@ -140,23 +148,29 @@ onMounted(() => {
 
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
-watch(task, clearSelection)
+watch(task, openItem)
 
-async function onSave() {
-  if (controls.value === 'single' && customLabel.value.trim()) selectedLabel.value = customLabel.value.trim()
-  if (!canSave.value) {
-    error.value = controls.value === 'multi' ? 'Please select at least one label' : 'Please select a label'
-    return
-  }
-  const label = controls.value === 'entities' ? JSON.stringify(entities.value) : selectedLabel.value
-  // A label chosen over a waiting suggestion corrects it, so the agreement counts it.
+/** The kit's Save. Throwing keeps the item and the work in the kit, which shows why. */
+async function onKitSave(assignment: Assignment) {
+  const tags = assignment.document_annotations
+  if (controls.value !== 'entities' && !tags.length) throw new Error('Choose a label for this item.')
+  // A label chosen over a waiting suggestion confirms or corrects it, so the agreement counts it.
   const saved = suggestion.value
-    ? await confirmSuggestion(suggestion.value.id, label, props.projectId, props.datasetId)
-    : await save(label, props.projectId, props.datasetId)
-  if (saved) {
-    notice.value = 'Annotation saved'
-    labelsVersion.value += 1
+    ? await confirmSuggestion(suggestion.value.id, tags[0].label, props.projectId, props.datasetId)
+    : await saveAssignment(assignment, props.projectId, props.datasetId)
+  if (!saved) {
+    const reason = error.value ?? 'Failed to save annotation'
+    error.value = null
+    throw new Error(reason)
   }
+  notice.value = 'Annotation saved'
+  labelsVersion.value += 1
+}
+
+function addLabel() {
+  const label = newLabel.value.trim()
+  if (label && !offeredLabels.value.includes(label)) sessionLabels.value = [...sessionLabels.value, label]
+  newLabel.value = ''
 }
 
 /** Bulk accept labelled items behind the queue's back. */
@@ -194,64 +208,13 @@ async function onReviewSkipped() {
   await reviewSkipped(props.projectId, props.datasetId)
 }
 
+// S skips. Saving is the kit's own button; its label keys are its own too.
 function onKeydown(event: KeyboardEvent) {
-  if (pendingSpan.value) {
-    if (event.key === 'Escape') closePopover()
-    return
-  }
   const target = event.target as HTMLElement | null
   if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
-  if (!task.value || isSubmitting.value) return
-  if (event.key.toLowerCase() === 'n' && canSave.value) onSave()
-  else if (event.key.toLowerCase() === 's' && !holdout.value) onSkip()
-}
-
-function nodeOffset(container: HTMLElement, node: Node, offset: number) {
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
-  let chars = 0
-  let current: Node | null
-  while ((current = walker.nextNode())) {
-    if (current === node) return chars + offset
-    chars += (current as Text).length
-  }
-  return chars + offset
-}
-
-function onTextMouseUp(event: MouseEvent) {
-  if (controls.value !== 'entities' || isSubmitting.value || !textContainer.value) return
-  const selection = window.getSelection()
-  if (!selection || selection.isCollapsed || !selection.rangeCount) {
-    if (pendingSpan.value) closePopover()
-    return
-  }
-  const range = selection.getRangeAt(0)
-  if (!textContainer.value.contains(range.commonAncestorContainer)) return
-  const text = selection.toString().trim()
-  if (!text) return
-  const start = nodeOffset(textContainer.value, range.startContainer, range.startOffset)
-  const end = nodeOffset(textContainer.value, range.endContainer, range.endOffset)
-  if (start < 0 || end <= start) return
-  pendingSpan.value = { text, start, end }
-  popover.value = { x: event.clientX, y: event.clientY + 14 }
-}
-
-function tagEntity(type: string) {
-  if (pendingSpan.value) entities.value = addEntity(entities.value, pendingSpan.value, type)
-  closePopover()
-}
-
-function closePopover() {
-  pendingSpan.value = null
-  window.getSelection()?.removeAllRanges()
-}
-
-function removeEntity(index: number) {
-  entities.value = entities.value.filter((_, i) => i !== index)
-}
-
-function entityColour(type: string) {
-  const index = labelChoices.value.indexOf(type)
-  return `vmlb-entity-${(index >= 0 ? index : 0) % 6}`
+  if (event.ctrlKey || event.metaKey || event.altKey) return
+  if (!task.value || isSubmitting.value || holdout.value) return
+  if (event.key.toLowerCase() === 's') onSkip()
 }
 
 async function onLabelHoldout() {
@@ -324,74 +287,56 @@ async function onLabelHoldout() {
         <p v-else class="vmlb-muted">No guidelines provided for this Project.</p>
       </details>
 
-      <div class="vmlb-card vmlb-annotation-card">
-        <p class="vmlb-muted vmlb-row-note">Row {{ task.item_index + 1 }} of the Dataset</p>
+      <p class="vmlb-muted vmlb-row-note">Row {{ task.item_index + 1 }} of the Dataset</p>
 
-        <template v-if="controls === 'entities'">
-          <p class="vmlb-muted vmlb-row-note">Select a text span to tag it as a named entity.</p>
-          <div ref="textContainer" class="vmlb-text vmlb-text-select" @mouseup="onTextMouseUp">
-            <template v-for="(segment, i) in segments" :key="i">
-              <mark v-if="segment.type" :class="entityColour(segment.type)">{{ segment.text }}<sup>{{ segment.type }}</sup></mark>
-              <template v-else>{{ segment.text }}</template>
-            </template>
-          </div>
-
-          <p class="vmlb-label">Tagged entities</p>
-          <p v-if="!entities.length" class="vmlb-muted">No entities tagged yet. Select text in the passage above to tag spans.</p>
-          <ul v-else class="vmlb-entity-list">
-            <li v-for="(entity, i) in entities" :key="`${entity.start}-${entity.end}`" :class="entityColour(entity.type)">
-              <strong>{{ entity.type }}</strong> <span>"{{ entity.text }}"</span>
-              <button class="vmlb-btn-tertiary" :disabled="isSubmitting" :aria-label="`Remove ${entity.text}`" @click="removeEntity(i)">
-                <Icon name="close" />
-              </button>
-            </li>
-          </ul>
-        </template>
-
-        <template v-else>
-          <p class="vmlb-text">{{ task.text }}</p>
-
-          <div v-if="suggestion" class="vmlb-llm-suggestion" role="note" aria-label="LLM suggestion">
-            <p class="vmlb-llm-suggestion-head">
-              <span class="vmlb-label">LLM suggestion</span> <strong>{{ suggestion.label }}</strong>
-            </p>
-            <p class="vmlb-llm-rationale">{{ suggestion.rationale }}</p>
-            <p class="vmlb-muted">It is not a label until you accept it. Choose another label below to correct it.</p>
-            <div class="vmlb-llm-suggestion-actions">
-              <button class="vmlb-btn-secondary" :disabled="isSubmitting" @click="onAcceptSuggestion">Accept</button>
-              <button class="vmlb-btn-tertiary" :disabled="isSubmitting" @click="onRejectSuggestion">Reject</button>
-            </div>
-          </div>
-
-          <div v-if="labelChoices.length" class="vmlb-label-grid" role="group" aria-label="Labels">
-            <button
-              v-for="label in labelChoices"
-              :key="label"
-              class="vmlb-label-btn"
-              :class="{ 'vmlb-label-btn-on': selectedSet.has(label) }"
-              :aria-pressed="selectedSet.has(label)"
-              :disabled="isSubmitting"
-              @click="selectedLabel = controls === 'multi' ? toggleLabel(selectedLabel, label) : label; customLabel = ''"
-            >
-              {{ label }}
-            </button>
-          </div>
-          <div v-if="allowsCustomLabel" class="vmlb-custom-label">
-            <input v-model="customLabel" type="text" placeholder="Type a label…" aria-label="Label" @input="selectedLabel = ''" @keydown.enter="onSave" />
-          </div>
-        </template>
-
-        <div class="vmlb-annotate-actions">
-          <button v-if="!holdout" class="vmlb-btn-secondary vmlb-skip" :disabled="isSubmitting" title="Skip this item (S key)" @click="onSkip">Skip</button>
-          <button class="vmlb-btn-primary" :disabled="isSubmitting || (!canSave && !customLabel.trim())" title="Save and next (N key)" @click="onSave">
-            {{ isSubmitting ? 'Saving…' : 'Save & Next' }}
-          </button>
-        </div>
-        <p class="vmlb-muted vmlb-keys">
-          <template v-if="!holdout">Press <kbd>S</kbd> to skip · </template>Press <kbd>N</kbd> to save &amp; next
-          <span v-if="notice" role="status" class="vmlb-notice">{{ notice }}</span>
+      <div v-if="suggestion" class="vmlb-llm-suggestion" role="note" aria-label="LLM suggestion">
+        <p class="vmlb-llm-suggestion-head">
+          <span class="vmlb-label">LLM suggestion</span> <strong>{{ suggestion.label }}</strong>
         </p>
+        <p class="vmlb-llm-rationale">{{ suggestion.rationale }}</p>
+        <p class="vmlb-muted">It is not a label until you accept it. Choose another label below to correct it.</p>
+        <div class="vmlb-llm-suggestion-actions">
+          <button class="vmlb-btn-secondary" :disabled="isSubmitting" @click="onAcceptSuggestion">Accept</button>
+          <button class="vmlb-btn-tertiary" :disabled="isSubmitting" @click="onRejectSuggestion">Reject</button>
+        </div>
       </div>
+
+      <div class="vmlb-kit">
+        <AnnotatorView
+          v-if="opened"
+          :key="task.id"
+          :document="opened.document"
+          :assignment="opened.assignment"
+          :labelset="labelset"
+          :annotation-level="annotationLevel"
+          :position="position"
+          :navigation="false"
+          :draft="false"
+          :show-relations="false"
+          :show-confidence="false"
+          :show-metadata="false"
+          :document-label-mode="controls === 'multi' ? 'multi' : 'single'"
+          :allow-overlap="controls !== 'entities'"
+          :on-save="onKitSave"
+        >
+          <template #header-actions>
+            <button v-if="!holdout" class="vmlb-btn-secondary vmlb-skip" :disabled="isSubmitting" title="Skip this item (S key)" @click="onSkip">
+              Skip
+            </button>
+          </template>
+          <template v-if="typedLabels" #sidebar-top>
+            <form class="vmlb-new-label" @submit.prevent="addLabel">
+              <input v-model="newLabel" type="text" placeholder="New label" aria-label="New label" />
+              <button type="submit" class="vmlb-btn-tertiary" :disabled="!newLabel.trim()">Add</button>
+            </form>
+          </template>
+        </AnnotatorView>
+        <div v-else class="vmlb-skeleton vmlb-skeleton-tile" />
+      </div>
+      <p class="vmlb-muted vmlb-keys">
+        <template v-if="!holdout">Press <kbd>S</kbd> to skip · </template>Choose a label, then Save
+        <span v-if="notice" role="status" class="vmlb-notice">{{ notice }}</span>
+      </p>
     </template>
 
     <div v-else-if="screenState === ANNOTATION_STATE.FINISHED" class="vmlb-empty">
@@ -428,18 +373,13 @@ async function onLabelHoldout() {
       <a v-else-if="taskType !== 'summarization' && createModelHref" :href="createModelHref" class="vmlb-btn-primary">Create a Model</a>
     </div>
 
-    <div v-if="pendingSpan" class="vmlb-entity-popover" :style="{ left: `${popover.x}px`, top: `${popover.y}px` }">
-      <p class="vmlb-label">Tag "{{ pendingSpan.text.length > 24 ? `${pendingSpan.text.slice(0, 24)}…` : pendingSpan.text }}" as:</p>
-      <div class="vmlb-label-grid">
-        <button v-for="label in labelChoices" :key="label" class="vmlb-label-btn" :class="entityColour(label)" @click="tagEntity(label)">{{ label }}</button>
-        <button class="vmlb-btn-tertiary" @click="closePopover">Cancel</button>
-      </div>
-    </div>
   </div>
 </template>
 
 <style scoped>
-.vmlb-annotate { max-width: 48rem; margin: 0 auto; }
+/* The kit lays an item out in three columns (labels, text, annotations), so the
+   workspace is wider than a reading column. */
+.vmlb-annotate { max-width: 72rem; margin: 0 auto; }
 .vmlb-annotate-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-bottom: 1rem; }
 .vmlb-annotate-head h1 { margin: 0; font-family: var(--vmlb-font-display); font-size: 1.5rem; font-weight: 600; }
 .vmlb-progress { margin-bottom: 1.25rem; }
@@ -457,25 +397,13 @@ async function onLabelHoldout() {
   transition: transform 0.35s var(--vmlb-ease);
 }
 .vmlb-annotation-skeleton { display: flex; flex-direction: column; gap: 0.75rem; }
-.vmlb-annotation-card { padding: 2rem; }
 .vmlb-guidelines { margin-bottom: 1.25rem; padding: 0.75rem 1rem; font-size: 0.875rem; }
 .vmlb-guidelines summary { cursor: pointer; font-weight: 600; }
 .vmlb-guidelines-text { white-space: pre-wrap; line-height: 1.6; }
 .vmlb-annotate-holdout { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem; font-size: 0.875rem; }
-.vmlb-row-note { margin: 0 0 0.75rem; font-size: 0.75rem; }
-.vmlb-text {
-  margin: 0 0 1.75rem;
-  font-family: var(--vmlb-font-display);
-  font-size: 1.1875rem;
-  line-height: 1.7;
-  max-width: 62ch;
-  white-space: pre-wrap;
-}
-.vmlb-text-select { cursor: text; }
-.vmlb-text mark { padding: 0 0.15rem; border-radius: 0.2rem; }
-.vmlb-text sup { margin-left: 0.15rem; font-size: 0.625rem; font-weight: 700; opacity: 0.8; }
+.vmlb-row-note { margin: 0 0 0.5rem; font-size: 0.75rem; }
 .vmlb-llm-suggestion {
-  margin: -0.75rem 0 1.5rem; padding: 0.75rem 1rem;
+  margin: 0 0 1rem; padding: 0.75rem 1rem;
   border: 1px dashed var(--vmlb-accent); border-radius: var(--vmlb-radius-md);
   background: var(--vmlb-accent-soft); font-size: 0.875rem;
 }
@@ -483,56 +411,51 @@ async function onLabelHoldout() {
 .vmlb-llm-suggestion-head strong { margin-left: 0.35rem; color: var(--vmlb-accent-strong); }
 .vmlb-llm-rationale { line-height: 1.5; }
 .vmlb-llm-suggestion-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-.vmlb-label-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
-.vmlb-label-btn {
-  padding: 0.5rem 0.9rem;
-  border: 1px solid var(--vmlb-border-strong);
-  border-radius: var(--vmlb-radius-md);
+
+/* legal-annotation-kit reads its colours and radii from --lak-* variables; take
+   them from the builder's theme so light and dark follow it. */
+.vmlb-kit {
+  --lak-accent: var(--vmlb-accent);
+  --lak-on-accent: var(--vmlb-on-accent);
+  --lak-bg: var(--vmlb-surface);
+  --lak-fg: var(--vmlb-text);
+  --lak-fg-soft: var(--vmlb-text-subtle);
+  --lak-muted: var(--vmlb-text-muted);
+  --lak-surface: var(--vmlb-surface);
+  --lak-sidebar-bg: var(--vmlb-surface-sunken);
+  --lak-border: var(--vmlb-border);
+  --lak-border-strong: var(--vmlb-border-strong);
+  --lak-hover: var(--vmlb-accent-soft);
+  --lak-success: var(--vmlb-success);
+  --lak-warning: var(--vmlb-warning);
+  --lak-warning-bg: var(--vmlb-warning-soft);
+  --lak-warning-fg: var(--vmlb-text);
+  --lak-danger: var(--vmlb-error);
+  --lak-danger-bg: var(--vmlb-error-soft);
+  --lak-danger-border: var(--vmlb-error);
+  --lak-danger-fg: var(--vmlb-text);
+  --lak-progress-track: var(--vmlb-surface-sunken);
+  --lak-radius: var(--vmlb-radius-md);
+  --lak-radius-sm: var(--vmlb-radius-sm);
+  --lak-radius-lg: var(--vmlb-radius-lg);
+  height: min(70vh, 40rem);
+  overflow: hidden;
+  border: 1px solid var(--vmlb-border);
+  border-radius: var(--vmlb-radius-lg);
   background: var(--vmlb-surface);
-  color: var(--vmlb-text);
-  font-family: inherit; font-size: 0.875rem; font-weight: 500;
-  cursor: pointer;
-  transition: border-color var(--vmlb-duration) var(--vmlb-ease),
-    background-color var(--vmlb-duration) var(--vmlb-ease),
-    color var(--vmlb-duration) var(--vmlb-ease),
-    transform var(--vmlb-duration) var(--vmlb-ease);
 }
-.vmlb-label-btn:hover:not(:disabled) {
-  border-color: var(--vmlb-accent);
-  background: var(--vmlb-accent-soft);
-  color: var(--vmlb-accent-strong);
-  transform: translateY(-1px);
-}
-.vmlb-label-btn:active { transform: scale(0.98); }
-.vmlb-label-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.vmlb-label-btn-on { border-color: var(--vmlb-accent); background: var(--vmlb-accent-soft); color: var(--vmlb-accent-strong); box-shadow: inset 0 0 0 1px var(--vmlb-accent); }
-.vmlb-custom-label { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
-.vmlb-custom-label input {
-  flex: 1;
-  padding: 0.5rem 0.75rem;
+.vmlb-kit > .vmlb-skeleton-tile { height: 100%; }
+.vmlb-new-label { display: flex; gap: 0.35rem; margin-bottom: 0.6rem; }
+.vmlb-new-label input {
+  flex: 1; min-width: 0;
+  padding: 0.35rem 0.5rem;
   border: 1px solid var(--vmlb-border-strong);
-  border-radius: var(--vmlb-radius-md);
+  border-radius: var(--vmlb-radius-sm);
   background: var(--vmlb-surface); color: var(--vmlb-text);
-  font-family: inherit; font-size: 0.875rem;
+  font-family: inherit; font-size: 0.8125rem;
 }
-.vmlb-custom-label input:focus { outline: none; border-color: var(--vmlb-accent); box-shadow: 0 0 0 3px var(--vmlb-accent-soft); }
-.vmlb-annotate-actions { display: flex; justify-content: center; gap: 0.75rem; margin-top: 0.5rem; }
-.vmlb-keys { margin: 0.9rem 0 0; font-size: 0.75rem; text-align: center; }
+.vmlb-new-label input:focus { outline: none; border-color: var(--vmlb-accent); box-shadow: 0 0 0 3px var(--vmlb-accent-soft); }
+.vmlb-keys { margin: 0.75rem 0 0; font-size: 0.75rem; text-align: center; }
 .vmlb-keys kbd { padding: 0.05rem 0.3rem; border: 1px solid var(--vmlb-border-strong); border-radius: 0.2rem; font-family: var(--vmlb-font-mono, monospace); }
 .vmlb-notice { margin-left: 0.5rem; color: var(--vmlb-accent-strong); font-weight: 600; }
-.vmlb-entity-list { display: flex; flex-direction: column; gap: 0.4rem; margin: 0 0 1rem; padding: 0; list-style: none; font-size: 0.875rem; }
-.vmlb-entity-list li { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.35rem 0.75rem; border-radius: var(--vmlb-radius-md); }
-.vmlb-entity-list span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.vmlb-entity-popover {
-  position: fixed; z-index: 50; transform: translateX(-50%); padding: 0.75rem;
-  background: var(--vmlb-surface); border: 1px solid var(--vmlb-border-strong); border-radius: var(--vmlb-radius-md);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.16);
-}
-.vmlb-entity-popover .vmlb-label-grid { margin-bottom: 0; }
-.vmlb-entity-0 { background: #dbeafe; color: #1e3a8a; }
-.vmlb-entity-1 { background: #dcfce7; color: #14532d; }
-.vmlb-entity-2 { background: #ffedd5; color: #7c2d12; }
-.vmlb-entity-3 { background: #f3e8ff; color: #581c87; }
-.vmlb-entity-4 { background: #fce7f3; color: #831843; }
-.vmlb-entity-5 { background: #cffafe; color: #164e63; }
 </style>

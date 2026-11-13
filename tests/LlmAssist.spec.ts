@@ -315,10 +315,12 @@ describe('LLM assistance: suggestions for the batch', () => {
   it('records a different label as a correction of the suggestion', async () => {
     const { adapter, wrapper } = await mounted({ listLlmSuggestions: vi.fn().mockResolvedValue([llmSuggestion()]) })
 
-    await click(wrapper, 'Civil')
-    await click(wrapper, 'Save & Next')
+    await wrapper.findAll('.doc-tag').find((t) => t.text().startsWith('Civil'))!.trigger('click')
+    await wrapper.find('.btn--save').trigger('click')
+    await flushPromises()
 
     expect(adapter.confirmLlmSuggestion).toHaveBeenCalledWith('s1', 'Civil')
+    expect(adapter.saveAnnotationAssignment).not.toHaveBeenCalled()
     expect(adapter.saveAnnotation).not.toHaveBeenCalled()
     wrapper.unmount()
   })
