@@ -74,7 +74,7 @@
     "vue-tsc": "^2.0.0"
   },
   "dependencies": {
-    "legal-annotation-kit": "github:shashankmc/vue-legal-annotation-kit#e6d6998b64b2d8ba643f7aa8dca2b659503caaf5",
+    "legal-annotation-kit": "github:shashankmc/vue-legal-annotation-kit#5e9a140dc7e6f72c0dc1615ecded13cf77f9122e",
     "plotly.js-basic-dist": "^2.35.3"
   }
 }
