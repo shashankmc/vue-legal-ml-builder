@@ -42,9 +42,14 @@ async function load() {
       limit: 1,
       offset: index.value,
     })
+    const next = page.tasks[0] ?? null
+    const nextOpened = next ? await props.adapter.getAnnotationAssignment(next.id) : null
+    // Swap the item and its labels in together: the kit is keyed on the task, so
+    // a new task with the old labels would open the next item with them, and a
+    // Back or Next would save them onto it.
     total.value = page.total
-    task.value = page.tasks[0] ?? null
-    opened.value = task.value ? await props.adapter.getAnnotationAssignment(task.value.id) : null
+    task.value = next
+    opened.value = nextOpened
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to load labels'
   } finally {

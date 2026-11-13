@@ -18,7 +18,18 @@ export function labelColour(name: string): string {
   return PALETTE[hash % PALETTE.length]
 }
 
-/** The kit's Labelset for label names, in order, each once. */
+/** The kit's Labelset for label names, in order, each once. Each label keeps its
+ * own colour; one whose colour an earlier label already has takes the next free
+ * one, so no two labels in a set look alike (up to the palette's twelve). */
 export function kitLabelset(names: string[], name = 'Labels'): Labelset {
-  return { name, desc: '', labels: [...new Set(names)].map((label) => ({ name: label, color: labelColour(label) })) }
+  const used = new Set<string>()
+  const labels = [...new Set(names)].map((label) => {
+    let color = labelColour(label)
+    for (let step = 1; used.has(color) && step < PALETTE.length; step++) {
+      color = PALETTE[(PALETTE.indexOf(labelColour(label)) + step) % PALETTE.length]
+    }
+    used.add(color)
+    return { name: label, color }
+  })
+  return { name, desc: '', labels }
 }
